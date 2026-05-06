@@ -104,6 +104,15 @@ with app.app_context():
     for rule in app.url_map.iter_rules():
         print(f"Rota: {rule.endpoint} | Caminho: {rule}")
     print("-------------------------\n")
+
+@app.template_filter('formato_real')
+def formato_real(valor):
+    if valor is None:
+        return "R$ 0,00"
+    # Formata com separador de milhar americano primeiro: 5,236.78
+    v = "{:,.2f}".format(valor)
+    # Inverte os sinais: vira 5.236,78
+    return v.replace(',', 'v').replace('.', ',').replace('v', '.')
     
 if __name__ == "__main__":
     app.run(debug=True)

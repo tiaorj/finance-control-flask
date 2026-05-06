@@ -1,41 +1,64 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container-fluid py-4">
+
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold text-dark"><i class="bi bi-wallet2 me-2"></i>Controle Financeiro - {{ mes }}/{{ ano }}</h2>
-        <a href="{{ url_for('financas.adicionar_gasto') }}" class="btn btn-primary fw-bold shadow-sm">
-            <i class="bi bi-plus-lg me-1"></i> NOVO GASTO
-        </a>
+        <h2 class="fw-bold text-dark">
+            <i class="bi bi-wallet2 me-2"></i>Controle Financeiro - {{ mes }}/{{ ano }}
+        </h2>
+        
+        <!-- Adicionamos o ID 'btnNovoGasto' -->
+        <a href="{{ url_for('financas.adicionar_gasto', mes=mes, ano=ano) }}" 
+        id="btnNovoGasto" 
+        class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i> Novos Gastos
+        </a>        
     </div>
 
     <!-- CAIXA AZUL: RESUMO GERAL -->
-    <div class="row g-3 mb-5">
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm bg-info bg-opacity-10 text-info h-100 p-3">
-                <div class="small fw-bold text-uppercase">Rendas Reais</div>
-                <div class="h3 fw-bold mb-0">R$ {{ "{:,.2f}".format(renda) }}</div>
-                
+
+    <div class="row g-4 mb-5">
+        <!-- COLUNA DA ESQUERDA: CAIXA AZUL (RESUMOS) -->
+        <div class="col-md-8">
+            <div class="row g-3">
+                <div class="col-6">
+                    <div class="card border-0 shadow-sm bg-info bg-opacity-10 text-info p-3">
+                        <div class="small fw-bold">RENDAS REAIS</div>
+                        <div class="h4 fw-bold mb-0">R$ {{ "{:,.2f}".format(renda) }}</div>
+                        <div class="small mt-2">RENDAS</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="card border-0 shadow-sm bg-danger bg-opacity-10 text-danger p-3">
+                        <div class="small fw-bold">CONTAS A PAGAR</div>
+                        <div class="h4 fw-bold mb-0">R$ {{ "{:,.2f}".format(pendentes) }}</div>
+                        <div class="small mt-2">Status: Pendente</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="card border-0 shadow-sm bg-success bg-opacity-10 text-success p-3">
+                        <div class="small fw-bold">SALDO EM CAIXA</div>
+                        <div class="h4 fw-bold mb-0">R$ {{ "{:,.2f}".format(saldo_total) }}</div>
+                        <div class="small mt-2">Já descontado o pago</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="card border-0 shadow-sm bg-primary text-white p-3 shadow">
+                        <div class="small fw-bold opacity-75">SALDO PREVISTO (PARA PRÓX. MÊS)</div>
+                        <div class="h4 fw-bold mb-0">R$ {{ "{:,.2f}".format(sobra) }}</div>
+                        <div class="small mt-2 text-white-50">Líquido estimado</div>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm bg-danger bg-opacity-10 text-danger h-100 p-3">
-                <div class="small fw-bold text-uppercase">Contas a Pagar</div>
-                <div class="h3 fw-bold mb-0">R$ {{ "{:,.2f}".format(pendentes) }}</div>
-                <div class="small mt-2">Status: Pendente</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm bg-success bg-opacity-10 text-success h-100 p-3">
-                <div class="small fw-bold text-uppercase">Saldo em Caixa</div>
-                <div class="h3 fw-bold mb-0">R$ {{ "{:,.2f}".format(saldo_total) }}</div>
-                <div class="small mt-2">Já descontado o pago</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm bg-primary text-white h-100 p-3 shadow">
-                <div class="small fw-bold text-uppercase opacity-75">Sobra Prevista</div>
-                <div class="h3 fw-bold mb-0">R$ {{ "{:,.2f}".format(sobra) }}</div>
-                <div class="small mt-2 text-white-50">Líquido estimado</div>
+
+        <!-- COLUNA DA DIREITA: GRÁFICO DE PIZZA -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 p-3">
+                <h6 class="fw-bold text-center mb-3">Distribuição de Gastos</h6>
+                <div style="max-height: 200px;">
+                    <canvas id="graficoGastos"></canvas>
+                </div>
             </div>
         </div>
     </div>
@@ -50,7 +73,7 @@
                 
                 <!-- Select de Meses -->
                 <div class="col-auto">
-                    <select name="mes" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <select name="mes" id="selectMes" class="form-select form-select-sm" onchange="atualizarLinkNovoGasto(); this.form.submit()">
                         {% for num, nome in meses %}
                             <option value="{{ num }}" {% if num == mes %}selected{% endif %}>
                                 {{ nome }}
@@ -61,7 +84,7 @@
                 
                 <!-- Select de Anos (Ano anterior e Atual) -->
                 <div class="col-auto">
-                    <select name="ano" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <select name="ano" id="selectAno" class="form-select form-select-sm" onchange="atualizarLinkNovoGasto(); this.form.submit()">
                         {% for a in anos %}
                             <option value="{{ a }}" {% if a == ano %}selected{% endif %}>
                                 {{ a }}
@@ -102,13 +125,13 @@
                         </td>
                         <td class="fw-bold">{{ l.Descricao }}</td>
                         <td>{{ l.DataVencimento.strftime('%d/%m/%Y') }}</td>
-                        <td class="text-end text-muted">R$ {{ "{:,.2f}".format(l.ValorEstimado) }}</td>
+                        <td class="text-end text-muted">R$ {{ l.ValorEstimado | formato_real }}</td>
                         <td class="text-end" style="width: 150pt;">
                             <div id="display-valor-{{ l.LancamentoId }}" 
                                 onclick="habilitarEdicao({{ l.LancamentoId }})"
                                 class="fw-bold cursor-pointer text-primary" 
                                 title="Clique para editar">
-                                R$ {{ "{:,.2f}".format(l.ValorReal if l.ValorReal else 0) }}
+                                R$ {{ l.ValorReal | formato_real if l.ValorReal else 0 }}
                             </div>
                             <!-- Input oculto que aparece apenas na edição -->
                             <div id="edit-container-{{ l.LancamentoId }}" class="d-none">
@@ -116,7 +139,7 @@
                                     <input type="text" 
                                         id="input-valor-{{ l.LancamentoId }}" 
                                         class="form-control form-control-sm text-end" 
-                                        value="{{ "{:.2f}".format(l.ValorReal if l.ValorReal else 0) }}"
+                                        value="{{ l.ValorReal if l.ValorReal | formato_real else 0 }}"
                                         onkeyup="if(event.key === 'Enter') salvarValor({{ l.LancamentoId }})">
                                     <button class="btn btn-success btn-sm" onclick="salvarValor({{ l.LancamentoId }})">
                                         <i class="bi bi-check"></i>
@@ -132,32 +155,57 @@
                                     <i class="bi bi-arrow-down-circle me-1"></i> BAIXAR
                                 </button>
                             {% endif %}
-<button class="btn btn-sm text-danger p-1" onclick="deletarGasto({{ l.LancamentoId }})" title="Excluir">
-                <i class="bi bi-trash"></i>
-            </button>                            
+                            <button class="btn btn-sm text-danger p-1" onclick="deletarGasto({{ l.LancamentoId }})" title="Excluir">
+                                <i class="bi bi-trash"></i>
+                            </button>                            
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
+                <tfoot class="table-light">
+                    <tr>
+                        <td colspan="3" class="text-end fw-bold">TOTAL PAGO NO MÊS:</td>
+                        <td class="text-end fw-bold text-success" style="font-size: 1.1rem;">
+                            R$ {{ pagas_mes | formato_real }}
+                        </td>
+                        <td></td> <!-- Espaço para a coluna de ações -->
+                    </tr>
+                </tfoot>                
             </table>
         </div>
     </div>
 </div>
 
 <script>
-    function deletarGasto(id) {
+
+function atualizarLinkNovoGasto() {
+    const mes = document.getElementById('selectMes').value;
+    const ano = document.getElementById('selectAno').value;
+    const btn = document.getElementById('btnNovoGasto');
+
+    // Monta a nova URL baseada nos valores selecionados no momento
+    // O caminho deve bater com o seu blueprint (ex: /financas/adicionar-gasto)
+    const novaUrl = `/financas/adicionar-gasto?mes=${mes}&ano=${ano}`;
+    
+    btn.setAttribute('href', novaUrl);
+}
+
+// Executa ao carregar a página para garantir que o link inicial esteja pareado
+window.onload = atualizarLinkNovoGasto;    
+
+function deletarGasto(id) {
     if (!confirm("Excluir este lançamento permanentemente?")) return;
 
     fetch(`/financas/deletar-gasto/${id}`, { method: 'POST' })
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            document.getElementById(`linha-gasto-${id}`).style.display = 'none';
-            // Recarrega para atualizar a "Caixa Azul" com os novos totais
-            location.reload(); 
+            window.location.reload(); 
         }
-    });
-    }
+    })
+    .catch(error => console.error('Erro ao deletar:', error));
+}
+
 function darBaixa(id) {
     if (!confirm("Confirmar pagamento deste item?")) return;
 
@@ -210,5 +258,44 @@ function salvarValor(id) {
     })
     .catch(error => console.error('Erro:', error));
 }
+
+(function() {
+    const canvas = document.getElementById('graficoGastos');
+    if (!canvas) return;
+
+    const ctxGrafico = canvas.getContext('2d');
+    
+    // Verifica se já existe uma instância do Chart.js vinculada ao canvas e a destrói
+    const existingChart = Chart.getChart("graficoGastos");
+    if (existingChart) {
+        existingChart.destroy();
+    }
+
+    new Chart(ctxGrafico, {
+        type: 'doughnut',
+        data: {
+            // O filtro tojson é mais seguro que o safe para arrays JS
+            labels: {{ labels_grafico | tojson }}, 
+            datasets: [{
+                data: {{ valores_grafico | tojson }},
+                backgroundColor: {{ cores_grafico | tojson }},
+                borderWidth: 1
+            }]
+        }, // Fechamento do data
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: { 
+                        boxWidth: 12, 
+                        font: { size: 10 } 
+                    }
+                }
+            }
+        }
+    }); // Fechamento do construtor Chart
+})();
 </script>
 {% endblock %}

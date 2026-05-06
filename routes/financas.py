@@ -8,8 +8,12 @@ financas_bp = Blueprint('financas', __name__, url_prefix='/financas')
 def adicionar_gasto():
     # ID fixo por enquanto (até integrarmos o login)
     usuario_id = 1 
-
+    hoje = datetime.now()
+  
     if request.method == 'POST':
+        # Captura os campos hidden que enviamos no form
+        mes_sel = request.form.get('mes', type=int)
+        ano_sel = request.form.get('ano', type=int)        
         descricao = request.form.get('descricao')
         categoria_id = request.form.get('categoria_id')
         valor_est = request.form.get('valor_estimado').replace(',', '.')
@@ -28,14 +32,20 @@ def adicionar_gasto():
             """, (usuario_id, categoria_id, descricao, valor_est, data_venc, mes, ano))
         
         flash('Gasto adicionado com sucesso!', 'success')
-        return redirect(url_for('financas.dashboard'))
+        return redirect(url_for('financas.dashboard', mes=mes_sel, ano=ano_sel))
+
+    
+    if request.method == 'GET':
+        mes_sel = request.args.get('mes', hoje.month, type=int)
+        ano_sel = request.args.get('ano', hoje.year, type=int)
 
     # GET: Busca categorias para preencher o Select do formulário
     with get_db_cursor() as cursor:
         cursor.execute("SELECT CategoriaId, Nome FROM FIN_Categorias WHERE UsuarioId = ?", (usuario_id,))
         categorias = cursor.fetchall()
 
-    return render_template('financas/form_gasto.html', categorias=categorias)
+    return render_template('financas/form_gasto.html', 
+                           categorias=categorias, mes=mes_sel, ano=ano_sel)
 
 @financas_bp.route('/')
 @financas_bp.route('/dashboard')
@@ -43,41 +53,56 @@ def dashboard():
     usuario_id = 1
     hoje = datetime.now()
     
-    # Captura mês e ano da URL ou usa o atual como padrão
+    # Captura mes/ano da URL ou usa o atual como padrão
     mes_sel = request.args.get('mes', hoje.month, type=int)
     ano_sel = request.args.get('ano', hoje.year, type=int)
 
-    # Lista para o <select> do HTML
+    # Listas para os selects do template
     meses_lista = [
         (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
         (5, 'Maio'), (6, 'Junho'), (7, 'Julho'), (8, 'Agosto'),
         (9, 'Setembro'), (10, 'Outubro'), (11, 'Novembro'), (12, 'Dezembro')
     ]
-    
-    # Lista de anos (ano atual, 1 anterior e 1 próximo)
     anos_lista = [hoje.year - 1, hoje.year]
 
     with get_db_cursor() as cursor:
-        # 1. Busca Resumo de Rendas
+        # 1. MOVIMENTAÇÃO DO MÊS ATUAL
+        # Renda Real do mês
         cursor.execute("""
-            SELECT SUM(ValorReal) as TotalReal, SUM(ValorPrevisto) as TotalPrevisto 
-            FROM FIN_Rendas WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
+            SELECT SUM(ValorReal) FROM FIN_Rendas 
+            WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
         """, (usuario_id, mes_sel, ano_sel))
         res_renda = cursor.fetchone()
-        total_renda = float(res_renda[0]) if res_renda and res_renda[0] else 0.0
+        renda_mes = float(res_renda[0]) if res_renda and res_renda[0] else 0.0
 
-        # 2. Busca Resumo de Despesas (Pagos vs Pendentes)
+        # Contas já pagas no mês (pagas_mes)
         cursor.execute("""
-            SELECT 
-                SUM(CASE WHEN Pago = 1 THEN ValorReal ELSE 0 END) as Pagas,
-                SUM(CASE WHEN Pago = 0 THEN ValorEstimado ELSE 0 END) as Pendentes
-            FROM FIN_Lancamentos WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
+            SELECT SUM(ValorReal) FROM FIN_Lancamentos 
+            WHERE UsuarioId = ? AND Pago = 1 
+            AND MesReferencia = ? AND AnoReferencia = ?
         """, (usuario_id, mes_sel, ano_sel))
-        res_despesas = cursor.fetchone()
-        contas_pagas = float(res_despesas[0]) if res_despesas and res_despesas[0] else 0.0
-        contas_pendentes = float(res_despesas[1]) if res_despesas and res_despesas[1] else 0.0
+        res_pagas_mes = cursor.fetchone()
+        pagas_mes = float(res_pagas_mes[0]) if res_pagas_mes and res_pagas_mes[0] else 0.0
 
-        # 3. Busca Lançamentos Detalhados (Para a tabela abaixo do resumo)
+        # Contas a pagar (Pendentes) do mês
+        cursor.execute("""
+            SELECT SUM(ValorEstimado) FROM FIN_Lancamentos 
+            WHERE UsuarioId = ? AND Pago = 0 
+            AND MesReferencia = ? AND AnoReferencia = ?
+        """, (usuario_id, mes_sel, ano_sel))
+        res_pendentes = cursor.fetchone()
+        contas_pendentes_mes = float(res_pendentes[0]) if res_pendentes and res_pendentes[0] else 0.0
+
+        # 2. CONTAS PAGAS ACUMULADAS (Histórico total para o card de pagas)
+        cursor.execute("""
+            SELECT SUM(ValorReal) FROM FIN_Lancamentos 
+            WHERE UsuarioId = ? AND Pago = 1
+            AND (AnoReferencia < ? OR (AnoReferencia = ? AND MesReferencia <= ?))
+        """, (usuario_id, ano_sel, ano_sel, mes_sel))
+        res_pagas_total = cursor.fetchone()
+        pagas_acumuladas = float(res_pagas_total[0]) if res_pagas_total and res_pagas_total[0] else 0.0
+
+        # 3. LANÇAMENTOS PARA A TABELA (Listagem do mês)
         cursor.execute("""
             SELECT L.*, C.Nome as CategoriaNome, C.CorHex 
             FROM FIN_Lancamentos L
@@ -87,20 +112,40 @@ def dashboard():
         """, (usuario_id, mes_sel, ano_sel))
         lancamentos = cursor.fetchall()
 
-    # Cálculos Automáticos (Lógica da Planilha)
-    saldo_total = total_renda - contas_pagas
-    sobra_prevista = total_renda - contas_pagas - contas_pendentes
+        # 4. DADOS DO GRÁFICO DE PIZZA
+        cursor.execute("""
+            SELECT C.Nome, SUM(L.ValorReal) as Total, C.CorHex
+            FROM FIN_Lancamentos L
+            JOIN FIN_Categorias C ON L.CategoriaId = C.CategoriaId
+            WHERE L.UsuarioId = ? AND L.MesReferencia = ? AND L.AnoReferencia = ? AND L.Pago = 1
+            GROUP BY C.Nome, C.CorHex
+        """, (usuario_id, mes_sel, ano_sel))
+        dados_grafico = cursor.fetchall()
+
+    # --- LÓGICA DE CÁLCULO SOLICITADA ---
+    # Sobra prevista é o faturamento real menos o que já foi pago
+    sobra_prevista = renda_mes - pagas_mes
+
+    # Formatação para o Chart.js
+    labels_grafico = [d.Nome for d in dados_grafico]
+    valores_grafico = [float(d.Total) for d in dados_grafico]
+    cores_grafico = [d.CorHex for d in dados_grafico]
 
     return render_template('financas/dashboard.html', 
-                           meses=meses_lista,
+                           meses=meses_lista, 
                            anos=anos_lista,
-                           mes=mes_sel, ano=ano_sel,
-                           renda=total_renda,                            
-                           pagas=contas_pagas, 
-                           pendentes=contas_pendentes,
-                           saldo_total=saldo_total,
+                           mes=mes_sel, 
+                           ano=ano_sel,
+                           renda=renda_mes,
+                           pagas=pagas_acumuladas,
+                           saldo_total=renda_mes, # Ajustado conforme o contexto de faturamento do mês
+                           pendentes=contas_pendentes_mes,
                            sobra=sobra_prevista,
-                           lancamentos=lancamentos)
+                           pagas_mes=pagas_mes,
+                           lancamentos=lancamentos,
+                           labels_grafico=labels_grafico,
+                           valores_grafico=valores_grafico,
+                           cores_grafico=cores_grafico)
 
 @financas_bp.route('/baixar-gasto/<int:id>', methods=['POST'])
 def baixar_gasto(id):
@@ -126,10 +171,11 @@ def atualizar_valor_real(id):
     usuario_id = 1
     # Captura o valor enviado pelo JSON
     dados = request.get_json()
-    novo_valor = dados.get('valor').replace(',', '.') # Sanitização básica
+    valor_bruto = dados.get('valor', '0')
     
     try:
-        valor_float = float(novo_valor)
+        valor_limpo = valor_bruto.replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')
+        valor_float = float(valor_limpo)
         with get_db_cursor() as cursor:
             cursor.execute("""
                 UPDATE FIN_Lancamentos 
@@ -218,6 +264,93 @@ def editar_renda(id):
 @financas_bp.route('/deletar-gasto/<int:id>', methods=['POST'])
 def deletar_gasto(id):
     usuario_id = 1
+    
+    hoje = datetime.now()
+
+    mes_sel = request.args.get('mes', hoje.month, type=int)
+    ano_sel = request.args.get('ano', hoje.year, type=int)
+
     with get_db_cursor() as cursor:
         cursor.execute("DELETE FROM FIN_Lancamentos WHERE LancamentoId = ? AND UsuarioId = ?", (id, usuario_id))
-    return {"success": True}, 200
+    
+    flash('Lançamento excluído com sucesso!', 'success')
+    
+    return redirect(url_for('financas.dashboard', mes=mes_sel,ano=ano_sel))
+
+@financas_bp.route('/importar-abril')
+def importar_abril():
+    usuario_id = 1
+    mes_ref = 4
+    ano_ref = 2026
+    
+    # Como a planilha não tem a data exata, usei o dia 10 como padrão. 
+    # Você pode alterar as datas depois pelo seu sistema.
+    data_padrao = '2026-04-10'
+
+    # Dados extraídos da sua imagem (Categoria, Descrição, Valor Real)
+    planilha = [
+        ("Impostos", "Impostos DIRECTTI", 660.00), # Corrigido pelo contexto
+        ("Fixos", "Pix Contador", 300.00),
+        ("Reserva", "PE DE MEIA", 0.01),
+        ("Financeiro", "NUBANK Cartao", 1081.00),
+        ("Financeiro", "Santander", 8470.44),
+        ("Fixos", "Tracker 11/48", 2194.39),
+        ("Fixos", "Conta Vivo", 64.70),
+        ("Fixos", "Conta Tim", 56.99),
+        ("Fixos", "AMIL", 166.96),
+        ("Fixos", "Taxa Conta de Luz ENEL", 260.15),
+        ("Fixos", "Conta Agua", 359.38),
+        ("Fixos", "Conta Internet", 151.90),
+        ("Fixos", "Luz Solar 23/36", 609.80),
+        ("Educação", "Futebol Caua", 0.01),
+        ("Educação", "Natação Maria", 190.00),
+        ("Educação", "Ingles Caua", 362.95),
+        ("Educação", "Ingles Maria", 297.50),
+        ("Educação", "Cejan Cauã", 635.00),
+        ("Fixos", "Iracema", 500.00),
+        ("Extras", "Deposito Crianças", 0.01),
+        ("Extras", "Deposito Luana", 0.01),
+        ("Fixos", "IPTU 4/9", 115.58),
+        ("Extras", "CRA-RJ", 421.84)
+    ]
+
+    with get_db_cursor() as cursor:
+        for cat_nome, descricao, valor in planilha:
+            
+            # 1. Busca o ID da Categoria (ou cria uma nova se não existir)
+            cursor.execute("SELECT CategoriaId FROM FIN_Categorias WHERE Nome = ? AND UsuarioId = ?", (cat_nome, usuario_id))
+            resultado_cat = cursor.fetchone()
+            
+            if resultado_cat:
+                cat_id = resultado_cat[0]
+            else:
+                cursor.execute("INSERT INTO FIN_Categorias (UsuarioId, Nome, CorHex) VALUES (?, ?, '#808080')", (usuario_id, cat_nome))
+                # Busca o último ID gerado na sessão atual
+                cursor.execute("SELECT @@IDENTITY")
+                cat_id = int(cursor.fetchone()[0])
+
+            # 2. Verifica se o Lançamento já existe neste mês/ano
+            cursor.execute("""
+                SELECT LancamentoId FROM FIN_Lancamentos 
+                WHERE UsuarioId = ? AND Descricao = ? AND MesReferencia = ? AND AnoReferencia = ?
+            """, (usuario_id, descricao, mes_ref, ano_ref))
+            resultado_lanc = cursor.fetchone()
+
+            if resultado_lanc:
+                # 3. UPDATE: Se já existe, atualiza os valores e marca como pago
+                cursor.execute("""
+                    UPDATE FIN_Lancamentos 
+                    SET ValorEstimado = ?, ValorReal = ?, CategoriaId = ?, Pago = 1
+                    WHERE LancamentoId = ?
+                """, (valor, valor, cat_id, resultado_lanc[0]))
+            else:
+                # 4. INSERT: Se não existe, cria um novo
+                cursor.execute("""
+                    INSERT INTO FIN_Lancamentos 
+                    (UsuarioId, CategoriaId, Descricao, ValorEstimado, ValorReal, DataVencimento, MesReferencia, AnoReferencia, Pago)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (usuario_id, cat_id, descricao, valor, valor, data_padrao, mes_ref, ano_ref, 1))
+
+    # Redireciona direto para o mês de Abril/2026 para você ver a mágica acontecer
+    flash('Planilha importada com sucesso para Abril!', 'success')
+    return redirect(url_for('financas.dashboard', mes=4, ano=2026))
