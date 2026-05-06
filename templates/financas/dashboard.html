@@ -38,7 +38,7 @@
                 <div class="col-6">
                     <div class="card border-0 shadow-sm bg-success bg-opacity-10 text-success p-3">
                         <div class="small fw-bold">SALDO EM CAIXA</div>
-                        <div class="h4 fw-bold mb-0">R$ {{ "{:,.2f}".format(saldo_total) }}</div>
+                        <div class="h4 fw-bold mb-0">R$ {{ saldo_em_caixa | formato_real }}</div>
                         <div class="small mt-2">Já descontado o pago</div>
                     </div>
                 </div>

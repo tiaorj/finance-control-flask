@@ -122,9 +122,29 @@ def dashboard():
         """, (usuario_id, mes_sel, ano_sel))
         dados_grafico = cursor.fetchall()
 
-    # --- LÓGICA DE CÁLCULO SOLICITADA ---
-    # Sobra prevista é o faturamento real menos o que já foi pago
-    sobra_prevista = renda_mes - pagas_mes
+        # 5. DADOS DO SALDO BANCÁRIO
+        # Pega o Saldo que você digitou manualmente
+        cursor.execute("SELECT SaldoAtual FROM FIN_Caixa WHERE UsuarioId = ?", (usuario_id,))
+        res_caixa = cursor.fetchone()
+        saldo_bancario = float(res_caixa[0]) if res_caixa else 0.0
+
+        # Calcula o "A Receber" do mês selecionado
+        cursor.execute("""
+            SELECT SUM(ValorPrevisto - ValorReal)
+            FROM FIN_Rendas 
+            WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
+            AND ValorPrevisto > ValorReal
+        """, (usuario_id, mes_sel, ano_sel))
+        res_a_receber = cursor.fetchone()
+        rendas_a_receber = float(res_a_receber[0]) if res_a_receber and res_a_receber[0] else 0.0
+
+    # --- CÁLCULOS FINAIS ---
+    
+    # SALDO EM CAIXA: Dinheiro no banco + O que falta receber
+    saldo_em_caixa_real = saldo_bancario + rendas_a_receber
+
+    # SALDO PREVISTO (SOBRA): Saldo em Caixa menos o que falta pagar
+    sobra_prevista = saldo_em_caixa_real - contas_pendentes_mes
 
     # Formatação para o Chart.js
     labels_grafico = [d.Nome for d in dados_grafico]
@@ -134,18 +154,18 @@ def dashboard():
     return render_template('financas/dashboard.html', 
                            meses=meses_lista, 
                            anos=anos_lista,
-                           mes=mes_sel, 
-                           ano=ano_sel,
+                           mes_sel=mes_sel, 
+                           ano_sel=ano_sel,
                            renda=renda_mes,
                            pagas=pagas_acumuladas,
-                           saldo_total=renda_mes, # Ajustado conforme o contexto de faturamento do mês
                            pendentes=contas_pendentes_mes,
                            sobra=sobra_prevista,
                            pagas_mes=pagas_mes,
                            lancamentos=lancamentos,
                            labels_grafico=labels_grafico,
                            valores_grafico=valores_grafico,
-                           cores_grafico=cores_grafico)
+                           cores_grafico=cores_grafico,
+                           saldo_em_caixa=saldo_em_caixa_real)
 
 @financas_bp.route('/baixar-gasto/<int:id>', methods=['POST'])
 def baixar_gasto(id):
@@ -277,10 +297,56 @@ def deletar_gasto(id):
     
     return redirect(url_for('financas.dashboard', mes=mes_sel,ano=ano_sel))
 
-@financas_bp.route('/importar-abril')
+@financas_bp.route('/atualizar-saldo', methods=['POST'])
+def atualizar_saldo():
+    usuario_id = 1
+    # Pega o valor, troca vírgula por ponto para o banco aceitar
+    novo_saldo = request.form.get('saldo_conta', '0').replace('.', '').replace(',', '.')
+    
+    hoje = datetime.now()
+
+    mes_sel = request.args.get('mes', hoje.month, type=int)
+    ano_sel = request.args.get('ano', hoje.year, type=int)
+
+    with get_db_cursor() as cursor:
+        cursor.execute("""
+            UPDATE FIN_Caixa 
+            SET SaldoAtual = ?, DataAtualizacao = GETDATE()
+            WHERE UsuarioId = ?
+        """, (novo_saldo, usuario_id))
+        
+    flash('Saldo em conta atualizado com sucesso!', 'success')
+    
+    return redirect(url_for('financas.gerenciar_rendas', mes=mes_sel, ano=ano_sel))
+    
+
+@financas_bp.route('/receber-renda/<int:id>', methods=['POST'])
+def receber_renda(id):
+    usuario_id = 1
+    with get_db_cursor() as cursor:
+        # Busca o valor previsto para igualar ao real
+        cursor.execute("SELECT ValorPrevisto, MesReferencia, AnoReferencia FROM FIN_Rendas WHERE RendaId = ? AND UsuarioId = ?", (id, usuario_id))
+        renda = cursor.fetchone()
+        
+        if renda:
+            # Faz o "Update" igualando o Real ao Previsto
+            cursor.execute("""
+                UPDATE FIN_Rendas 
+                SET ValorReal = ValorPrevisto 
+                WHERE RendaId = ? AND UsuarioId = ?
+            """, (id, usuario_id))
+            
+            mes_ref = renda.MesReferencia
+            ano_ref = renda.AnoReferencia
+            
+    flash('Renda marcada como recebida!', 'success')
+    # Redireciona de volta para a tela de rendas (ajuste o nome da função se necessário)
+    return redirect(url_for('financas.gerenciar_rendas', mes=mes_ref, ano=ano_ref))
+
+@financas_bp.route('/importar-planilha')
 def importar_abril():
     usuario_id = 1
-    mes_ref = 4
+    mes_ref = 5
     ano_ref = 2026
     
     # Como a planilha não tem a data exata, usei o dia 10 como padrão. 
@@ -291,27 +357,23 @@ def importar_abril():
     planilha = [
         ("Impostos", "Impostos DIRECTTI", 660.00), # Corrigido pelo contexto
         ("Fixos", "Pix Contador", 300.00),
-        ("Reserva", "PE DE MEIA", 0.01),
-        ("Financeiro", "NUBANK Cartao", 1081.00),
-        ("Financeiro", "Santander", 8470.44),
+        ("Reserva", "PE DE MEIA", 0.00),
+        ("Financeiro", "NUBANK Cartao", 1463.60),
+        ("Financeiro", "Santander", 5131.79),
         ("Fixos", "Tracker 11/48", 2194.39),
         ("Fixos", "Conta Vivo", 64.70),
         ("Fixos", "Conta Tim", 56.99),
         ("Fixos", "AMIL", 166.96),
         ("Fixos", "Taxa Conta de Luz ENEL", 260.15),
-        ("Fixos", "Conta Agua", 359.38),
+        ("Fixos", "Conta Agua", 465.44),
         ("Fixos", "Conta Internet", 151.90),
-        ("Fixos", "Luz Solar 23/36", 609.80),
-        ("Educação", "Futebol Caua", 0.01),
+        ("Fixos", "Luz Solar 23/36", 608.39),
+        ("Educação", "Futebol Caua", 150.00),
         ("Educação", "Natação Maria", 190.00),
         ("Educação", "Ingles Caua", 362.95),
         ("Educação", "Ingles Maria", 297.50),
         ("Educação", "Cejan Cauã", 635.00),
-        ("Fixos", "Iracema", 500.00),
-        ("Extras", "Deposito Crianças", 0.01),
-        ("Extras", "Deposito Luana", 0.01),
-        ("Fixos", "IPTU 4/9", 115.58),
-        ("Extras", "CRA-RJ", 421.84)
+        ("Fixos", "IPTU 5/9", 115.58)        
     ]
 
     with get_db_cursor() as cursor:
@@ -349,8 +411,8 @@ def importar_abril():
                     INSERT INTO FIN_Lancamentos 
                     (UsuarioId, CategoriaId, Descricao, ValorEstimado, ValorReal, DataVencimento, MesReferencia, AnoReferencia, Pago)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (usuario_id, cat_id, descricao, valor, valor, data_padrao, mes_ref, ano_ref, 1))
+                """, (usuario_id, cat_id, descricao, valor, valor, data_padrao, mes_ref, ano_ref, 0))
 
     # Redireciona direto para o mês de Abril/2026 para você ver a mágica acontecer
     flash('Planilha importada com sucesso para Abril!', 'success')
-    return redirect(url_for('financas.dashboard', mes=4, ano=2026))
+    return redirect(url_for('financas.dashboard', mes=5, ano=2026))
