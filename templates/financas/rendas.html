@@ -1,29 +1,30 @@
 {% extends "base.html" %}
-{% block content %}
-<div class="container mt-5">
-    <div class="row">
+{% macro dinheiro(valor) -%}R$ {{ (valor or 0) | formato_real }}{%- endmacro %}
 
-        <div class="card shadow-sm border-0 mb-4">
-            <div class="card-header bg-primary text-white fw-bold">
-                <i class="bi bi-bank me-2"></i> Atualizar Saldo em Conta
-            </div>
-            <div class="card-body">
-                <form method="POST" action="{{ url_for('financas.atualizar_saldo', mes=mes, ano=ano) }}" class="d-flex align-items-center gap-3">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <label for="saldo_conta" class="form-label mb-0 fw-bold">Saldo atual no Banco:</label>
-                    <div class="input-group w-50">
-                        <span class="input-group-text">R$</span>
-                        <input type="text" class="form-control" name="saldo_conta" value="{{ saldo_atual | formato_real }}" placeholder="0,00" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary fw-bold">ATUALIZAR</button>
-                </form>
-                <div class="form-text mt-2 text-muted">
-                    <i class="bi bi-info-circle"></i> Quando receber uma renda, atualize este saldo pelo valor real da sua conta bancária.
+{% block content %}
+<div class="container py-5">
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-primary text-white fw-bold">
+            <i class="bi bi-bank me-2"></i>Atualizar Saldo em Conta
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('financas.atualizar_saldo', mes=mes, ano=ano) }}" class="d-flex flex-wrap align-items-center gap-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label for="saldo_conta" class="form-label mb-0 fw-bold">Saldo atual no banco:</label>
+                <div class="input-group flex-grow-1" style="min-width: 220px;">
+                    <span class="input-group-text">R$</span>
+                    <input type="text" id="saldo_conta" class="form-control" name="saldo_conta" value="{{ saldo_atual | formato_real }}" placeholder="0,00" required>
                 </div>
+                <button type="submit" class="btn btn-primary fw-bold">Atualizar</button>
+            </form>
+            <div class="form-text mt-2 text-muted">
+                <i class="bi bi-info-circle"></i> Quando receber uma renda, atualize este saldo pelo valor real da sua conta bancária.
             </div>
-        </div>        
-        <!-- FORMULÁRIO DE ENTRADA -->
-        <div class="col-md-4">
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-success text-white fw-bold">
                     <i class="bi bi-graph-up-arrow me-2"></i>Nova Renda
@@ -47,98 +48,103 @@
                             <label class="form-label">Data do Recebimento</label>
                             <input type="date" name="data_recebimento" class="form-control" required>
                         </div>
-                        <button type="submit" class="btn btn-success w-100 fw-bold">SALVAR RENDA</button>
+                        <button type="submit" class="btn btn-success w-100 fw-bold">Salvar Renda</button>
                     </form>
                 </div>
             </div>
         </div>
 
-        <!-- LISTAGEM DO MÊS -->
-        <div class="col-md-8">
+        <div class="col-lg-8">
             <div class="card shadow-sm border-0">
                 <div class="card-body">
-                    <h5 class="fw-bold mb-3">Entradas do Mês</h5>
-                    <div class="d-flex justify-content-between mb-2">
-                        <h5 class="fw-bold">Entradas de {{ mes }}/{{ ano }}</h5>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                         <div>
-                            <a href="?mes={{ mes-1 if mes > 1 else 12 }}&ano={{ ano if mes > 1 else ano-1 }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-left"></i></a>
-                            <a href="?mes={{ mes+1 if mes < 12 else 1 }}&ano={{ ano if mes < 12 else ano+1 }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-right"></i></a>
+                            <h5 class="fw-bold mb-0">Entradas do Mês</h5>
+                            <div class="text-muted small">{{ mes }}/{{ ano }}</div>
                         </div>
-                    </div>                    
-                    <table class="table align-middle">
-                        <thead>
-                            <tr>
-                                <th>Descrição</th>
-                                <th class="text-end">Previsto</th>
-                                <th class="text-end">Recebido</th>
-                                <th class="text-end">A receber</th>
-                                <th class="text-center">Ações</th>
-                                <th class="text-center">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        {% for r in rendas %}
-                        <tr id="linha-renda-{{ r.RendaId }}">
-                            <td>
-                                <span id="desc-text-{{ r.RendaId }}">{{ r.Descricao }}</span>
-                                <input type="text" id="desc-edit-{{ r.RendaId }}" class="form-control form-control-sm d-none" value="{{ r.Descricao }}">
-                            </td>
-                            <td class="text-end">
-                                <span id="prev-text-{{ r.RendaId }}">R$ {{ "{:,.2f}".format(r.ValorPrevisto) }}</span>
-                                <input type="text" id="prev-edit-{{ r.RendaId }}" class="form-control form-control-sm d-none text-end" value="{{ "{:.2f}".format(r.ValorPrevisto) }}">
-                            </td>
-                            <td class="text-end fw-bold text-success">
-                                <span id="real-text-{{ r.RendaId }}">R$ {{ "{:,.2f}".format(r.ValorReal) }}</span>
-                                <input type="text" id="real-edit-{{ r.RendaId }}" class="form-control form-control-sm d-none text-end" value="{{ "{:.2f}".format(r.ValorReal) }}">
-                            </td>
-                            <td class="text-end fw-bold text-primary">
-                                R$ {{ r.ValorAReceber | formato_real }}
-                            </td>
-                            <td class="text-center">
-                                <!-- Botões de Ação -->
-                                <div id="acoes-padrao-{{ r.RendaId }}">
-                                    <button class="btn btn-sm btn-outline-primary border-0" onclick="iniciarEdicaoRenda({{ r.RendaId }})">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger border-0" onclick="deletarRenda({{ r.RendaId }})">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                                <!-- Botões de Salvar (Ocultos) -->
-                                <div id="acoes-edicao-{{ r.RendaId }}" class="d-none">
-                                    <button class="btn btn-sm btn-success" onclick="salvarEdicaoRenda({{ r.RendaId }})">
-                                        <i class="bi bi-check-lg"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-secondary" onclick="cancelarEdicaoRenda({{ r.RendaId }})">
-                                        <i class="bi bi-x-lg"></i>
-                                    </button>                                  
-                                </div>
-                            </td>
-                            <td class="text-center">
-                                <div id="acoes-edicao2-{{ r.RendaId }}">
-                                    {% if not r.Recebida %}
-                                    <form action="{{ url_for('financas.receber_renda', id=r.RendaId) }}" method="POST" style="display:inline;">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-success border-0" title="Marcar como Recebido">
-                                            <i class="bi bi-check-circle-fill"></i>
-                                        </button>
-                                    </form>
-                                    {% else %}
-                                    <span class="text-success me-2" title="Recebido"><i class="bi bi-check-all"></i></span>
-                                    <form action="{{ url_for('financas.reabrir_renda', id=r.RendaId) }}" method="POST" style="display:inline;">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-warning border-0" title="Marcar como Pendente">
-                                            <i class="bi bi-arrow-counterclockwise"></i>
-                                        </button>
-                                    </form>
-                                    {% endif %}                                    
-                                </div>
+                        <div class="btn-group" role="group" aria-label="Navegação por mês">
+                            <a href="?mes={{ mes-1 if mes > 1 else 12 }}&ano={{ ano if mes > 1 else ano-1 }}" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+                            <a href="?mes={{ mes+1 if mes < 12 else 1 }}&ano={{ ano if mes < 12 else ano+1 }}" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </div>
+                    </div>
 
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Descrição</th>
+                                    <th class="text-end">Previsto</th>
+                                    <th class="text-end">Recebido</th>
+                                    <th class="text-end">A receber</th>
+                                    <th class="text-center">Ações</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for r in rendas %}
+                                    <tr id="linha-renda-{{ r.RendaId }}">
+                                        <td>
+                                            <span id="desc-text-{{ r.RendaId }}">{{ r.Descricao }}</span>
+                                            <input type="text" id="desc-edit-{{ r.RendaId }}" class="form-control form-control-sm d-none" value="{{ r.Descricao }}">
+                                        </td>
+                                        <td class="text-end">
+                                            <span id="prev-text-{{ r.RendaId }}">{{ dinheiro(r.ValorPrevisto) }}</span>
+                                            <input type="text" id="prev-edit-{{ r.RendaId }}" class="form-control form-control-sm d-none text-end" value="{{ r.ValorPrevisto | formato_real }}">
+                                        </td>
+                                        <td class="text-end fw-bold text-success">
+                                            <span id="real-text-{{ r.RendaId }}">{{ dinheiro(r.ValorReal) }}</span>
+                                            <input type="text" id="real-edit-{{ r.RendaId }}" class="form-control form-control-sm d-none text-end" value="{{ r.ValorReal | formato_real }}">
+                                        </td>
+                                        <td class="text-end fw-bold text-primary">{{ dinheiro(r.ValorAReceber) }}</td>
+                                        <td class="text-center">
+                                            <div id="acoes-padrao-{{ r.RendaId }}">
+                                                <button class="btn btn-sm btn-outline-primary border-0" onclick="iniciarEdicaoRenda({{ r.RendaId }})" title="Editar">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger border-0" onclick="deletarRenda({{ r.RendaId }})" title="Excluir">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                            <div id="acoes-edicao-{{ r.RendaId }}" class="d-none">
+                                                <button class="btn btn-sm btn-success" onclick="salvarEdicaoRenda({{ r.RendaId }})" title="Salvar">
+                                                    <i class="bi bi-check-lg"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-secondary" onclick="cancelarEdicaoRenda({{ r.RendaId }})" title="Cancelar">
+                                                    <i class="bi bi-x-lg"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            {% if not r.Recebida %}
+                                                <form action="{{ url_for('financas.receber_renda', id=r.RendaId) }}" method="POST" class="d-inline">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <button type="submit" class="btn btn-sm btn-outline-success border-0" title="Marcar como recebido">
+                                                        <i class="bi bi-check-circle-fill"></i>
+                                                    </button>
+                                                </form>
+                                            {% else %}
+                                                <span class="text-success me-2" title="Recebido"><i class="bi bi-check-all"></i></span>
+                                                <form action="{{ url_for('financas.reabrir_renda', id=r.RendaId) }}" method="POST" class="d-inline">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <button type="submit" class="btn btn-sm btn-outline-warning border-0" title="Marcar como pendente">
+                                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted py-4">Nenhuma renda encontrada neste período.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -146,56 +152,55 @@
 </div>
 
 <script>
-    // GARANTA QUE ESTA FUNÇÃO ESTEJA AQUI DENTRO
-    function iniciarEdicaoRenda(id) {
-        console.log("Iniciando edição para o ID:", id); // Log para debug no F12
-        document.getElementById(`desc-text-${id}`).classList.add('d-none');
-        document.getElementById(`desc-edit-${id}`).classList.remove('d-none');
-        document.getElementById(`prev-text-${id}`).classList.add('d-none');
-        document.getElementById(`prev-edit-${id}`).classList.remove('d-none');
-        document.getElementById(`real-text-${id}`).classList.add('d-none');
-        document.getElementById(`real-edit-${id}`).classList.remove('d-none');
-        
-        document.getElementById(`acoes-padrao-${id}`).classList.add('d-none');
-        document.getElementById(`acoes-edicao-${id}`).classList.remove('d-none');
-    }
+function iniciarEdicaoRenda(id) {
+    document.getElementById(`desc-text-${id}`).classList.add('d-none');
+    document.getElementById(`desc-edit-${id}`).classList.remove('d-none');
+    document.getElementById(`prev-text-${id}`).classList.add('d-none');
+    document.getElementById(`prev-edit-${id}`).classList.remove('d-none');
+    document.getElementById(`real-text-${id}`).classList.add('d-none');
+    document.getElementById(`real-edit-${id}`).classList.remove('d-none');
 
-    function salvarEdicaoRenda(id) {
-        const payload = {
-            descricao: document.getElementById(`desc-edit-${id}`).value,
-            valor_previsto: document.getElementById(`prev-edit-${id}`).value,
-            valor_real: document.getElementById(`real-edit-${id}`).value
-        };
+    document.getElementById(`acoes-padrao-${id}`).classList.add('d-none');
+    document.getElementById(`acoes-edicao-${id}`).classList.remove('d-none');
+}
 
-        fetch(`/financas/editar-renda/${id}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': window.csrfToken
-            },
-            body: JSON.stringify(payload)
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) location.reload();
-            else alert("Erro ao salvar: " + data.message);
-        });
-    }
+function salvarEdicaoRenda(id) {
+    const payload = {
+        descricao: document.getElementById(`desc-edit-${id}`).value,
+        valor_previsto: document.getElementById(`prev-edit-${id}`).value,
+        valor_real: document.getElementById(`real-edit-${id}`).value
+    };
 
-    function cancelarEdicaoRenda(id) {
-        location.reload();
-    }
+    fetch(`/financas/editar-renda/${id}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': window.csrfToken
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) location.reload();
+        else alert("Erro ao salvar: " + (data.message || "não foi possível atualizar a renda."));
+    });
+}
 
-    function deletarRenda(id) {
-        if (!confirm("Tem certeza que deseja excluir esta renda?")) return;
-        fetch(`/financas/deletar-renda/${id}`, {
-            method: 'POST',
-            headers: { 'X-CSRFToken': window.csrfToken }
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) document.getElementById(`linha-renda-${id}`).remove();
-        });
-    }
+function cancelarEdicaoRenda(id) {
+    location.reload();
+}
+
+function deletarRenda(id) {
+    if (!confirm("Tem certeza que deseja excluir esta renda?")) return;
+    fetch(`/financas/deletar-renda/${id}`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': window.csrfToken }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) document.getElementById(`linha-renda-${id}`).remove();
+        else alert("Erro ao excluir renda.");
+    });
+}
 </script>
 {% endblock %}

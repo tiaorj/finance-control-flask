@@ -17,7 +17,10 @@ class Config:
     DB_PASSWORD = os.getenv('DB_PASSWORD')
     
     # Driver automático: usa Driver 17 para Linux (Render) e Windows local
-    DB_DRIVER = '{ODBC Driver 17 for SQL Server}'
+    DB_DRIVER = os.getenv('DB_DRIVER', '{ODBC Driver 17 for SQL Server}')
+    DB_ENCRYPT = os.getenv('DB_ENCRYPT', 'no')
+    DB_TRUST_SERVER_CERTIFICATE = os.getenv('DB_TRUST_SERVER_CERTIFICATE', 'yes')
+    DB_BACKEND = os.getenv('DB_BACKEND', 'pymssql').lower()
 
     MAIL_SERVER = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
     MAIL_PORT = int(os.getenv('MAIL_PORT', '587'))
