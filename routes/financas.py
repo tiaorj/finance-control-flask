@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from database import get_db_cursor
 from datetime import datetime
 
@@ -219,16 +219,17 @@ def atualizar_valor_real(id):
 
     try:
         valor_float = parse_money(valor_bruto)
+        pago = 1 if valor_float > 0 else 0
         with get_db_cursor() as cursor:
             cursor.execute("""
                 UPDATE FIN_Lancamentos
-                SET ValorReal = ?, Pago = CASE WHEN ? > 0 THEN 1 ELSE Pago END
+                SET ValorReal = ?, Pago = ?
                 WHERE LancamentoId = ? AND UsuarioId = ?
-            """, (valor_float, valor_float, id, usuario_id))
+            """, (valor_float, pago, id, usuario_id))
 
         return {"success": True}, 200
     except ValueError:
-        return {"success": False, "message": "Valor invÃ¡lido"}, 400
+        return {"success": False, "message": "Valor inválido"}, 400
 
 @financas_bp.route('/rendas', methods=['GET', 'POST'])
 def gerenciar_rendas():
