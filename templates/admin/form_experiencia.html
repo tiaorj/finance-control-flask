@@ -12,6 +12,7 @@
             </div>
 
             <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="card shadow border-0 mb-4">
                     <div class="card-body p-4">
                         
@@ -23,8 +24,8 @@
                             <select name="nome_empresa" class="form-select" required>
                                 <option value="">Selecione a empresa...</option>
                                 {% for nome in empresas %}
-                                <option value="{{ nome.empresa_id }}" {% if nome.nome_empresa == nome_empresa_atual %}selected{% endif %}>
-                                    {{ nome.NomeEmpresa }}
+                                <option value="{{ nome }}" {% if nome == nome_empresa_atual %}selected{% endif %}>
+                                    {{ nome }}
                                 </option>
                                 {% endfor %}
                             </select>

@@ -4,11 +4,11 @@
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="fw-bold text-dark">
-            <i class="bi bi-wallet2 me-2"></i>Controle Financeiro - {{ mes }}/{{ ano }}
+            <i class="bi bi-wallet2 me-2"></i>Controle Financeiro - {{ mes_sel }}/{{ ano_sel }}
         </h2>
         
         <!-- Adicionamos o ID 'btnNovoGasto' -->
-        <a href="{{ url_for('financas.adicionar_gasto', mes=mes, ano=ano) }}" 
+        <a href="{{ url_for('financas.adicionar_gasto', mes=mes_sel, ano=ano_sel) }}"
         id="btnNovoGasto" 
         class="btn btn-primary">
             <i class="bi bi-plus-circle me-1"></i> Novos Gastos
@@ -23,30 +23,30 @@
             <div class="row g-3">
                 <div class="col-6">
                     <div class="card border-0 shadow-sm bg-info bg-opacity-10 text-info p-3">
-                        <div class="small fw-bold">RENDAS REAIS</div>
-                        <div class="h4 fw-bold mb-0">R$ {{ "{:,.2f}".format(renda) }}</div>
-                        <div class="small mt-2">RENDAS</div>
+                        <div class="small fw-bold">RENDAS A RECEBER</div>
+                        <div class="h4 fw-bold mb-0">R$ {{ rendas_a_receber | formato_real }}</div>
+                        <div class="small mt-2">Recebido: R$ {{ renda | formato_real }}</div>
                     </div>
                 </div>
                 <div class="col-6">
                     <div class="card border-0 shadow-sm bg-danger bg-opacity-10 text-danger p-3">
                         <div class="small fw-bold">CONTAS A PAGAR</div>
-                        <div class="h4 fw-bold mb-0">R$ {{ "{:,.2f}".format(pendentes) }}</div>
-                        <div class="small mt-2">Status: Pendente</div>
+                        <div class="h4 fw-bold mb-0">R$ {{ pendentes | formato_real }}</div>
+                        <div class="small mt-2">Gastos pendentes do mês</div>
                     </div>
                 </div>
                 <div class="col-6">
                     <div class="card border-0 shadow-sm bg-success bg-opacity-10 text-success p-3">
                         <div class="small fw-bold">SALDO EM CAIXA</div>
                         <div class="h4 fw-bold mb-0">R$ {{ saldo_em_caixa | formato_real }}</div>
-                        <div class="small mt-2">Já descontado o pago</div>
+                        <div class="small mt-2">Banco: R$ {{ saldo_bancario | formato_real }} + a receber</div>
                     </div>
                 </div>
                 <div class="col-6">
                     <div class="card border-0 shadow-sm bg-primary text-white p-3 shadow">
-                        <div class="small fw-bold opacity-75">SALDO PREVISTO (PARA PRÓX. MÊS)</div>
-                        <div class="h4 fw-bold mb-0">R$ {{ "{:,.2f}".format(sobra) }}</div>
-                        <div class="small mt-2 text-white-50">Líquido estimado</div>
+                        <div class="small fw-bold opacity-75">SALDO PREVISTO (PROX. MES)</div>
+                        <div class="h4 fw-bold mb-0">R$ {{ sobra | formato_real }}</div>
+                        <div class="small mt-2 text-white-50">Saldo em caixa - contas a pagar</div>
                     </div>
                 </div>
             </div>
@@ -75,7 +75,7 @@
                 <div class="col-auto">
                     <select name="mes" id="selectMes" class="form-select form-select-sm" onchange="atualizarLinkNovoGasto(); this.form.submit()">
                         {% for num, nome in meses %}
-                            <option value="{{ num }}" {% if num == mes %}selected{% endif %}>
+                            <option value="{{ num }}" {% if num == mes_sel %}selected{% endif %}>
                                 {{ nome }}
                             </option>
                         {% endfor %}
@@ -86,7 +86,7 @@
                 <div class="col-auto">
                     <select name="ano" id="selectAno" class="form-select form-select-sm" onchange="atualizarLinkNovoGasto(); this.form.submit()">
                         {% for a in anos %}
-                            <option value="{{ a }}" {% if a == ano %}selected{% endif %}>
+                            <option value="{{ a }}" {% if a == ano_sel %}selected{% endif %}>
                                 {{ a }}
                             </option>
                         {% endfor %}
@@ -133,7 +133,7 @@
                                 title="Clique para editar">
                                 R$ {{ l.ValorReal | formato_real if l.ValorReal else 0 }}
                             </div>
-                            <!-- Input oculto que aparece apenas na edição -->
+                            <!-- Input oculto que aparece apenas na ediÃ§Ã£o -->
                             <div id="edit-container-{{ l.LancamentoId }}" class="d-none">
                                 <div class="input-group input-group-sm">
                                     <input type="text" 
@@ -164,9 +164,12 @@
                 </tbody>
                 <tfoot class="table-light">
                     <tr>
-                        <td colspan="3" class="text-end fw-bold">TOTAL PAGO NO MÊS:</td>
+                        <td colspan="3" class="text-end fw-bold">TOTAL:</td>
                         <td class="text-end fw-bold text-success" style="font-size: 1.1rem;">
-                            R$ {{ pagas_mes | formato_real }}
+                            A PAGAR R$ {{ pendentes | formato_real }}
+                        </td>                        
+                        <td class="text-end fw-bold text-success" style="font-size: 1.1rem;">
+                           PAGO R$ {{ pagas_mes | formato_real }}
                         </td>
                         <td></td> <!-- Espaço para a coluna de ações -->
                     </tr>
@@ -196,7 +199,10 @@ window.onload = atualizarLinkNovoGasto;
 function deletarGasto(id) {
     if (!confirm("Excluir este lançamento permanentemente?")) return;
 
-    fetch(`/financas/deletar-gasto/${id}`, { method: 'POST' })
+    fetch(`/financas/deletar-gasto/${id}`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': window.csrfToken }
+    })
     .then(res => res.json())
     .then(data => {
         if (data.success) {
@@ -211,16 +217,15 @@ function darBaixa(id) {
 
     fetch(`/financas/baixar-gasto/${id}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': window.csrfToken
+        }
     })
     .then(response => {
         if (response.ok) {
-            // Atualiza o visual da célula sem recarregar a página
             const container = document.getElementById(`status-container-${id}`);
             container.innerHTML = '<span class="text-success fw-bold"><i class="bi bi-check-circle-fill me-1"></i>PAGO</span>';
-            
-            // Opcional: Recarregar o resumo azul para atualizar os totais
-            // location.reload(); // Se quiser atualizar os cards do topo imediatamente
         } else {
             alert("Erro ao processar a baixa no servidor.");
         }
@@ -244,7 +249,10 @@ function salvarValor(id) {
 
     fetch(`/financas/atualizar-valor-real/${id}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': window.csrfToken
+        },
         body: JSON.stringify({ valor: novoValor })
     })
     .then(response => response.json())

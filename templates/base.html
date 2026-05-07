@@ -19,6 +19,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     
     <style>
         :root {
@@ -39,7 +40,7 @@
 
     <script>
         // Agora sim o seu código do gráfico
-        const ctx = document.getElementById('graficoGastos').getContext('2d');
+        window.csrfToken = "{{ csrf_token() }}";
         // ... resto do código
     </script>      
 </head>

@@ -1,13 +1,11 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from database import get_db_connection
+from database import get_db_cursor
 from functools import wraps
-from werkzeug.security import check_password_hash # Importante para verificar a senha
+from werkzeug.security import check_password_hash
 from datetime import datetime
-from werkzeug.security import generate_password_hash, check_password_hash
 
 admin_bp = Blueprint('admin', __name__)
 
-# --- DEFINIÇÃO DO DECORADOR DE SEGURANÇA ---
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -15,112 +13,102 @@ def login_required(f):
             return redirect(url_for('admin.login'))
         return f(*args, **kwargs)
     return decorated_function
-# -------------------------------------------
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form.get('usuario')
         senha_digitada = request.form.get('senha')
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Busca o usuário pelo username
-        cursor.execute("SELECT UsuarioId, Nome, SenhaHash FROM Usuarios WHERE Username = ?", (username,))
-        usuario = cursor.fetchone()
-        
-        if usuario and check_password_hash(usuario.SenhaHash, senha_digitada):
-            # Verifica se a senha digitada bate com o Hash do banco
-            if check_password_hash(usuario.SenhaHash, senha_digitada):
+
+        with get_db_cursor() as cursor:
+            cursor.execute("SELECT UsuarioId, Nome, SenhaHash FROM Usuarios WHERE Username = ?", (username,))
+            usuario = cursor.fetchone()
+
+            if usuario and check_password_hash(usuario.SenhaHash, senha_digitada):
                 session['admin_logado'] = True
                 session['usuario_id'] = usuario.UsuarioId
                 session['usuario_nome'] = usuario.Nome
-                
-                # Opcional: Atualizar último acesso
-                cursor.execute("UPDATE Usuarios SET UltimoAcesso = ? WHERE UsuarioId = ?", (datetime.now(), usuario.UsuarioId))
-                conn.commit()
-                conn.close()
-                
+
+                cursor.execute("UPDATE Usuarios SET UltimoAcesso = ? WHERE UsuarioId = ?",
+                               (datetime.now(), usuario.UsuarioId))
+
                 flash(f'Bem-vindo, {usuario.Nome}!', 'success')
                 return redirect(url_for('dashboard.index'))
-        
-        conn.close()
+
         flash('Usuário ou senha inválidos.', 'danger')
-        
+
     return render_template('admin/login.html')
 
 @admin_bp.route('/logout')
 def logout():
-    session.clear() # Limpa toda a sessão por segurança
+    session.clear()
     return redirect(url_for('empresa.home'))
 
 @admin_bp.route('/experiencia/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
 def editar_experiencia(id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
     if request.method == 'POST':
-        empresa_id = request.form.get('empresa_id')
+        nome_empresa = request.form.get('nome_empresa')
         cargo = request.form.get('cargo')
         resumo = request.form.get('resumo_curto')
         data_inicio = request.form.get('data_inicio')
         data_fim = request.form.get('data_fim') or None
 
-        cursor.execute("""
-            UPDATE ExperienciaProfissional 
-            SET EmpresaId = ?, Cargo = ?, ResumoCurto = ?, DataInicio = ?, DataFim = ?
-            WHERE ExperienciaId = ?
-        """, (empresa_id, cargo, resumo, data_inicio, data_fim, id))
-        
-        conn.commit()
-        conn.close()
+        with get_db_cursor() as cursor:
+            cursor.execute("SELECT EmpresaId FROM Empresa WHERE NomeEmpresa = ?", (nome_empresa,))
+            empresa = cursor.fetchone()
+            if not empresa:
+                flash('Empresa selecionada não encontrada.', 'danger')
+                return redirect(url_for('admin.editar_experiencia', id=id))
+
+            cursor.execute("""
+                UPDATE ExperienciaProfissional
+                SET EmpresaId = ?, Cargo = ?, ResumoCurto = ?, DataInicio = ?, DataFim = ?
+                WHERE ExperienciaId = ?
+            """, (empresa[0], cargo, resumo, data_inicio, data_fim, id))
+
         flash('Experiência e empresa atualizadas!', 'success')
         return redirect(url_for('curriculo.especialista'))
 
-    # BUSCA DADOS DA EXPERIÊNCIA
-    cursor.execute("SELECT * FROM ExperienciaProfissional WHERE ExperienciaId = ?", (id,))
-    exp = cursor.fetchone()
+    with get_db_cursor() as cursor:
+        cursor.execute("""
+            SELECT E.*, Em.NomeEmpresa
+            FROM ExperienciaProfissional E
+            JOIN Empresa Em ON E.EmpresaId = Em.EmpresaId
+            WHERE E.ExperienciaId = ?
+        """, (id,))
+        exp = cursor.fetchone()
 
-    # BUSCA LISTA DE EMPRESAS PARA O SELECT
-    cursor.execute("SELECT EmpresaId, NomeEmpresa FROM Empresa ORDER BY NomeEmpresa")
-    empresas = cursor.fetchall()
+        cursor.execute("SELECT NomeEmpresa FROM Empresa ORDER BY NomeEmpresa")
+        empresas = [row[0] for row in cursor.fetchall()]
 
-    # BUSCA OS DETALHES (CONQUISTAS) DESTA EXPERIÊNCIA
-    cursor.execute("SELECT * FROM ExperienciaDetalhe WHERE ExperienciaId = ?", (id,))
-    detalhes = cursor.fetchall()
+        cursor.execute("SELECT * FROM ExperienciaDetalhe WHERE ExperienciaId = ?", (id,))
+        detalhes = cursor.fetchall()
 
-    conn.close()
-    return render_template('admin/form_experiencia.html', exp=exp, empresas=empresas, detalhes=detalhes)
+    nome_empresa_atual = exp.NomeEmpresa if exp else ""
+    return render_template('admin/form_experiencia.html',
+                           exp=exp, empresas=empresas, detalhes=detalhes,
+                           nome_empresa_atual=nome_empresa_atual)
 
-# Rota para Adicionar Detalhe
 @admin_bp.route('/experiencia/detalhe/adicionar/<int:exp_id>', methods=['POST'])
 @login_required
 def adicionar_conquista(exp_id):
     descricao = request.form.get('descricao_conquista')
     if descricao:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO ExperienciaDetalhe (ExperienciaId, DescricaoConquista) 
-            VALUES (?, ?)
-        """, (exp_id, descricao))
-        conn.commit()
-        conn.close()
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO ExperienciaDetalhe (ExperienciaId, DescricaoConquista)
+                VALUES (?, ?)
+            """, (exp_id, descricao))
         flash('Conquista adicionada com sucesso!', 'success')
-    
+
     return redirect(url_for('admin.editar_experiencia', id=exp_id))
 
-# Rota para Excluir Detalhe
-@admin_bp.route('/experiencia/detalhe/excluir/<int:detalhe_id>/<int:exp_id>')
+@admin_bp.route('/experiencia/detalhe/excluir/<int:detalhe_id>/<int:exp_id>', methods=['POST'])
 @login_required
 def excluir_conquista(detalhe_id, exp_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM ExperienciaDetalhe WHERE ExperienciaDetalheId = ?", (detalhe_id,))
-    conn.commit()
-    conn.close()
+    with get_db_cursor() as cursor:
+        cursor.execute("DELETE FROM ExperienciaDetalhe WHERE ExperienciaDetalheId = ?", (detalhe_id,))
+
     flash('Conquista removida.', 'info')
-    
     return redirect(url_for('admin.editar_experiencia', id=exp_id))

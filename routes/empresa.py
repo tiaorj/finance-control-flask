@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app
-from database import get_db_connection
+from database import get_db_cursor
 from flask_mail import Message
 
 empresa_bp = Blueprint('empresa', __name__)
@@ -11,19 +11,17 @@ def home():
 
 @empresa_bp.route('/projetos')
 def projetos():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Busca os projetos da nova tabela conforme sua remodelagem
-    cursor.execute("SELECT Titulo, Descricao, Tecnologias, IconeClass FROM Projeto ORDER BY OrdemExibicao")
-    projetos = []
-    for row in cursor.fetchall():
-        projetos.append({
-            'Titulo': row.Titulo,
-            'Descricao': row.Descricao,
-            'Tecnologias': row.Tecnologias,
-            'IconeClass': row.IconeClass
-        })
+    with get_db_cursor() as cursor:
+        # Busca os projetos da nova tabela conforme sua remodelagem
+        cursor.execute("SELECT Titulo, Descricao, Tecnologias, IconeClass FROM Projeto ORDER BY OrdemExibicao")
+        projetos = []
+        for row in cursor.fetchall():
+            projetos.append({
+                'Titulo': row.Titulo,
+                'Descricao': row.Descricao,
+                'Tecnologias': row.Tecnologias,
+                'IconeClass': row.IconeClass
+            })
 
     return render_template('projetos.html', projetos=projetos, info={})
     

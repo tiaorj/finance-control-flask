@@ -8,16 +8,17 @@
                 <i class="bi bi-bank me-2"></i> Atualizar Saldo em Conta
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('financas.atualizar_saldo') }}" class="d-flex align-items-center gap-3">
+                <form method="POST" action="{{ url_for('financas.atualizar_saldo', mes=mes, ano=ano) }}" class="d-flex align-items-center gap-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <label for="saldo_conta" class="form-label mb-0 fw-bold">Saldo atual no Banco:</label>
                     <div class="input-group w-50">
                         <span class="input-group-text">R$</span>
-                        <input type="text" class="form-control" name="saldo_conta" value="{{ saldo_atual }}" placeholder="0,00" required>
+                        <input type="text" class="form-control" name="saldo_conta" value="{{ saldo_atual | formato_real }}" placeholder="0,00" required>
                     </div>
                     <button type="submit" class="btn btn-primary fw-bold">ATUALIZAR</button>
                 </form>
                 <div class="form-text mt-2 text-muted">
-                    <i class="bi bi-info-circle"></i> Atualize este valor diariamente olhando seu app do banco.
+                    <i class="bi bi-info-circle"></i> Quando receber uma renda, atualize este saldo pelo valor real da sua conta bancária.
                 </div>
             </div>
         </div>        
@@ -29,6 +30,7 @@
                 </div>
                 <div class="card-body">
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-3">
                             <label class="form-label">Descrição</label>
                             <input type="text" name="descricao" class="form-control" placeholder="Ex: Pro-labore" required>
@@ -39,7 +41,7 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Valor Real Recebido</label>
-                            <input type="text" name="valor_real" class="form-control" placeholder="0,00">
+                            <input type="text" name="valor_real" class="form-control" value="0,00" placeholder="0,00">
                         </div>
                         <div class="mb-4">
                             <label class="form-label">Data do Recebimento</label>
@@ -68,8 +70,10 @@
                             <tr>
                                 <th>Descrição</th>
                                 <th class="text-end">Previsto</th>
-                                <th class="text-end">Real</th>
-                                <th>Data</th>
+                                <th class="text-end">Recebido</th>
+                                <th class="text-end">A receber</th>
+                                <th class="text-center">Ações</th>
+                                <th class="text-center">Status</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -86,6 +90,9 @@
                             <td class="text-end fw-bold text-success">
                                 <span id="real-text-{{ r.RendaId }}">R$ {{ "{:,.2f}".format(r.ValorReal) }}</span>
                                 <input type="text" id="real-edit-{{ r.RendaId }}" class="form-control form-control-sm d-none text-end" value="{{ "{:.2f}".format(r.ValorReal) }}">
+                            </td>
+                            <td class="text-end fw-bold text-primary">
+                                R$ {{ r.ValorAReceber | formato_real }}
                             </td>
                             <td class="text-center">
                                 <!-- Botões de Ação -->
@@ -109,17 +116,22 @@
                             </td>
                             <td class="text-center">
                                 <div id="acoes-edicao2-{{ r.RendaId }}">
-                                    {% if r.ValorReal < r.ValorPrevisto %}
+                                    {% if not r.Recebida %}
                                     <form action="{{ url_for('financas.receber_renda', id=r.RendaId) }}" method="POST" style="display:inline;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn btn-sm btn-outline-success border-0" title="Marcar como Recebido">
                                             <i class="bi bi-check-circle-fill"></i>
                                         </button>
                                     </form>
                                     {% else %}
                                     <span class="text-success me-2" title="Recebido"><i class="bi bi-check-all"></i></span>
-                                    {% endif %}
-
-                                    <a href="{{ url_for('financas.editar_renda', id=r.RendaId) }}" class="btn btn-sm btn-outline-primary border-0"><i class="bi bi-pencil"></i></a>                                  
+                                    <form action="{{ url_for('financas.reabrir_renda', id=r.RendaId) }}" method="POST" style="display:inline;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-warning border-0" title="Marcar como Pendente">
+                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}                                    
                                 </div>
 
                             </td>
@@ -157,7 +169,10 @@
 
         fetch(`/financas/editar-renda/${id}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': window.csrfToken
+            },
             body: JSON.stringify(payload)
         })
         .then(res => res.json())
@@ -173,7 +188,10 @@
 
     function deletarRenda(id) {
         if (!confirm("Tem certeza que deseja excluir esta renda?")) return;
-        fetch(`/financas/deletar-renda/${id}`, { method: 'POST' })
+        fetch(`/financas/deletar-renda/${id}`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': window.csrfToken }
+        })
         .then(res => res.json())
         .then(data => {
             if (data.success) document.getElementById(`linha-renda-${id}`).remove();

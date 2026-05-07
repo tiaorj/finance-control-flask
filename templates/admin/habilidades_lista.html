@@ -9,6 +9,7 @@
         <div class="card-body p-4">
             <h5 class="fw-bold mb-3 small text-uppercase text-secondary">Adicionar Nova Skill</h5>
             <form action="{{ url_for('habilidades_admin.adicionar') }}" method="POST" class="row g-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="col-md-4">
                     <select name="categoria_id" class="form-select" required>
                         <option value="" selected disabled>Escolha a Categoria...</option>
@@ -43,11 +44,12 @@
                     <td><span class="badge bg-dark">{{ h.NomeCategoria }}</span></td>
                     <td class="fw-bold">{{ h.Descricao }}</td>
                     <td class="text-center">
-                        <a href="{{ url_for('habilidades_admin.excluir', id=h.HabilidadeId) }}" 
-                           class="btn btn-sm btn-outline-danger border-0"
-                           onclick="return confirm('Remover esta habilidade?')">
+                        <form method="POST" action="{{ url_for('habilidades_admin.excluir', id=h.HabilidadeId) }}" class="d-inline" onsubmit="return confirm('Remover esta habilidade?')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger border-0">
                             <i class="bi bi-trash3"></i>
-                        </a>
+                            </button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}
@@ -56,3 +58,4 @@
     </div>
 </div>
 {% endblock %}
+

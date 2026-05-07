@@ -62,11 +62,10 @@ def form(id):
     return render_template('admin/form_projeto.html', projeto=projeto)
 
 # EXCLUIR PROJETO
-@projetos_bp.route('/excluir/<int:id>')
+@projetos_bp.route('/excluir/<int:id>', methods=['POST'])
 @login_required
 def excluir(id):
     with get_db_cursor() as cursor:
         cursor.execute("DELETE FROM Projeto WHERE ProjetoId = ?", (id,))
-        projetos = cursor.fetchall()
         flash('Projeto removido.', 'danger')
     return redirect(url_for('projetos_admin.lista'))

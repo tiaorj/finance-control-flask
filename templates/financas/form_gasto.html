@@ -10,6 +10,7 @@
                 </div>
                 <div class="card-body p-4">
                     <form method="POST" action="{{ url_for('financas.adicionar_gasto') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="mes" value="{{ request.args.get('mes') }}">
                         <input type="hidden" name="ano" value="{{ request.args.get('ano') }}">                        
                         <div class="mb-3">

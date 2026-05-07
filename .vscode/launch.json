@@ -6,21 +6,29 @@
     "configurations": [
     
         {
-            "name": "Python Debugger: Flask",
+            "name": "Flask: app.py",
             "type": "debugpy",
             "request": "launch",
             "module": "flask",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
             "env": {
                 "FLASK_APP": "app.py",
-                "FLASK_DEBUG": "1"
+                "FLASK_DEBUG": "1",
+                "FLASK_ENV": "development"
             },
             "args": [
                 "run",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "5000",
                 "--no-debugger",
                 "--no-reload"
             ],
             "jinja": true,
-            "autoStartBrowser": false
+            "autoStartBrowser": false,
+            "justMyCode": true
         }
     ]
 }
