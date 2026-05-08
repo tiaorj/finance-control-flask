@@ -1,112 +1,150 @@
 {% extends 'base.html' %}
+{% macro dinheiro(valor) -%}{{ (valor or 0) | formato_real }}{%- endmacro %}
 
 {% block content %}
-<main class="admin-dashboard">
+<main class="client-portal">
     <div class="container py-5">
-        <section class="admin-dashboard-hero">
+        <section class="client-portal-hero">
             <div>
-                <span class="admin-kicker">&Aacute;rea administrativa</span>
-                <h1>Painel de Controle</h1>
-                <p>Bem-vindo, <strong>{{ session.usuario_nome }}</strong>. Gerencie conte&uacute;dos, acompanhe volumes e mantenha o portf&oacute;lio atualizado.</p>
+                <span class="admin-kicker">Portal do Cliente</span>
+                <h1>Bem-vindo, {{ session.usuario_nome }}</h1>
+                <p>Seu ponto de entrada para acompanhar finan&ccedil;as, evoluir perfil profissional e solicitar servi&ccedil;os digitais.</p>
             </div>
-
-            <div class="admin-hero-actions">
-                <a href="{{ url_for('curriculo.gerar_pdf') }}" class="btn btn-danger fw-bold">
-                    <i class="bi bi-file-earmark-pdf me-2"></i>Baixar curr&iacute;culo PDF
+            <div class="client-portal-actions">
+                <a href="{{ url_for('financas.dashboard') }}" class="btn btn-warning fw-bold">
+                    <i class="bi bi-wallet2 me-2"></i>Abrir financeiro
                 </a>
-                <a href="{{ url_for('admin.logout') }}" class="btn btn-outline-danger fw-bold">
-                    <i class="bi bi-box-arrow-right me-2"></i>Logout
+                <a href="{{ url_for('empresa.contato', servico='suporte') }}" class="btn btn-outline-light fw-bold">
+                    <i class="bi bi-headset me-2"></i>Solicitar suporte
                 </a>
             </div>
         </section>
 
-        <section class="admin-stats-grid" aria-label="Resumo do conteudo">
-            <article class="admin-stat-card stat-primary">
-                <div>
-                    <span>Experi&ecirc;ncias</span>
-                    <strong>{{ total_exp }}</strong>
+        <section class="client-widget-grid">
+            <article class="client-widget client-widget-finance">
+                <div class="client-widget-header">
+                    <div>
+                        <span class="admin-kicker">Financeiro</span>
+                        <h2>Resumo de {{ mes_atual }}</h2>
+                    </div>
+                    <i class="bi bi-cash-stack"></i>
                 </div>
-                <i class="bi bi-briefcase"></i>
+
+                <div class="client-finance-balance">
+                    <span>Saldo previsto</span>
+                    <strong class="{{ 'text-danger' if saldo_previsto < 0 else 'text-success' }}">{{ dinheiro(saldo_previsto) }}</strong>
+                </div>
+
+                <div class="client-mini-metrics">
+                    <div>
+                        <span>Saldo atual</span>
+                        <strong>{{ dinheiro(saldo_atual) }}</strong>
+                    </div>
+                    <div>
+                        <span>A receber</span>
+                        <strong>{{ dinheiro(rendas_a_receber) }}</strong>
+                    </div>
+                    <div>
+                        <span>Pendentes</span>
+                        <strong>{{ dinheiro(contas_pendentes) }}</strong>
+                    </div>
+                </div>
+
+                <a href="{{ url_for('financas.dashboard') }}" class="client-widget-link">Ver dashboard financeiro <i class="bi bi-arrow-right"></i></a>
             </article>
 
-            <article class="admin-stat-card stat-success">
-                <div>
-                    <span>Projetos</span>
-                    <strong>{{ total_proj }}</strong>
+            <article class="client-widget">
+                <div class="client-widget-header">
+                    <div>
+                        <span class="admin-kicker">Curr&iacute;culo</span>
+                        <h2>Status do perfil</h2>
+                    </div>
+                    <i class="bi bi-person-vcard"></i>
                 </div>
-                <i class="bi bi-code-slash"></i>
-            </article>
 
-            <article class="admin-stat-card stat-info">
-                <div>
-                    <span>Forma&ccedil;&otilde;es</span>
-                    <strong>{{ total_form }}</strong>
+                <div class="client-profile-progress">
+                    <strong>{{ perfil_percentual }}%</strong>
+                    <div class="progress">
+                        <div class="progress-bar" role="progressbar" style="width: {{ perfil_percentual }}%;" aria-valuenow="{{ perfil_percentual }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
                 </div>
-                <i class="bi bi-mortarboard"></i>
-            </article>
 
-            <article class="admin-stat-card stat-warning">
-                <div>
-                    <span>Certificados</span>
-                    <strong>{{ total_cert }}</strong>
+                <div class="client-checklist">
+                    {% for item in perfil_itens %}
+                        <span class="{{ 'done' if item.ativo else '' }}">
+                            <i class="bi {{ 'bi-check-circle-fill' if item.ativo else 'bi-circle' }}"></i>{{ item.label|safe }}
+                        </span>
+                    {% endfor %}
                 </div>
-                <i class="bi bi-patch-check"></i>
+
+                <a href="{{ url_for('curriculo.especialista') }}" class="client-widget-link">Ver perfil profissional <i class="bi bi-arrow-right"></i></a>
             </article>
         </section>
 
-        <div class="admin-section-heading">
+        <section class="client-portal-layout">
             <div>
-                <span class="admin-kicker">Gest&atilde;o</span>
-                <h2>Conte&uacute;do do site</h2>
+                <div class="client-section-title">
+                    <span class="admin-kicker">Servi&ccedil;os</span>
+                    <h2>Pr&oacute;ximos passos</h2>
+                </div>
+
+                <div class="client-service-grid">
+                    {% for servico in servicos %}
+                        <article class="client-service-card">
+                            <i class="bi {{ servico.icone }}"></i>
+                            <h3>{{ servico.titulo|safe }}</h3>
+                            <p>{{ servico.texto|safe }}</p>
+                            <a href="{{ url_for(servico.url) }}{{ servico.anchor }}">Acessar <i class="bi bi-arrow-right"></i></a>
+                        </article>
+                    {% endfor %}
+                </div>
+
+                <div class="client-section-title mt-4">
+                    <span class="admin-kicker">Conte&uacute;do</span>
+                    <h2>Artigos recomendados</h2>
+                </div>
+
+                <div class="client-article-list">
+                    {% for artigo in artigos %}
+                        <article>
+                            <span>{{ artigo.categoria }}</span>
+                            <h3>{{ artigo.titulo|safe }}</h3>
+                            <small>{{ artigo.tempo }} de leitura</small>
+                        </article>
+                    {% endfor %}
+                </div>
             </div>
-            <p>Use os atalhos abaixo para atualizar as &aacute;reas p&uacute;blicas do portf&oacute;lio.</p>
-        </div>
 
-        <section class="admin-management-grid" aria-label="Atalhos de gestao de conteudo">
-            <article class="admin-action-card accent-primary">
-                <div class="admin-action-icon"><i class="bi bi-briefcase"></i></div>
-                <h3>Experi&ecirc;ncias</h3>
-                <p>Gerencie trajet&oacute;ria profissional, empresas, cargos e entregas principais.</p>
-                <a href="{{ url_for('experiencias_admin.lista') }}" class="btn btn-outline-primary fw-bold">
-                    Acessar <i class="bi bi-arrow-right ms-2"></i>
-                </a>
-            </article>
+            <aside class="client-side-panel">
+                <div class="client-section-title">
+                    <span class="admin-kicker">Agenda</span>
+                    <h2>Contas pendentes</h2>
+                </div>
 
-            <article class="admin-action-card accent-success">
-                <div class="admin-action-icon"><i class="bi bi-code-square"></i></div>
-                <h3>Projetos</h3>
-                <p>Atualize a vitrine de projetos, tecnologias utilizadas e links externos.</p>
-                <a href="{{ url_for('projetos_admin.lista') }}" class="btn btn-outline-success fw-bold">
-                    Acessar <i class="bi bi-arrow-right ms-2"></i>
-                </a>
-            </article>
+                <div class="client-pending-list">
+                    {% for conta in proximas_contas %}
+                        <article>
+                            <div>
+                                <strong>{{ conta.Descricao }}</strong>
+                                <span>{{ conta.CategoriaNome or 'Sem categoria' }}</span>
+                            </div>
+                            <div class="text-end">
+                                <strong>{{ dinheiro(conta.ValorEstimado) }}</strong>
+                                <span>{{ conta.DataVencimento.strftime('%d/%m') if conta.DataVencimento else '-' }}</span>
+                            </div>
+                        </article>
+                    {% else %}
+                        <div class="client-empty-state">
+                            <i class="bi bi-check2-circle"></i>
+                            <p>Nenhuma conta pendente cadastrada.</p>
+                        </div>
+                    {% endfor %}
+                </div>
 
-            <article class="admin-action-card accent-info">
-                <div class="admin-action-icon"><i class="bi bi-mortarboard"></i></div>
-                <h3>Forma&ccedil;&atilde;o</h3>
-                <p>Organize hist&oacute;rico acad&ecirc;mico, gradua&ccedil;&otilde;es, cursos e per&iacute;odos.</p>
-                <a href="{{ url_for('formacao_admin.lista') }}" class="btn btn-outline-info fw-bold">
-                    Acessar <i class="bi bi-arrow-right ms-2"></i>
+                <a href="{{ url_for('financas.adicionar_gasto') }}" class="btn btn-primary w-100 fw-bold mt-3">
+                    Novo lan&ccedil;amento
                 </a>
-            </article>
-
-            <article class="admin-action-card accent-warning">
-                <div class="admin-action-icon"><i class="bi bi-lightning-charge"></i></div>
-                <h3>Habilidades</h3>
-                <p>Mantenha stacks, ferramentas e compet&ecirc;ncias t&eacute;cnicas sempre atuais.</p>
-                <a href="{{ url_for('habilidades_admin.lista') }}" class="btn btn-outline-warning fw-bold">
-                    Acessar <i class="bi bi-arrow-right ms-2"></i>
-                </a>
-            </article>
-
-            <article class="admin-action-card accent-danger">
-                <div class="admin-action-icon"><i class="bi bi-patch-check"></i></div>
-                <h3>Certifica&ccedil;&otilde;es</h3>
-                <p>Cadastre certificados, emissores, cursos e credenciais relevantes.</p>
-                <a href="{{ url_for('certificacoes_admin.lista') }}" class="btn btn-outline-danger fw-bold">
-                    Acessar <i class="bi bi-arrow-right ms-2"></i>
-                </a>
-            </article>
+            </aside>
         </section>
     </div>
 </main>

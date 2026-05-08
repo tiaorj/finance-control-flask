@@ -702,6 +702,68 @@ body {
     text-transform: uppercase;
 }
 
+.platform-testimonials {
+    background: #f6f8fb;
+}
+
+.platform-testimonial-grid,
+.platform-article-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.platform-testimonial-grid article,
+.platform-article-grid article {
+    background: #fff;
+    border: 1px solid #e7edf5;
+    border-radius: 8px;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+    padding: 1.35rem;
+}
+
+.platform-testimonial-grid p {
+    color: #344054;
+    font-size: 1rem;
+    line-height: 1.65;
+    margin-bottom: 1.1rem;
+}
+
+.platform-testimonial-grid strong,
+.platform-testimonial-grid span,
+.platform-article-grid span {
+    display: block;
+}
+
+.platform-testimonial-grid strong {
+    color: #182230;
+    font-weight: 800;
+}
+
+.platform-testimonial-grid span,
+.platform-article-grid span {
+    color: #667085;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.platform-article-grid h3 {
+    color: #182230;
+    font-size: 1.45rem;
+    letter-spacing: 0;
+    line-height: 1.05;
+    margin: 0.65rem 0 0.75rem;
+    text-transform: uppercase;
+}
+
+.platform-article-grid p {
+    color: #667085;
+    line-height: 1.55;
+    margin: 0;
+}
+
 .platform-final-cta {
     background: #002147;
     color: #fff;
@@ -812,7 +874,9 @@ body {
 
     .platform-trust-strip .container,
     .platform-services-grid,
-    .platform-plan-grid {
+    .platform-plan-grid,
+    .platform-testimonial-grid,
+    .platform-article-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
@@ -833,13 +897,362 @@ body {
 
     .platform-trust-strip .container,
     .platform-services-grid,
-    .platform-plan-grid {
+    .platform-plan-grid,
+    .platform-testimonial-grid,
+    .platform-article-grid {
         grid-template-columns: 1fr;
     }
 
     .platform-section,
     .platform-final-cta {
         padding: 3.5rem 0;
+    }
+}
+
+.client-portal {
+    background: #f5f7fb;
+    min-height: calc(100vh - 180px);
+}
+
+.client-portal-hero {
+    align-items: center;
+    background: linear-gradient(120deg, #002147 0%, #083d77 68%, #0b5d89 100%);
+    border-radius: 8px;
+    color: #fff;
+    display: flex;
+    gap: 1.5rem;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    padding: 1.75rem;
+}
+
+.client-portal-hero .admin-kicker {
+    color: #ffb24a;
+}
+
+.client-portal-hero h1 {
+    color: #fff;
+    font-size: clamp(2.35rem, 5vw, 3.7rem);
+    letter-spacing: 0;
+    line-height: 1;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+.client-portal-hero p {
+    color: rgba(255,255,255,0.8);
+    margin: 0.65rem 0 0;
+    max-width: 680px;
+}
+
+.client-portal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.client-portal-actions .btn {
+    border-radius: 6px;
+    padding: 0.72rem 1rem;
+    text-transform: uppercase;
+}
+
+.client-widget-grid,
+.client-portal-layout {
+    display: grid;
+    gap: 1rem;
+}
+
+.client-widget-grid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+    margin-bottom: 1.25rem;
+}
+
+.client-widget,
+.client-service-card,
+.client-side-panel,
+.client-article-list article {
+    background: #fff;
+    border: 1px solid #e7edf5;
+    border-radius: 8px;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+}
+
+.client-widget {
+    padding: 1.35rem;
+}
+
+.client-widget-header {
+    align-items: flex-start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+}
+
+.client-widget-header h2,
+.client-section-title h2,
+.client-service-card h3,
+.client-article-list h3 {
+    color: #182230;
+    letter-spacing: 0;
+    line-height: 1;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+.client-widget-header h2 {
+    font-size: 1.7rem;
+}
+
+.client-widget-header > i {
+    align-items: center;
+    background: #eef5ff;
+    border-radius: 8px;
+    color: #0056b3;
+    display: inline-flex;
+    font-size: 1.55rem;
+    height: 52px;
+    justify-content: center;
+    width: 52px;
+}
+
+.client-finance-balance {
+    border-bottom: 1px solid #eef2f7;
+    margin-top: 1.1rem;
+    padding-bottom: 1rem;
+}
+
+.client-finance-balance span,
+.client-mini-metrics span,
+.client-pending-list span {
+    color: #667085;
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.client-finance-balance strong {
+    display: block;
+    font-size: clamp(2rem, 4vw, 3rem);
+    line-height: 1;
+    margin-top: 0.45rem;
+}
+
+.client-mini-metrics {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 1rem 0;
+}
+
+.client-mini-metrics div {
+    background: #f8fafc;
+    border: 1px solid #edf2f7;
+    border-radius: 8px;
+    padding: 0.85rem;
+}
+
+.client-mini-metrics strong {
+    color: #182230;
+    display: block;
+    font-size: 1rem;
+    margin-top: 0.3rem;
+}
+
+.client-widget-link,
+.client-service-card a {
+    align-items: center;
+    color: #0056b3;
+    display: inline-flex;
+    font-weight: 800;
+    gap: 0.45rem;
+    text-decoration: none;
+    text-transform: uppercase;
+}
+
+.client-profile-progress {
+    margin: 1.15rem 0 1rem;
+}
+
+.client-profile-progress strong {
+    color: #182230;
+    display: block;
+    font-size: 2.35rem;
+    line-height: 1;
+    margin-bottom: 0.7rem;
+}
+
+.client-profile-progress .progress {
+    height: 10px;
+}
+
+.client-profile-progress .progress-bar {
+    background: #0056b3;
+}
+
+.client-checklist {
+    display: grid;
+    gap: 0.45rem;
+    margin-bottom: 1rem;
+}
+
+.client-checklist span {
+    align-items: center;
+    color: #667085;
+    display: flex;
+    font-weight: 700;
+    gap: 0.5rem;
+}
+
+.client-checklist span.done {
+    color: #198754;
+}
+
+.client-portal-layout {
+    grid-template-columns: minmax(0, 1fr) 360px;
+}
+
+.client-section-title {
+    margin-bottom: 0.85rem;
+}
+
+.client-section-title h2 {
+    font-size: 1.75rem;
+}
+
+.client-service-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.client-service-card {
+    display: flex;
+    flex-direction: column;
+    min-height: 220px;
+    padding: 1.15rem;
+}
+
+.client-service-card > i {
+    align-items: center;
+    background: #eef5ff;
+    border-radius: 8px;
+    color: #0056b3;
+    display: inline-flex;
+    font-size: 1.45rem;
+    height: 46px;
+    justify-content: center;
+    margin-bottom: 1rem;
+    width: 46px;
+}
+
+.client-service-card h3,
+.client-article-list h3 {
+    font-size: 1.32rem;
+}
+
+.client-service-card p {
+    color: #667085;
+    flex: 1;
+    line-height: 1.55;
+    margin: 0.65rem 0 1rem;
+}
+
+.client-article-list {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.client-article-list article {
+    padding: 1rem;
+}
+
+.client-article-list span,
+.client-article-list small {
+    color: #667085;
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.client-article-list h3 {
+    margin: 0.45rem 0;
+}
+
+.client-side-panel {
+    padding: 1.15rem;
+}
+
+.client-pending-list {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.client-pending-list article {
+    align-items: center;
+    border-bottom: 1px solid #edf2f7;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    padding-bottom: 0.75rem;
+}
+
+.client-pending-list article:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.client-pending-list strong {
+    color: #182230;
+    display: block;
+}
+
+.client-empty-state {
+    align-items: center;
+    color: #667085;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 180px;
+    text-align: center;
+}
+
+.client-empty-state i {
+    color: #198754;
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+@media (max-width: 991.98px) {
+    .client-portal-hero {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .client-portal-actions {
+        justify-content: flex-start;
+    }
+
+    .client-widget-grid,
+    .client-portal-layout,
+    .client-service-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .client-mini-metrics {
+        grid-template-columns: 1fr;
+    }
+
+    .client-portal-actions,
+    .client-portal-actions .btn {
+        width: 100%;
     }
 }
 

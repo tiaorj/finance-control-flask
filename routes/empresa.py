@@ -26,9 +26,11 @@ def projetos():
     
 @empresa_bp.route('/contato', methods=['GET', 'POST'])
 def contato():
+    servico = request.args.get('servico', '')
     if request.method == 'POST':
         nome = request.form.get('nome')
         email_cliente = request.form.get('email')
+        servico = request.form.get('servico') or servico
         mensagem = request.form.get('mensagem')
         
         # Lógica de Envio de E-mail
@@ -36,7 +38,7 @@ def contato():
         msg = Message(
             subject=f"Novo Contato: {nome} (via Site DIRECTI)",
             recipients=['direct.ti.tec@gmail.com'], # Seu e-mail de destino
-            body=f"Nome: {nome}\nE-mail: {email_cliente}\n\nMensagem:\n{mensagem}"
+            body=f"Nome: {nome}\nE-mail: {email_cliente}\nServiço: {servico or 'Não informado'}\n\nMensagem:\n{mensagem}"
         )
         
         try:
@@ -48,4 +50,4 @@ def contato():
             
         return redirect(url_for('empresa.contato'))
         
-    return render_template('contato.html', info={})
+    return render_template('contato.html', info={}, servico=servico)

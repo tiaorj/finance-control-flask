@@ -39,6 +39,7 @@
                 <div class="bg-light p-5 rounded shadow-sm">
                     <form method="POST">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="servico" value="{{ servico or '' }}">
                         <div class="mb-3">
                             <label class="form-label fw-bold text-uppercase small">Nome</label>
                             <input type="text" name="nome" class="form-control" placeholder="Seu nome completo" required>
@@ -49,7 +50,7 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold text-uppercase small">Mensagem</label>
-                            <textarea name="mensagem" class="form-control" rows="5" placeholder="Como podemos ajudar?" required></textarea>
+                            <textarea name="mensagem" class="form-control" rows="5" placeholder="Como podemos ajudar?" required>{% if servico == 'suporte' %}Gostaria de abrir uma solicita&ccedil;&atilde;o de suporte para minha conta.{% elif servico == 'curriculo' %}Gostaria de saber mais sobre a consultoria de curr&iacute;culo.{% elif servico == 'upgrade' %}Gostaria de conhecer os upgrades e planos pagos da plataforma.{% endif %}</textarea>
                         </div>
                         <button type="submit" class="btn btn-primary btn-lg w-100 mt-3" style="background-color: var(--directi-blue); border: none;">
                             Enviar Mensagem
