@@ -31,16 +31,16 @@
                 {% endif %}                    
                 </div>
 
+                <div class="professional-timeline">
                 {% for exp in experiencias %}
-                <div class="mb-5 position-relative ps-4 border-start border-3 border-light-subtle">
-                    <div class="position-absolute start-0 translate-middle-x bg-primary-custom rounded-circle" 
-                         style="width: 15px; height: 15px; margin-left: -1.5px; margin-top: 10px;"></div>
+                <article class="experience-item position-relative">
+                    <div class="experience-marker"></div>
                     
                     <div class="d-flex justify-content-between align-items-start mb-1">
                         <div>
-                            <span class="text-primary-custom fw-bold text-uppercase small">{{ exp.periodo }}</span>
-                            <h4 class="fw-bold mb-0 text-uppercase mt-1">{{ exp.cargo }}</h4>
-                            <h5 class="text-secondary small fw-bold mb-3">{{ exp.empresa }}</h5>
+                            <span class="experience-period">{{ exp.periodo }}</span>
+                            <h4 class="experience-title">{{ exp.cargo }}</h4>
+                            <h5 class="experience-company">{{ exp.empresa }}</h5>
                         </div>
                         
                         {# BOTÃO DE EDIÇÃO SÓ PARA O ADMIN #}
@@ -51,21 +51,22 @@
                         {% endif %}
                     </div>
 
-                    <p class="text-muted mb-3">{{ exp.resumo }}</p>
+                    <p class="experience-summary">{{ exp.resumo }}</p>
 
                     {# LISTA DE CONQUISTAS/DETALHES #}
                     {% if exp.conquistas %}
-                    <ul class="list-unstyled small">
+                    <ul class="experience-achievements">
                         {% for conquista in exp.conquistas %}
-                        <li class="mb-2 d-flex align-items-start text-secondary">
-                            <i class="bi bi-check2-circle text-primary-custom me-2 mt-1"></i>
+                        <li>
+                            <i class="bi bi-check2-circle"></i>
                             <span>{{ conquista }}</span>
                         </li>
                         {% endfor %}
                     </ul>
                     {% endif %}
-                </div>
+                </article>
                 {% endfor %}
+                </div>
             </div>
 
             <div class="col-lg-4">
@@ -139,5 +140,98 @@
     .x-small { font-size: 0.85rem; }
     .transition-all { transition: all 0.3s ease; }
     .hover-shadow:hover { transform: translateY(-3px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+
+    .professional-timeline {
+        border-left: 2px solid rgba(0, 51, 102, 0.14);
+        padding-left: 1.25rem;
+    }
+
+    .experience-item {
+        background: #fff;
+        border: 1px solid rgba(0, 51, 102, 0.10);
+        border-radius: 8px;
+        box-shadow: 0 10px 24px rgba(0, 51, 102, 0.06);
+        margin-bottom: 1.25rem;
+        padding: 1.25rem;
+    }
+
+    .experience-marker {
+        background: #ff8c00;
+        border: 3px solid #fff;
+        border-radius: 999px;
+        box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.25);
+        height: 14px;
+        left: -1.72rem;
+        position: absolute;
+        top: 1.55rem;
+        width: 14px;
+    }
+
+    .experience-period {
+        color: #ff8c00;
+        display: inline-block;
+        font-size: 0.76rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        margin-bottom: 0.25rem;
+        text-transform: uppercase;
+    }
+
+    .experience-title {
+        color: #003366;
+        font-size: 1.15rem;
+        font-weight: 800;
+        line-height: 1.2;
+        margin: 0;
+        text-transform: uppercase;
+    }
+
+    .experience-company {
+        color: #6c757d;
+        font-size: 0.82rem;
+        font-weight: 800;
+        margin: 0.35rem 0 0.9rem;
+    }
+
+    .experience-summary {
+        color: #5f6c7b;
+        line-height: 1.6;
+        margin-bottom: 0.95rem;
+    }
+
+    .experience-achievements {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .experience-achievements li {
+        align-items: flex-start;
+        color: #495057;
+        display: flex;
+        font-size: 0.9rem;
+        gap: 0.55rem;
+        margin-bottom: 0.55rem;
+    }
+
+    .experience-achievements i {
+        color: #ff8c00;
+        flex: 0 0 auto;
+        margin-top: 0.1rem;
+    }
+
+    @media (max-width: 575.98px) {
+        .professional-timeline {
+            padding-left: 1rem;
+        }
+
+        .experience-item {
+            padding: 1rem;
+        }
+
+        .experience-title {
+            font-size: 1rem;
+        }
+    }
 </style>
 {% endblock %}

@@ -2,8 +2,13 @@
 from database import get_db_cursor
 from datetime import datetime, date
 import calendar
+from flask_login import current_user
 
 financas_bp = Blueprint('financas', __name__, url_prefix='/financas')
+
+
+def usuario_atual_id():
+    return int(current_user.get_id())
 
 def parse_money(valor, default=0.0):
     if valor is None:
@@ -192,12 +197,12 @@ def saldo_transportado_periodo(cursor, usuario_id, mes, ano, profundidade=12):
 
 @financas_bp.before_request
 def exigir_login():
-    if 'admin_logado' not in session:
-        return redirect(url_for('admin.login'))
+    if not current_user.is_authenticated:
+        return redirect(url_for('admin.login', next=request.full_path))
 
 @financas_bp.route('/adicionar-gasto', methods=['GET', 'POST'])
 def adicionar_gasto():
-    usuario_id = 1
+    usuario_id = usuario_atual_id()
     mes_atual, ano_atual = periodo_atual()
     mes_sel, ano_sel = normalizar_periodo(
         request.values.get('mes', mes_atual, type=int),
@@ -244,7 +249,7 @@ def adicionar_gasto():
 @financas_bp.route('/')
 @financas_bp.route('/dashboard')
 def dashboard():
-    usuario_id = 1
+    usuario_id = usuario_atual_id()
     mes_atual, ano_atual = periodo_atual()
     mes_sel, ano_sel = normalizar_periodo(
         request.args.get('mes', mes_atual, type=int),
@@ -397,7 +402,7 @@ def dashboard():
 
 @financas_bp.route('/baixar-gasto/<int:id>', methods=['POST'])
 def baixar_gasto(id):
-    usuario_id = 1
+    usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
         cursor.execute("""
@@ -427,7 +432,7 @@ def baixar_gasto(id):
 
 @financas_bp.route('/atualizar-valor-estimado/<int:id>', methods=['POST'])
 def atualizar_valor_estimado(id):
-    usuario_id = 1
+    usuario_id = usuario_atual_id()
     dados = request.get_json() or {}
     valor_bruto = dados.get('valor', '0')
 
@@ -462,7 +467,7 @@ def atualizar_valor_estimado(id):
 
 @financas_bp.route('/atualizar-valor-real/<int:id>', methods=['POST'])
 def atualizar_valor_real(id):
-    usuario_id = 1
+    usuario_id = usuario_atual_id()
     dados = request.get_json() or {}
     valor_bruto = dados.get('valor', '0')
 
@@ -502,7 +507,7 @@ def atualizar_valor_real(id):
 
 @financas_bp.route('/rendas', methods=['GET', 'POST'])
 def gerenciar_rendas():
-    usuario_id = 1
+    usuario_id = usuario_atual_id()
     hoje = datetime.now()
 
     # Captura mês/ano da URL ou usa o atual como padrão
@@ -565,14 +570,14 @@ def gerenciar_rendas():
 
 @financas_bp.route('/deletar-renda/<int:id>', methods=['POST'])
 def deletar_renda(id):
-    usuario_id = 1
+    usuario_id = usuario_atual_id()
     with get_db_cursor() as cursor:
         cursor.execute("DELETE FROM FIN_Rendas WHERE RendaId = ? AND UsuarioId = ?", (id, usuario_id))
     return {"success": True}, 200
 
 @financas_bp.route('/editar-renda/<int:id>', methods=['POST'])
 def editar_renda(id):
-    usuario_id = 1
+    usuario_id = usuario_atual_id()
     dados = request.get_json()
 
     # Tratamento para garantir que o SQL receba o tipo correto
@@ -593,7 +598,7 @@ def editar_renda(id):
 
 @financas_bp.route('/deletar-gasto/<int:id>', methods=['POST'])
 def deletar_gasto(id):
-    usuario_id = 1
+    usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
         cursor.execute("""
@@ -614,7 +619,7 @@ def deletar_gasto(id):
 
 @financas_bp.route('/atualizar-saldo', methods=['POST'])
 def atualizar_saldo():
-    usuario_id = 1
+    usuario_id = usuario_atual_id()
     # Aceita valores no formato brasileiro antes de gravar no banco.
     novo_saldo = parse_money(request.form.get('saldo_conta', '0'))
 
@@ -642,7 +647,7 @@ def atualizar_saldo():
 
 @financas_bp.route('/receber-renda/<int:id>', methods=['POST'])
 def receber_renda(id):
-    usuario_id = 1
+    usuario_id = usuario_atual_id()
     hoje = datetime.now()
     mes_ref = hoje.month
     ano_ref = hoje.year
@@ -685,7 +690,7 @@ def receber_renda(id):
 
 @financas_bp.route('/reabrir-renda/<int:id>', methods=['POST'])
 def reabrir_renda(id):
-    usuario_id = 1
+    usuario_id = usuario_atual_id()
     hoje = datetime.now()
     mes_ref = hoje.month
     ano_ref = hoje.year
@@ -721,7 +726,7 @@ def reabrir_renda(id):
 
 @financas_bp.route('/clonar-mes-anterior', methods=['POST'])
 def clonar_mes_anterior():
-    usuario_id = 1
+    usuario_id = usuario_atual_id()
     mes_atual, ano_atual = periodo_atual()
     mes_destino, ano_destino = normalizar_periodo(
         request.form.get('mes', mes_atual, type=int),
@@ -767,7 +772,7 @@ def clonar_mes_anterior():
 
 @financas_bp.route('/importar-planilha', methods=['POST'])
 def importar_abril():
-    usuario_id = 1
+    usuario_id = usuario_atual_id()
     mes_ref = 4
     ano_ref = 2026
 

@@ -1,9 +1,10 @@
 from flask import Flask
+from flask_login import LoginManager
 from flask_mail import Mail
 from flask_wtf import CSRFProtect
 from routes.empresa import empresa_bp
 from routes.curriculo import curriculo_bp
-from routes.admin import admin_bp 
+from routes.admin import admin_bp, load_user
 from datetime import datetime
 from routes.dashboard import dashboard_bp
 from routes.projetos import projetos_bp
@@ -28,6 +29,13 @@ def split_techs(value):
 
 app.config.from_object(Config)
 csrf = CSRFProtect(app)
+
+login_manager = LoginManager()
+login_manager.login_view = 'admin.login'
+login_manager.login_message = 'Faça login para acessar esta área.'
+login_manager.login_message_category = 'warning'
+login_manager.init_app(app)
+login_manager.user_loader(load_user)
 
 @app.template_filter('formata_data')
 def formata_data(value):
@@ -101,4 +109,4 @@ def formato_real(valor):
     return v.replace(',', 'v').replace('.', ',').replace('v', '.')
     
 if __name__ == "__main__":
-    app.run(debug=app.config.get('DEBUG', False))
+    app.run(debug=app.config.get('DEBUG', False), use_reloader=True)

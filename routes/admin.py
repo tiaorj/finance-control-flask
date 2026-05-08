@@ -1,18 +1,37 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from database import get_db_cursor
-from functools import wraps
+from flask_login import UserMixin, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash
 from datetime import datetime
 
 admin_bp = Blueprint('admin', __name__)
 
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'admin_logado' not in session:
-            return redirect(url_for('admin.login'))
-        return f(*args, **kwargs)
-    return decorated_function
+class User(UserMixin):
+    def __init__(self, usuario_id, nome, username=None):
+        self.id = int(usuario_id)
+        self.nome = nome
+        self.username = username
+
+
+def load_user(usuario_id):
+    with get_db_cursor() as cursor:
+        cursor.execute("""
+            SELECT UsuarioId, Nome, Username
+            FROM Usuarios
+            WHERE UsuarioId = ?
+        """, (usuario_id,))
+        usuario = cursor.fetchone()
+
+    if not usuario:
+        return None
+
+    return User(usuario.UsuarioId, usuario.Nome, usuario.Username)
+
+
+def safe_next_url(target):
+    if target and target.startswith('/') and not target.startswith('//'):
+        return target
+    return None
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -25,6 +44,9 @@ def login():
             usuario = cursor.fetchone()
 
             if usuario and check_password_hash(usuario.SenhaHash, senha_digitada):
+                user = User(usuario.UsuarioId, usuario.Nome, username)
+                login_user(user)
+
                 session['admin_logado'] = True
                 session['usuario_id'] = usuario.UsuarioId
                 session['usuario_nome'] = usuario.Nome
@@ -33,7 +55,8 @@ def login():
                                (datetime.now(), usuario.UsuarioId))
 
                 flash(f'Bem-vindo, {usuario.Nome}!', 'success')
-                return redirect(url_for('dashboard.index'))
+                next_page = safe_next_url(request.args.get('next'))
+                return redirect(next_page or url_for('dashboard.index'))
 
         flash('Usuário ou senha inválidos.', 'danger')
 
@@ -41,6 +64,7 @@ def login():
 
 @admin_bp.route('/logout')
 def logout():
+    logout_user()
     session.clear()
     return redirect(url_for('empresa.home'))
 

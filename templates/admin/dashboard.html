@@ -1,151 +1,113 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<main class="container py-5">
-    <div class="d-flex justify-content-between align-items-center mb-5 border-bottom pb-3">
-        <div>
-            <h1 class="display-5 fw-bold text-uppercase">Painel <span class="text-primary-custom">Controle</span></h1>
-            <p class="text-muted">Bem-vindo, <strong>{{ session.usuario_nome }}</strong>. O que vamos atualizar hoje?</p>
-        </div>
-        <div class="d-flex justify-content-between align-items-center mb-4">            
-            <a href="{{ url_for('curriculo.gerar_pdf') }}" class="btn btn-danger fw-bold shadow-sm">
-                <i class="bi bi-file-earmark-pdf me-2"></i> BAIXAR CURRÍCULO PDF
-            </a>
-        </div>           
-        <a href="{{ url_for('admin.logout') }}" class="btn btn-outline-danger btn-sm fw-bold">
-            <i class="bi bi-box-arrow-right"></i> LOGOUT
-        </a>
-    </div>
+<main class="admin-dashboard">
+    <div class="container py-5">
+        <section class="admin-dashboard-hero">
+            <div>
+                <span class="admin-kicker">&Aacute;rea administrativa</span>
+                <h1>Painel de Controle</h1>
+                <p>Bem-vindo, <strong>{{ session.usuario_nome }}</strong>. Gerencie conte&uacute;dos, acompanhe volumes e mantenha o portf&oacute;lio atualizado.</p>
+            </div>
 
-    <div class="row g-3 mb-5">
-    <!-- Total Experiências -->
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm border-start border-primary border-4 h-100">
-                <div class="card-body d-flex align-items-center justify-content-between p-4">
-                    <div>
-                        <h6 class="text-muted text-uppercase small fw-bold mb-1">Experiências</h6>
-                        <h2 class="fw-bold mb-0">{{ total_exp }}</h2>
-                    </div>
-                    <div class="bg-primary bg-opacity-10 p-3 rounded">
-                        <i class="bi bi-briefcase text-primary fs-3"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- Total Projetos -->
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm border-start border-success border-4 h-100">
-                <div class="card-body d-flex align-items-center justify-content-between p-4">
-                    <div>
-                        <h6 class="text-muted text-uppercase small fw-bold mb-1">Projetos</h6>
-                        <h2 class="fw-bold mb-0">{{ total_proj }}</h2>
-                    </div>
-                    <div class="bg-success bg-opacity-10 p-3 rounded">
-                        <i class="bi bi-code-slash text-success fs-3"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Total Formações -->
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm border-start border-info border-4 h-100">
-                <div class="card-body d-flex align-items-center justify-content-between p-4">
-                    <div>
-                        <h6 class="text-muted text-uppercase small fw-bold mb-1">Formações</h6>
-                        <h2 class="fw-bold mb-0">{{ total_form }}</h2>
-                    </div>
-                    <div class="bg-info bg-opacity-10 p-3 rounded">
-                        <i class="bi bi-mortarboard text-info fs-3"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Total Certificações -->
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm border-start border-warning border-4 h-100">
-                <div class="card-body d-flex align-items-center justify-content-between p-4">
-                    <div>
-                        <h6 class="text-muted text-uppercase small fw-bold mb-1">Certificados</h6>
-                        <h2 class="fw-bold mb-0">{{ total_cert }}</h2>
-                    </div>
-                    <div class="bg-warning bg-opacity-10 p-3 rounded">
-                        <i class="bi bi-patch-check text-warning fs-3"></i>
-                    </div>
-                </div>
-            </div>
-        </div>        
-    </div>
-
-    <h3 class="fw-bold text-uppercase mb-4 h5">Gestão de Conteúdo</h3>
-    <div class="row g-4">
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm border-0 text-center p-4 border-start border-primary border-4">
-                <i class="bi bi-briefcase fs-1 text-primary mb-3"></i>
-                <h4 class="fw-bold text-uppercase">Experiências</h4>
-                <p class="text-muted small">Gerencie sua trajetória profissional e cargos anteriores.</p>
-                <a href="{{ url_for('experiencias_admin.lista') }}" class="btn btn-outline-primary w-100 mt-auto fw-bold">
-                    ACESSAR
+            <div class="admin-hero-actions">
+                <a href="{{ url_for('curriculo.gerar_pdf') }}" class="btn btn-danger fw-bold">
+                    <i class="bi bi-file-earmark-pdf me-2"></i>Baixar curr&iacute;culo PDF
+                </a>
+                <a href="{{ url_for('admin.logout') }}" class="btn btn-outline-danger fw-bold">
+                    <i class="bi bi-box-arrow-right me-2"></i>Logout
                 </a>
             </div>
-        </div>       
-        <!-- Projetos e Portfólio -->
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm border-0 text-center p-4 border-start border-success border-4">
-                <i class="bi bi-code-square fs-1 text-success mb-3"></i>
-                <h4 class="fw-bold text-uppercase">Projetos</h4>
-                <p class="text-muted small">Vitrine de projetos, tecnologias utilizadas e links externos.</p>
-                <a href="{{ url_for('projetos_admin.lista') }}" class="btn btn-outline-success w-100 mt-auto fw-bold">
-                    ACESSAR
-                </a>
+        </section>
+
+        <section class="admin-stats-grid" aria-label="Resumo do conteudo">
+            <article class="admin-stat-card stat-primary">
+                <div>
+                    <span>Experi&ecirc;ncias</span>
+                    <strong>{{ total_exp }}</strong>
+                </div>
+                <i class="bi bi-briefcase"></i>
+            </article>
+
+            <article class="admin-stat-card stat-success">
+                <div>
+                    <span>Projetos</span>
+                    <strong>{{ total_proj }}</strong>
+                </div>
+                <i class="bi bi-code-slash"></i>
+            </article>
+
+            <article class="admin-stat-card stat-info">
+                <div>
+                    <span>Forma&ccedil;&otilde;es</span>
+                    <strong>{{ total_form }}</strong>
+                </div>
+                <i class="bi bi-mortarboard"></i>
+            </article>
+
+            <article class="admin-stat-card stat-warning">
+                <div>
+                    <span>Certificados</span>
+                    <strong>{{ total_cert }}</strong>
+                </div>
+                <i class="bi bi-patch-check"></i>
+            </article>
+        </section>
+
+        <div class="admin-section-heading">
+            <div>
+                <span class="admin-kicker">Gest&atilde;o</span>
+                <h2>Conte&uacute;do do site</h2>
             </div>
+            <p>Use os atalhos abaixo para atualizar as &aacute;reas p&uacute;blicas do portf&oacute;lio.</p>
         </div>
 
-        <!-- Formação Acadêmica -->
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm border-0 text-center p-4 border-start border-info border-4">
-                <i class="bi bi-mortarboard fs-1 text-info mb-3"></i>
-                <h4 class="fw-bold text-uppercase">Formação</h4>
-                <p class="text-muted small">Histórico acadêmico, graduações e cursos técnicos.</p>
-                <a href="{{ url_for('formacao_admin.lista') }}" class="btn btn-outline-info w-100 mt-auto fw-bold">
-                    ACESSAR
+        <section class="admin-management-grid" aria-label="Atalhos de gestao de conteudo">
+            <article class="admin-action-card accent-primary">
+                <div class="admin-action-icon"><i class="bi bi-briefcase"></i></div>
+                <h3>Experi&ecirc;ncias</h3>
+                <p>Gerencie trajet&oacute;ria profissional, empresas, cargos e entregas principais.</p>
+                <a href="{{ url_for('experiencias_admin.lista') }}" class="btn btn-outline-primary fw-bold">
+                    Acessar <i class="bi bi-arrow-right ms-2"></i>
                 </a>
-            </div>
-        </div>     
-    
-        <!-- Habilidades Técnicas (Skills) -->
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm border-0 text-center p-4 border-start border-warning border-4">
-                <i class="bi bi-lightning-charge fs-1 text-warning mb-3"></i>
-                <h4 class="fw-bold text-uppercase">Habilidades</h4>
-                <p class="text-muted small">Gerencie suas stacks (Python, SQL Server, Flask, etc).</p>
-                <a href="{{ url_for('habilidades_admin.lista') }}" class="btn btn-outline-warning w-100 mt-auto fw-bold">
-                    ACESSAR
+            </article>
+
+            <article class="admin-action-card accent-success">
+                <div class="admin-action-icon"><i class="bi bi-code-square"></i></div>
+                <h3>Projetos</h3>
+                <p>Atualize a vitrine de projetos, tecnologias utilizadas e links externos.</p>
+                <a href="{{ url_for('projetos_admin.lista') }}" class="btn btn-outline-success fw-bold">
+                    Acessar <i class="bi bi-arrow-right ms-2"></i>
                 </a>
-            </div>
-        </div>
-                    
-        <!-- Certificações -->
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm border-0 text-center p-4 border-start border-danger border-4">
-                <i class="bi bi-patch-check fs-1 text-danger mb-3"></i>
-                <h4 class="fw-bold text-uppercase">Certificações</h4>
-                <p class="text-muted small">Certificados de cursos, Microsoft, AWS e outros.</p>
-                <a href="{{ url_for('certificacoes_admin.lista') }}" class="btn btn-outline-danger w-100 mt-auto fw-bold">
-                    ACESSAR
+            </article>
+
+            <article class="admin-action-card accent-info">
+                <div class="admin-action-icon"><i class="bi bi-mortarboard"></i></div>
+                <h3>Forma&ccedil;&atilde;o</h3>
+                <p>Organize hist&oacute;rico acad&ecirc;mico, gradua&ccedil;&otilde;es, cursos e per&iacute;odos.</p>
+                <a href="{{ url_for('formacao_admin.lista') }}" class="btn btn-outline-info fw-bold">
+                    Acessar <i class="bi bi-arrow-right ms-2"></i>
                 </a>
-            </div>
-        </div>        
+            </article>
+
+            <article class="admin-action-card accent-warning">
+                <div class="admin-action-icon"><i class="bi bi-lightning-charge"></i></div>
+                <h3>Habilidades</h3>
+                <p>Mantenha stacks, ferramentas e compet&ecirc;ncias t&eacute;cnicas sempre atuais.</p>
+                <a href="{{ url_for('habilidades_admin.lista') }}" class="btn btn-outline-warning fw-bold">
+                    Acessar <i class="bi bi-arrow-right ms-2"></i>
+                </a>
+            </article>
+
+            <article class="admin-action-card accent-danger">
+                <div class="admin-action-icon"><i class="bi bi-patch-check"></i></div>
+                <h3>Certifica&ccedil;&otilde;es</h3>
+                <p>Cadastre certificados, emissores, cursos e credenciais relevantes.</p>
+                <a href="{{ url_for('certificacoes_admin.lista') }}" class="btn btn-outline-danger fw-bold">
+                    Acessar <i class="bi bi-arrow-right ms-2"></i>
+                </a>
+            </article>
+        </section>
     </div>
 </main>
-
-<style>
-    .hover-card { transition: all 0.3s ease; }
-    .hover-card:hover { 
-        transform: translateY(-5px); 
-        border-color: var(--directi-blue) !important;
-        background-color: #fff !important;
-    }
-</style>
 {% endblock %}
