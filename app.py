@@ -5,6 +5,7 @@ from flask_wtf import CSRFProtect
 from routes.empresa import empresa_bp
 from routes.curriculo import curriculo_bp
 from routes.admin import admin_bp, load_user
+from routes.main import main_bp
 from datetime import datetime
 from routes.dashboard import dashboard_bp
 from routes.projetos import projetos_bp
@@ -15,7 +16,7 @@ from dotenv import load_dotenv
 from flask import render_template
 from routes.formacao import formacao_bp
 from config import Config
-from routes.financas import financas_bp
+from routes.financas import financas_bp, financas_legacy_bp
 
 load_dotenv()
 
@@ -55,6 +56,8 @@ app.register_blueprint(certificacoes_bp)
 app.register_blueprint(experiencias_bp)
 app.register_blueprint(formacao_bp)
 app.register_blueprint(financas_bp)
+app.register_blueprint(financas_legacy_bp)
+app.register_blueprint(main_bp)
 
 # CONFIGURAÇÃO DE E-MAIL (Exemplo Gmail)
 mail = Mail(app) # Inicializa o motor de e-mail
@@ -82,7 +85,7 @@ def inject_info():
     return dict(INFO_BASE=INFO_BASE)
 
 # Registro dos módulos (Blueprints)
-app.register_blueprint(empresa_bp)   # Cuida da Home (/)
+app.register_blueprint(empresa_bp)
 app.register_blueprint(curriculo_bp)  # Cuida do Sobre (/sobre)
 
 @app.errorhandler(404)

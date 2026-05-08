@@ -382,13 +382,25 @@
 </div>
 
 <script>
+const financeRoutes = {
+    adicionarGasto: "{{ url_for('financas.adicionar_gasto') }}",
+    deletarGasto: "{{ url_for('financas.deletar_gasto', id=0) }}",
+    baixarGasto: "{{ url_for('financas.baixar_gasto', id=0) }}",
+    atualizarEstimado: "{{ url_for('financas.atualizar_valor_estimado', id=0) }}",
+    atualizarReal: "{{ url_for('financas.atualizar_valor_real', id=0) }}"
+};
+
+function routeWithId(template, id) {
+    return template.replace('/0', `/${id}`);
+}
+
 function atualizarLinkNovoGasto() {
     const mes = document.getElementById('selectMes')?.value;
     const ano = document.getElementById('selectAno')?.value;
     const btn = document.getElementById('btnNovoGasto');
 
     if (!mes || !ano || !btn) return;
-    btn.setAttribute('href', `/financas/adicionar-gasto?mes=${mes}&ano=${ano}`);
+    btn.setAttribute('href', `${financeRoutes.adicionarGasto}?mes=${mes}&ano=${ano}`);
 }
 
 window.addEventListener('DOMContentLoaded', atualizarLinkNovoGasto);
@@ -396,7 +408,7 @@ window.addEventListener('DOMContentLoaded', atualizarLinkNovoGasto);
 function deletarGasto(id) {
     if (!confirm("Excluir este lançamento permanentemente?")) return;
 
-    fetch(`/financas/deletar-gasto/${id}`, {
+    fetch(routeWithId(financeRoutes.deletarGasto, id), {
         method: 'POST',
         headers: { 'X-CSRFToken': window.csrfToken }
     })
@@ -411,7 +423,7 @@ function deletarGasto(id) {
 function darBaixa(id) {
     if (!confirm("Confirmar pagamento deste item?")) return;
 
-    fetch(`/financas/baixar-gasto/${id}`, {
+    fetch(routeWithId(financeRoutes.baixarGasto, id), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -446,7 +458,7 @@ function habilitarEdicaoEstimado(id) {
 function salvarEstimado(id) {
     const novoValor = document.getElementById(`input-estimado-${id}`).value;
 
-    fetch(`/financas/atualizar-valor-estimado/${id}`, {
+    fetch(routeWithId(financeRoutes.atualizarEstimado, id), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -465,7 +477,7 @@ function salvarEstimado(id) {
 function salvarValor(id) {
     const novoValor = document.getElementById(`input-valor-${id}`).value;
 
-    fetch(`/financas/atualizar-valor-real/${id}`, {
+    fetch(routeWithId(financeRoutes.atualizarReal, id), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

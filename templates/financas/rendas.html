@@ -152,6 +152,15 @@
 </div>
 
 <script>
+const rendaRoutes = {
+    editar: "{{ url_for('financas.editar_renda', id=0) }}",
+    deletar: "{{ url_for('financas.deletar_renda', id=0) }}"
+};
+
+function rendaRouteWithId(template, id) {
+    return template.replace('/0', `/${id}`);
+}
+
 function iniciarEdicaoRenda(id) {
     document.getElementById(`desc-text-${id}`).classList.add('d-none');
     document.getElementById(`desc-edit-${id}`).classList.remove('d-none');
@@ -171,7 +180,7 @@ function salvarEdicaoRenda(id) {
         valor_real: document.getElementById(`real-edit-${id}`).value
     };
 
-    fetch(`/financas/editar-renda/${id}`, {
+    fetch(rendaRouteWithId(rendaRoutes.editar, id), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -192,7 +201,7 @@ function cancelarEdicaoRenda(id) {
 
 function deletarRenda(id) {
     if (!confirm("Tem certeza que deseja excluir esta renda?")) return;
-    fetch(`/financas/deletar-renda/${id}`, {
+    fetch(rendaRouteWithId(rendaRoutes.deletar, id), {
         method: 'POST',
         headers: { 'X-CSRFToken': window.csrfToken }
     })

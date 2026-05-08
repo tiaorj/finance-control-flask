@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<main class="platform-landing">
+    <section class="platform-hero" style="background-image: linear-gradient(90deg, rgba(0, 20, 45, 0.92), rgba(0, 33, 71, 0.72), rgba(0, 33, 71, 0.18)), url('{{ url_for('static', filename='img/platform-hero.png') }}');">
+        <div class="container">
+            <div class="platform-hero-content">
+                <span class="platform-kicker">Direct TI Plataforma</span>
+                <h1>Gest&atilde;o Financeira e Solu&ccedil;&otilde;es Digitais em um s&oacute; lugar.</h1>
+                <p>Organize finan&ccedil;as, fortale&ccedil;a perfis profissionais e contrate portais sob medida com uma plataforma criada para transformar opera&ccedil;&atilde;o em resultado.</p>
+
+                <div class="platform-hero-actions">
+                    <a href="{{ url_for('admin.cadastro') }}" class="btn btn-warning fw-bold">
+                        Comece agora gratuitamente
+                    </a>
+                    <a href="#servicos" class="btn btn-outline-light fw-bold">
+                        Conhe&ccedil;a as solu&ccedil;&otilde;es
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="platform-trust-strip">
+        <div class="container">
+            <span>Controle financeiro</span>
+            <span>Perfil profissional</span>
+            <span>Portais empresariais</span>
+            <span>Consultoria t&eacute;cnica</span>
+        </div>
+    </section>
+
+    <section id="servicos" class="platform-section">
+        <div class="container">
+            <div class="platform-section-heading">
+                <span class="platform-kicker">Servi&ccedil;os</span>
+                <h2>O que a plataforma resolve</h2>
+                <p>Tr&ecirc;s frentes para empresas, profissionais e opera&ccedil;&otilde;es que precisam de organiza&ccedil;&atilde;o, presen&ccedil;a digital e software feito para a realidade do neg&oacute;cio.</p>
+            </div>
+
+            <div class="platform-services-grid">
+                <article class="platform-service-card">
+                    <div class="platform-service-icon"><i class="bi bi-wallet2"></i></div>
+                    <h3>Gest&atilde;o Financeira</h3>
+                    <p>Cadastre receitas, despesas, saldos e acompanhe a sa&uacute;de financeira por per&iacute;odo, categoria e status de pagamento.</p>
+                    <a href="{{ url_for('admin.cadastro') }}">Come&ccedil;ar controle <i class="bi bi-arrow-right"></i></a>
+                </article>
+
+                <article class="platform-service-card">
+                    <div class="platform-service-icon"><i class="bi bi-person-vcard"></i></div>
+                    <h3>Consultoria de Curr&iacute;culos</h3>
+                    <p>Organize experi&ecirc;ncias, forma&ccedil;&otilde;es, habilidades e conquistas para transformar trajet&oacute;ria em um perfil claro e competitivo.</p>
+                    <a href="{{ url_for('curriculo.especialista') }}">Ver modelo profissional <i class="bi bi-arrow-right"></i></a>
+                </article>
+
+                <article class="platform-service-card">
+                    <div class="platform-service-icon"><i class="bi bi-window-stack"></i></div>
+                    <h3>Desenvolvimento sob Medida</h3>
+                    <p>Cria&ccedil;&atilde;o de portais, dashboards e sistemas internos para empresas que precisam sair da planilha e ganhar escala.</p>
+                    <a href="{{ url_for('empresa.contato') }}">Solicitar proposta <i class="bi bi-arrow-right"></i></a>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <section id="planos" class="platform-section platform-plans">
+        <div class="container">
+            <div class="platform-section-heading">
+                <span class="platform-kicker">Planos</span>
+                <h2>Comece simples, evolua conforme a necessidade</h2>
+            </div>
+
+            <div class="platform-plan-grid">
+                <article>
+                    <h3>Gratuito</h3>
+                    <p>Controle financeiro inicial para organizar entradas, despesas e saldos mensais.</p>
+                    <strong>R$ 0</strong>
+                    <a href="{{ url_for('admin.cadastro') }}" class="btn btn-outline-primary fw-bold">Criar conta</a>
+                </article>
+
+                <article>
+                    <h3>Consultoria</h3>
+                    <p>Acompanhamento para estruturar perfil profissional, curr&iacute;culo, portf&oacute;lio e posicionamento.</p>
+                    <strong>Sob consulta</strong>
+                    <a href="{{ url_for('empresa.contato') }}" class="btn btn-primary fw-bold">Falar com especialista</a>
+                </article>
+
+                <article>
+                    <h3>Projeto sob Medida</h3>
+                    <p>Desenvolvimento de portais e automa&ccedil;&otilde;es para opera&ccedil;&otilde;es que precisam de software pr&oacute;prio.</p>
+                    <strong>Projeto fechado</strong>
+                    <a href="{{ url_for('empresa.contato') }}" class="btn btn-outline-primary fw-bold">Pedir diagn&oacute;stico</a>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <section class="platform-final-cta">
+        <div class="container">
+            <h2>Pronto para transformar organiza&ccedil;&atilde;o em crescimento?</h2>
+            <p>Entre pela gest&atilde;o financeira gratuita ou fale sobre uma solu&ccedil;&atilde;o digital sob medida.</p>
+            <div>
+                <a href="{{ url_for('admin.cadastro') }}" class="btn btn-warning fw-bold">Come&ccedil;ar agora</a>
+                <a href="{{ url_for('empresa.contato') }}" class="btn btn-outline-light fw-bold">Conversar sobre projeto</a>
+            </div>
+        </div>
+    </section>
+</main>
+{% endblock %}

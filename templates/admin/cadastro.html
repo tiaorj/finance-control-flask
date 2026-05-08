@@ -5,8 +5,8 @@
     <div class="auth-card">
         <div class="auth-brand">
             <span>Direct<span> TI</span></span>
-            <strong>Acesse sua conta</strong>
-            <p>Entre para gerenciar suas finan&ccedil;as, conte&uacute;dos e servi&ccedil;os contratados.</p>
+            <strong>Crie sua conta</strong>
+            <p>Comece pelo controle financeiro e evolua sua opera&ccedil;&atilde;o com as solu&ccedil;&otilde;es da plataforma.</p>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -19,22 +19,35 @@
 
         <form method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="mb-3">
+                <label class="form-label small fw-bold text-uppercase">Nome</label>
+                <input type="text" name="nome" class="form-control" required>
+            </div>
+
             <div class="mb-3">
                 <label class="form-label small fw-bold text-uppercase">Usu&aacute;rio</label>
                 <input type="text" name="usuario" class="form-control" required>
             </div>
-            <div class="mb-4">
+
+            <div class="mb-3">
                 <label class="form-label small fw-bold text-uppercase">Senha</label>
-                <input type="password" name="senha" class="form-control" required>
+                <input type="password" name="senha" class="form-control" minlength="6" required>
             </div>
+
+            <div class="mb-4">
+                <label class="form-label small fw-bold text-uppercase">Confirmar senha</label>
+                <input type="password" name="confirmar_senha" class="form-control" minlength="6" required>
+            </div>
+
             <button type="submit" class="btn btn-primary w-100 fw-bold py-2">
-                Entrar na plataforma
+                Come&ccedil;ar gratuitamente
             </button>
         </form>
 
         <div class="auth-footer">
-            Ainda n&atilde;o tem conta?
-            <a href="{{ url_for('admin.cadastro') }}">Come&ccedil;ar gratuitamente</a>
+            J&aacute; tem conta?
+            <a href="{{ url_for('admin.login') }}">Entrar na plataforma</a>
         </div>
     </div>
 </div>

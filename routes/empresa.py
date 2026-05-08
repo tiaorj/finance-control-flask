@@ -4,10 +4,9 @@ from flask_mail import Message
 
 empresa_bp = Blueprint('empresa', __name__)
 
-@empresa_bp.route('/')
+@empresa_bp.route('/empresa')
 def home():
-    # A home pode mostrar apenas os 3 primeiros projetos como destaque
-    return render_template('empresa.html', info={})
+    return render_template('landing.html')
 
 @empresa_bp.route('/projetos')
 def projetos():

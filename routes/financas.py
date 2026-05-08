@@ -4,11 +4,28 @@ from datetime import datetime, date
 import calendar
 from flask_login import current_user
 
-financas_bp = Blueprint('financas', __name__, url_prefix='/financas')
+financas_bp = Blueprint('financas', __name__, url_prefix='/app/financeiro')
+financas_legacy_bp = Blueprint('financas_legacy', __name__, url_prefix='/financas')
 
 
 def usuario_atual_id():
     return int(current_user.get_id())
+
+
+@financas_legacy_bp.route('/dashboard')
+@financas_legacy_bp.route('', strict_slashes=False)
+def legacy_dashboard():
+    return redirect(url_for('financas.dashboard', **request.args))
+
+
+@financas_legacy_bp.route('/adicionar-gasto')
+def legacy_adicionar_gasto():
+    return redirect(url_for('financas.adicionar_gasto', **request.args))
+
+
+@financas_legacy_bp.route('/rendas')
+def legacy_rendas():
+    return redirect(url_for('financas.gerenciar_rendas', **request.args))
 
 def parse_money(valor, default=0.0):
     if valor is None:
@@ -198,7 +215,8 @@ def saldo_transportado_periodo(cursor, usuario_id, mes, ano, profundidade=12):
 @financas_bp.before_request
 def exigir_login():
     if not current_user.is_authenticated:
-        return redirect(url_for('admin.login', next=request.full_path))
+        next_url = request.full_path if request.query_string else request.path
+        return redirect(url_for('admin.login', next=next_url))
 
 @financas_bp.route('/adicionar-gasto', methods=['GET', 'POST'])
 def adicionar_gasto():
@@ -246,8 +264,8 @@ def adicionar_gasto():
     return render_template('financas/form_gasto.html',
                            categorias=categorias, mes=mes_sel, ano=ano_sel)
 
-@financas_bp.route('/')
 @financas_bp.route('/dashboard')
+@financas_bp.route('', strict_slashes=False)
 def dashboard():
     usuario_id = usuario_atual_id()
     mes_atual, ano_atual = periodo_atual()

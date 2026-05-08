@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from database import get_db_cursor
 from flask_login import UserMixin, login_required, login_user, logout_user
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import datetime
 
 admin_bp = Blueprint('admin', __name__)
@@ -62,11 +62,53 @@ def login():
 
     return render_template('admin/login.html')
 
+
+@admin_bp.route('/cadastro', methods=['GET', 'POST'])
+def cadastro():
+    if request.method == 'POST':
+        nome = (request.form.get('nome') or '').strip()
+        username = (request.form.get('usuario') or '').strip()
+        senha = request.form.get('senha') or ''
+        confirmar_senha = request.form.get('confirmar_senha') or ''
+
+        if not nome or not username or not senha:
+            flash('Preencha todos os campos obrigatórios.', 'danger')
+            return redirect(url_for('admin.cadastro'))
+
+        if senha != confirmar_senha:
+            flash('As senhas informadas não conferem.', 'danger')
+            return redirect(url_for('admin.cadastro'))
+
+        with get_db_cursor() as cursor:
+            cursor.execute("SELECT UsuarioId FROM Usuarios WHERE Username = ?", (username,))
+            if cursor.fetchone():
+                flash('Este usuário já está cadastrado.', 'warning')
+                return redirect(url_for('admin.cadastro'))
+
+            cursor.execute("""
+                INSERT INTO Usuarios (Nome, Username, SenhaHash)
+                VALUES (?, ?, ?)
+            """, (nome, username, generate_password_hash(senha)))
+
+            cursor.execute("SELECT UsuarioId, Nome FROM Usuarios WHERE Username = ?", (username,))
+            usuario = cursor.fetchone()
+
+        user = User(usuario.UsuarioId, usuario.Nome, username)
+        login_user(user)
+        session['admin_logado'] = True
+        session['usuario_id'] = usuario.UsuarioId
+        session['usuario_nome'] = usuario.Nome
+
+        flash('Conta criada com sucesso. Bem-vindo à plataforma!', 'success')
+        return redirect(url_for('financas.dashboard'))
+
+    return render_template('admin/cadastro.html')
+
 @admin_bp.route('/logout')
 def logout():
     logout_user()
     session.clear()
-    return redirect(url_for('empresa.home'))
+    return redirect(url_for('main.index'))
 
 @admin_bp.route('/experiencia/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
