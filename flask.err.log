@@ -16,3 +16,11 @@ Press CTRL+C to quit
 127.0.0.1 - - [08/May/2026 10:52:57] "GET /especialista HTTP/1.1" 200 -
 127.0.0.1 - - [08/May/2026 10:52:57] "GET /static/css/style.css HTTP/1.1" 304 -
 127.0.0.1 - - [08/May/2026 10:52:57] "GET /static/img/minha-foto.jpg HTTP/1.1" 304 -
+127.0.0.1 - - [08/May/2026 11:10:06] "GET /especialista HTTP/1.1" 200 -
+127.0.0.1 - - [08/May/2026 11:10:06] "GET /static/css/style.css HTTP/1.1" 304 -
+127.0.0.1 - - [08/May/2026 11:10:06] "GET /static/img/minha-foto.jpg HTTP/1.1" 304 -
+127.0.0.1 - - [08/May/2026 11:10:58] "GET /admin/experiencias/trajetoria HTTP/1.1" 200 -
+127.0.0.1 - - [08/May/2026 11:10:59] "GET /static/css/style.css HTTP/1.1" 304 -
+127.0.0.1 - - [08/May/2026 11:11:05] "GET /admin/experiencias/trajetoria HTTP/1.1" 200 -
+127.0.0.1 - - [08/May/2026 11:11:05] "GET /static/css/style.css HTTP/1.1" 200 -
+127.0.0.1 - - [08/May/2026 11:11:06] "GET /favicon.ico HTTP/1.1" 404 -
