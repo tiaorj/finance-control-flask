@@ -181,7 +181,13 @@
                 <div class="finance-card metric-card bg-white p-3">
                     <div class="metric-label">Saldo em caixa</div>
                     <div class="metric-value mt-2 text-success">{{ dinheiro(saldo_em_caixa) }}</div>
-                    <div class="small text-muted mt-2">Banco: {{ dinheiro(saldo_bancario) }} + a receber</div>
+                    <div class="small text-muted mt-2">
+                        Banco: {{ dinheiro(saldo_bancario) }}
+                        {% if saldo_transportado > 0 %}
+                            + anterior: {{ dinheiro(saldo_transportado) }}
+                        {% endif %}
+                        + a receber
+                    </div>
                 </div>
             </div>
             <div class="col-sm-6 col-xl-3">
@@ -300,7 +306,32 @@
                                         </td>
                                         <td class="fw-bold">{{ l.Descricao }}</td>
                                         <td>{{ l.DataVencimento.strftime('%d/%m/%Y') if l.DataVencimento else '-' }}</td>
-                                        <td class="text-end text-muted">{{ dinheiro(l.ValorEstimado) }}</td>
+                                        <td class="text-end text-muted" style="min-width: 150px;">
+                                            {% if not l.Pago %}
+                                                <button id="display-estimado-{{ l.LancamentoId }}"
+                                                        type="button"
+                                                        onclick="habilitarEdicaoEstimado({{ l.LancamentoId }})"
+                                                        class="btn btn-sm btn-link fw-bold text-primary text-decoration-none p-0"
+                                                        title="Editar valor estimado">
+                                                    {{ dinheiro(l.ValorEstimado) }}
+                                                </button>
+                                                <div id="edit-estimado-container-{{ l.LancamentoId }}" class="d-none">
+                                                    <div class="input-group input-group-sm">
+                                                        <span class="input-group-text">R$</span>
+                                                        <input type="text"
+                                                               id="input-estimado-{{ l.LancamentoId }}"
+                                                               class="form-control form-control-sm text-end"
+                                                               value="{{ (l.ValorEstimado or 0) | formato_real }}"
+                                                               onkeyup="if(event.key === 'Enter') salvarEstimado({{ l.LancamentoId }})">
+                                                        <button class="btn btn-success btn-sm" onclick="salvarEstimado({{ l.LancamentoId }})" title="Salvar">
+                                                            <i class="bi bi-check"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            {% else %}
+                                                {{ dinheiro(l.ValorEstimado) }}
+                                            {% endif %}
+                                        </td>
                                         <td class="text-end" style="min-width: 150px;">
                                             <button id="display-valor-{{ l.LancamentoId }}"
                                                     type="button"
@@ -401,6 +432,34 @@ function habilitarEdicao(id) {
     const input = document.getElementById(`input-valor-${id}`);
     input.focus();
     input.select();
+}
+
+function habilitarEdicaoEstimado(id) {
+    document.getElementById(`display-estimado-${id}`).classList.add('d-none');
+    document.getElementById(`edit-estimado-container-${id}`).classList.remove('d-none');
+
+    const input = document.getElementById(`input-estimado-${id}`);
+    input.focus();
+    input.select();
+}
+
+function salvarEstimado(id) {
+    const novoValor = document.getElementById(`input-estimado-${id}`).value;
+
+    fetch(`/financas/atualizar-valor-estimado/${id}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': window.csrfToken
+        },
+        body: JSON.stringify({ valor: novoValor })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) location.reload();
+        else alert("Erro: " + (data.message || "nao foi possivel salvar o valor estimado."));
+    })
+    .catch(error => console.error('Erro:', error));
 }
 
 function salvarValor(id) {

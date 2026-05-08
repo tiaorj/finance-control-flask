@@ -77,6 +77,119 @@ def ajustar_caixa(cursor, usuario_id, mes, ano, delta):
             VALUES (?, ?, ?, ?, GETDATE())
         """, (usuario_id, mes, ano, delta))
 
+
+def chave_periodo(mes, ano):
+    return ano * 12 + mes
+
+
+def periodo_por_chave(chave):
+    ano = (chave - 1) // 12
+    mes = chave - (ano * 12)
+    return mes, ano
+
+
+def saldo_transportado_periodo(cursor, usuario_id, mes, ano, profundidade=12):
+    if profundidade <= 0:
+        return 0.0
+
+    chave_atual = chave_periodo(mes, ano)
+    chave_inicio = chave_atual - profundidade
+    chave_fim = chave_atual - 1
+    mes_inicio, ano_inicio = periodo_por_chave(chave_inicio)
+    mes_fim, ano_fim = periodo_por_chave(chave_fim)
+    params_periodo = (
+        usuario_id,
+        ano_inicio, ano_inicio, mes_inicio,
+        ano_fim, ano_fim, mes_fim,
+    )
+    resumos = {}
+
+    for chave in range(chave_inicio, chave_fim + 1):
+        mes_ref, ano_ref = periodo_por_chave(chave)
+        resumos[chave] = {
+            'mes': mes_ref,
+            'ano': ano_ref,
+            'saldo_bancario': 0.0,
+            'rendas_a_receber': 0.0,
+            'contas_pendentes': 0.0,
+        }
+
+    cursor.execute("""
+        SELECT
+            MesReferencia,
+            AnoReferencia,
+            SUM(SaldoBancario) AS SaldoBancario,
+            SUM(RendasAReceber) AS RendasAReceber,
+            SUM(ContasPendentes) AS ContasPendentes
+        FROM (
+            SELECT
+                MesReferencia,
+                AnoReferencia,
+                SUM(ISNULL(SaldoAtual, 0)) AS SaldoBancario,
+                0 AS RendasAReceber,
+                0 AS ContasPendentes
+            FROM FIN_Caixa
+            WHERE UsuarioId = ?
+            AND (AnoReferencia > ? OR (AnoReferencia = ? AND MesReferencia >= ?))
+            AND (AnoReferencia < ? OR (AnoReferencia = ? AND MesReferencia <= ?))
+            GROUP BY MesReferencia, AnoReferencia
+
+            UNION ALL
+
+            SELECT
+                MesReferencia,
+                AnoReferencia,
+                0 AS SaldoBancario,
+                SUM(
+                    CASE
+                        WHEN ISNULL(ValorReal, 0) > 0 THEN 0
+                        ELSE ISNULL(ValorPrevisto, 0)
+                    END
+                ) AS RendasAReceber,
+                0 AS ContasPendentes
+            FROM FIN_Rendas
+            WHERE UsuarioId = ?
+            AND (AnoReferencia > ? OR (AnoReferencia = ? AND MesReferencia >= ?))
+            AND (AnoReferencia < ? OR (AnoReferencia = ? AND MesReferencia <= ?))
+            GROUP BY MesReferencia, AnoReferencia
+
+            UNION ALL
+
+            SELECT
+                MesReferencia,
+                AnoReferencia,
+                0 AS SaldoBancario,
+                0 AS RendasAReceber,
+                SUM(ISNULL(ValorEstimado, 0)) AS ContasPendentes
+            FROM FIN_Lancamentos
+            WHERE UsuarioId = ? AND Pago = 0
+            AND (AnoReferencia > ? OR (AnoReferencia = ? AND MesReferencia >= ?))
+            AND (AnoReferencia < ? OR (AnoReferencia = ? AND MesReferencia <= ?))
+            GROUP BY MesReferencia, AnoReferencia
+        ) resumo
+        GROUP BY MesReferencia, AnoReferencia
+    """, params_periodo * 3)
+    for item in cursor.fetchall():
+        chave = chave_periodo(item.MesReferencia, item.AnoReferencia)
+        if chave in resumos:
+            resumos[chave]['saldo_bancario'] = float(item.SaldoBancario or 0)
+            resumos[chave]['rendas_a_receber'] = float(item.RendasAReceber or 0)
+            resumos[chave]['contas_pendentes'] = float(item.ContasPendentes or 0)
+
+    saldo_transportado = 0.0
+    for chave in range(chave_inicio, chave_fim + 1):
+        resumo = resumos[chave]
+        sobra = (
+            resumo['saldo_bancario']
+            + saldo_transportado
+            + resumo['rendas_a_receber']
+            - resumo['contas_pendentes']
+        )
+        saldo_transportado = max(sobra, 0.0)
+
+    return saldo_transportado
+
+
 @financas_bp.before_request
 def exigir_login():
     if 'admin_logado' not in session:
@@ -143,46 +256,58 @@ def dashboard():
 
     with get_db_cursor() as cursor:
         cursor.execute("""
-            SELECT ValorPrevisto, ISNULL(ValorReal, 0) AS ValorReal
-            FROM FIN_Rendas
-            WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
-        """, (usuario_id, mes_sel, ano_sel))
-        rendas_mes = cursor.fetchall()
-
-        rendas_recebidas = 0.0
-        rendas_a_receber = 0.0
-        for renda in rendas_mes:
-            valor_previsto = float(renda.ValorPrevisto or 0)
-            valor_real = float(renda.ValorReal or 0)
-            if valor_real > 0:
-                rendas_recebidas += valor_real
-            else:
-                rendas_a_receber += valor_previsto
-
+            SELECT
+                ISNULL((
+                    SELECT SUM(ISNULL(ValorReal, 0))
+                    FROM FIN_Rendas
+                    WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
+                    AND ISNULL(ValorReal, 0) > 0
+                ), 0) AS RendasRecebidas,
+                ISNULL((
+                    SELECT SUM(ISNULL(ValorPrevisto, 0))
+                    FROM FIN_Rendas
+                    WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
+                    AND ISNULL(ValorReal, 0) <= 0
+                ), 0) AS RendasAReceber,
+                ISNULL((
+                    SELECT SUM(ISNULL(ValorReal, 0))
+                    FROM FIN_Lancamentos
+                    WHERE UsuarioId = ? AND Pago = 1
+                    AND MesReferencia = ? AND AnoReferencia = ?
+                ), 0) AS PagasMes,
+                ISNULL((
+                    SELECT SUM(ISNULL(ValorEstimado, 0))
+                    FROM FIN_Lancamentos
+                    WHERE UsuarioId = ? AND Pago = 0
+                    AND MesReferencia = ? AND AnoReferencia = ?
+                ), 0) AS ContasPendentesMes,
+                ISNULL((
+                    SELECT SUM(ISNULL(ValorReal, 0))
+                    FROM FIN_Lancamentos
+                    WHERE UsuarioId = ? AND Pago = 1
+                    AND (AnoReferencia < ? OR (AnoReferencia = ? AND MesReferencia <= ?))
+                ), 0) AS PagasAcumuladas,
+                ISNULL((
+                    SELECT TOP 1 SaldoAtual
+                    FROM FIN_Caixa
+                    WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
+                ), 0) AS SaldoBancario
+        """, (
+            usuario_id, mes_sel, ano_sel,
+            usuario_id, mes_sel, ano_sel,
+            usuario_id, mes_sel, ano_sel,
+            usuario_id, mes_sel, ano_sel,
+            usuario_id, ano_sel, ano_sel, mes_sel,
+            usuario_id, mes_sel, ano_sel,
+        ))
+        resumo_mes = cursor.fetchone()
+        rendas_recebidas = float(resumo_mes.RendasRecebidas or 0)
+        rendas_a_receber = float(resumo_mes.RendasAReceber or 0)
         rendas_previstas = rendas_recebidas + rendas_a_receber
-        cursor.execute("""
-            SELECT SUM(ValorReal) FROM FIN_Lancamentos
-            WHERE UsuarioId = ? AND Pago = 1
-            AND MesReferencia = ? AND AnoReferencia = ?
-        """, (usuario_id, mes_sel, ano_sel))
-        res_pagas_mes = cursor.fetchone()
-        pagas_mes = float(res_pagas_mes[0]) if res_pagas_mes and res_pagas_mes[0] else 0.0
-
-        cursor.execute("""
-            SELECT SUM(ValorEstimado) FROM FIN_Lancamentos
-            WHERE UsuarioId = ? AND Pago = 0
-            AND MesReferencia = ? AND AnoReferencia = ?
-        """, (usuario_id, mes_sel, ano_sel))
-        res_pendentes = cursor.fetchone()
-        contas_pendentes_mes = float(res_pendentes[0]) if res_pendentes and res_pendentes[0] else 0.0
-
-        cursor.execute("""
-            SELECT SUM(ValorReal) FROM FIN_Lancamentos
-            WHERE UsuarioId = ? AND Pago = 1
-            AND (AnoReferencia < ? OR (AnoReferencia = ? AND MesReferencia <= ?))
-        """, (usuario_id, ano_sel, ano_sel, mes_sel))
-        res_pagas_total = cursor.fetchone()
-        pagas_acumuladas = float(res_pagas_total[0]) if res_pagas_total and res_pagas_total[0] else 0.0
+        pagas_mes = float(resumo_mes.PagasMes or 0)
+        contas_pendentes_mes = float(resumo_mes.ContasPendentesMes or 0)
+        pagas_acumuladas = float(resumo_mes.PagasAcumuladas or 0)
+        saldo_bancario = float(resumo_mes.SaldoBancario or 0)
 
         cursor.execute("""
             SELECT L.*, C.Nome as CategoriaNome, C.CorHex
@@ -193,22 +318,7 @@ def dashboard():
         """, (usuario_id, mes_sel, ano_sel))
         lancamentos = cursor.fetchall()
 
-        cursor.execute("""
-            SELECT C.Nome, SUM(L.ValorReal) as Total, C.CorHex
-            FROM FIN_Lancamentos L
-            JOIN FIN_Categorias C ON L.CategoriaId = C.CategoriaId
-            WHERE L.UsuarioId = ? AND L.MesReferencia = ? AND L.AnoReferencia = ? AND L.Pago = 1
-            GROUP BY C.Nome, C.CorHex
-        """, (usuario_id, mes_sel, ano_sel))
-        dados_grafico = cursor.fetchall()
-
-        cursor.execute("""
-            SELECT SaldoAtual
-            FROM FIN_Caixa
-            WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
-        """, (usuario_id, mes_sel, ano_sel))
-        res_caixa = cursor.fetchone()
-        saldo_bancario = float(res_caixa[0]) if res_caixa else 0.0
+        saldo_transportado = saldo_transportado_periodo(cursor, usuario_id, mes_sel, ano_sel)
 
         cursor.execute("""
             SELECT TOP 6 
@@ -249,12 +359,13 @@ def dashboard():
         for item in ranking_categorias
     ]
 
-    saldo_em_caixa_real = saldo_bancario + rendas_a_receber
-    sobra_prevista = (saldo_bancario + rendas_a_receber) - contas_pendentes_mes
+    caixa_disponivel = saldo_bancario + saldo_transportado
+    saldo_em_caixa_real = caixa_disponivel + rendas_a_receber
+    sobra_prevista = saldo_em_caixa_real - contas_pendentes_mes
 
-    labels_grafico = [d.Nome for d in dados_grafico]
-    valores_grafico = [float(d.Total or 0) for d in dados_grafico]
-    cores_grafico = [d.CorHex or '#6c757d' for d in dados_grafico]
+    labels_grafico = [d['Nome'] for d in ranking_categorias]
+    valores_grafico = [d['Total'] for d in ranking_categorias]
+    cores_grafico = [d['CorHex'] for d in ranking_categorias]
 
     return render_template('financas/dashboard.html',
                            meses=MESES_LISTA,
@@ -278,6 +389,7 @@ def dashboard():
                            valores_grafico=valores_grafico,
                            cores_grafico=cores_grafico,
                            saldo_bancario=saldo_bancario,
+                           saldo_transportado=saldo_transportado,
                            saldo_em_caixa=saldo_em_caixa_real,
                            labels_evolucao=labels_evolucao,
                            valores_evolucao=valores_evolucao,
@@ -313,6 +425,41 @@ def baixar_gasto(id):
 
     return {"success": False}, 400
 
+@financas_bp.route('/atualizar-valor-estimado/<int:id>', methods=['POST'])
+def atualizar_valor_estimado(id):
+    usuario_id = 1
+    dados = request.get_json() or {}
+    valor_bruto = dados.get('valor', '0')
+
+    try:
+        valor_float = parse_money(valor_bruto)
+        if valor_float < 0:
+            return {"success": False, "message": "Informe um valor estimado maior ou igual a zero."}, 400
+
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                SELECT Pago
+                FROM FIN_Lancamentos
+                WHERE LancamentoId = ? AND UsuarioId = ?
+            """, (id, usuario_id))
+            gasto = cursor.fetchone()
+
+            if not gasto:
+                return {"success": False, "message": "Lancamento nao encontrado"}, 404
+
+            if gasto.Pago:
+                return {"success": False, "message": "O valor estimado so pode ser editado enquanto o lancamento estiver pendente."}, 409
+
+            cursor.execute("""
+                UPDATE FIN_Lancamentos
+                SET ValorEstimado = ?
+                WHERE LancamentoId = ? AND UsuarioId = ? AND Pago = 0
+            """, (valor_float, id, usuario_id))
+
+        return {"success": True}, 200
+    except ValueError:
+        return {"success": False, "message": "Valor invalido"}, 400
+
 @financas_bp.route('/atualizar-valor-real/<int:id>', methods=['POST'])
 def atualizar_valor_real(id):
     usuario_id = 1
@@ -321,6 +468,9 @@ def atualizar_valor_real(id):
 
     try:
         valor_float = parse_money(valor_bruto)
+        if valor_float < 0:
+            return {"success": False, "message": "Informe um valor real maior ou igual a zero."}, 400
+
         with get_db_cursor() as cursor:
             cursor.execute("""
                 SELECT ISNULL(ValorReal, 0) AS ValorReal, Pago, MesReferencia, AnoReferencia
@@ -334,6 +484,7 @@ def atualizar_valor_real(id):
 
             valor_real_anterior = float(gasto.ValorReal or 0) if gasto.Pago else 0.0
             pago = 1 if valor_float > 0 else 0
+            diferenca_caixa = valor_real_anterior - valor_float
 
             cursor.execute("""
                 UPDATE FIN_Lancamentos
@@ -341,10 +492,11 @@ def atualizar_valor_real(id):
                 WHERE LancamentoId = ? AND UsuarioId = ?
             """, (valor_float, pago, id, usuario_id))
 
-            diferenca_caixa = valor_real_anterior - valor_float if pago else valor_real_anterior
+            # Ao informar o valor real no dashboard, abate o gasto do caixa.
+            # Se o valor for editado depois, movimenta apenas a diferença para evitar duplicidade.
             ajustar_caixa(cursor, usuario_id, gasto.MesReferencia, gasto.AnoReferencia, diferenca_caixa)
 
-        return {"success": True}, 200
+        return {"success": True, "delta_caixa": diferenca_caixa}, 200
     except ValueError:
         return {"success": False, "message": "Valor inválido"}, 400
 
