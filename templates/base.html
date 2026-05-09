@@ -37,7 +37,7 @@
 </head>
 <body>
     {% set endpoint = request.endpoint or '' %}
-    {% set admin_menu_ativo = endpoint.startswith('dashboard.') or endpoint.startswith('financas.') or endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.') or endpoint == 'curriculo.gerar_pdf' %}
+    {% set admin_menu_ativo = endpoint.startswith('dashboard.') or endpoint.startswith('financas.') or endpoint.startswith('assinaturas.') or endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.') or endpoint == 'curriculo.gerar_pdf' %}
 
     <nav class="navbar navbar-expand-lg navbar-dark sticky-top shadow site-navbar">
         <div class="container">
@@ -100,6 +100,11 @@
                             <li>
                                 <a class="dropdown-item {{ 'active' if endpoint == 'financas.adicionar_gasto' else '' }}" href="{{ url_for('financas.adicionar_gasto') }}">
                                     <i class="bi bi-plus-circle me-2"></i>Novo Gasto
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item {{ 'active' if endpoint.startswith('assinaturas.') else '' }}" href="{{ url_for('assinaturas.lista') }}">
+                                    <i class="bi bi-repeat me-2"></i>Assinaturas
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>

@@ -203,6 +203,37 @@
             </div>
         </div>
 
+        <div class="finance-card bg-white p-3 mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div>
+                    <h6 class="fw-bold mb-1"><i class="bi bi-repeat me-2"></i>Assinaturas recorrentes</h6>
+                    <div class="text-muted small">
+                        {{ resumo_assinaturas.ativas }} ativas • custo mensal estimado de
+                        <strong class="text-danger">{{ dinheiro(resumo_assinaturas.total_mensal) }}</strong>
+                        • projeção anual de <strong>{{ dinheiro(resumo_assinaturas.total_anual) }}</strong>
+                    </div>
+                </div>
+                <a href="{{ url_for('assinaturas.lista') }}" class="btn btn-sm btn-outline-primary fw-bold">
+                    Gerenciar
+                </a>
+            </div>
+            {% if resumo_assinaturas.proximas %}
+            <div class="row g-2 mt-3">
+                {% for item in resumo_assinaturas.proximas %}
+                <div class="col-md-6 col-xl-4">
+                    <div class="border rounded p-2 h-100">
+                        <div class="fw-bold small">{{ item.nome }}</div>
+                        <div class="small text-muted">
+                            {{ dinheiro(item.valor) }} •
+                            {% if item.dias == 0 %}renova hoje{% else %}renova em {{ item.dias }} dias{% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
         <div class="row g-4 mb-4">
             <div class="col-lg-4">
                 <div class="finance-card bg-white h-100 p-3">

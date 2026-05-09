@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% macro dinheiro(valor) -%}R$ {{ (valor or 0) | formato_real }}{%- endmacro %}
+
+{% block content %}
+<style>
+    .subscriptions-page {
+        background: #f6f8fb;
+        min-height: calc(100vh - 160px);
+    }
+
+    .service-card {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+    }
+
+    .metric-label {
+        color: #64748b;
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+
+    .metric-value {
+        color: #0f172a;
+        font-size: 1.45rem;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+
+    .subscription-row {
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        padding: 1rem;
+    }
+
+    .subscription-row:last-child {
+        border-bottom: 0;
+    }
+
+    .subscription-title {
+        color: #0f172a;
+        font-weight: 800;
+    }
+
+    .status-pill {
+        border-radius: 999px;
+        font-size: .72rem;
+        font-weight: 800;
+        padding: .25rem .65rem;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .empty-state {
+        color: #64748b;
+        padding: 3rem 1rem;
+        text-align: center;
+    }
+
+    @media (max-width: 767.98px) {
+        .subscription-row {
+            gap: .75rem;
+        }
+    }
+</style>
+
+<div class="subscriptions-page py-4">
+    <div class="container-fluid">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+            <div>
+                <h2 class="fw-bold text-dark mb-1">
+                    <i class="bi bi-repeat me-2"></i>Assinaturas
+                </h2>
+                <div class="text-muted">Serviços recorrentes, renovações e custo mensalizado.</div>
+            </div>
+
+            <a href="{{ url_for('assinaturas.form') }}" class="btn btn-primary fw-bold">
+                <i class="bi bi-plus-circle me-1"></i>Nova Assinatura
+            </a>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-xl-3">
+                <div class="service-card bg-white p-3 h-100">
+                    <div class="metric-label">Custo mensal</div>
+                    <div class="metric-value mt-2 text-danger">{{ dinheiro(resumo.total_mensal) }}</div>
+                    <div class="small text-muted mt-2">Assinaturas ativas mensalizadas</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="service-card bg-white p-3 h-100">
+                    <div class="metric-label">Projeção anual</div>
+                    <div class="metric-value mt-2 text-primary">{{ dinheiro(resumo.total_anual) }}</div>
+                    <div class="small text-muted mt-2">Impacto estimado em 12 meses</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="service-card bg-white p-3 h-100">
+                    <div class="metric-label">Ativas</div>
+                    <div class="metric-value mt-2 text-success">{{ resumo.ativas }}</div>
+                    <div class="small text-muted mt-2">Serviços recorrentes em uso</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="service-card bg-white p-3 h-100">
+                    <div class="metric-label">Próximos 7 dias</div>
+                    <div class="metric-value mt-2 text-warning">{{ resumo.proximas|length }}</div>
+                    <div class="small text-muted mt-2">Renovações chegando</div>
+                </div>
+            </div>
+        </div>
+
+        {% if resumo.proximas %}
+        <div class="service-card bg-white p-3 mb-4">
+            <h6 class="fw-bold mb-3"><i class="bi bi-bell me-2"></i>Renovações próximas</h6>
+            <div class="row g-2">
+                {% for item in resumo.proximas %}
+                <div class="col-md-6 col-xl-4">
+                    <div class="border rounded p-3 h-100">
+                        <div class="fw-bold">{{ item.nome }}</div>
+                        <div class="small text-muted">
+                            {{ dinheiro(item.valor) }} • {{ item.ciclo|capitalize }} •
+                            {% if item.dias == 0 %}vence hoje{% else %}em {{ item.dias }} dias{% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="service-card bg-white">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 p-3 border-bottom">
+                <h6 class="fw-bold mb-0"><i class="bi bi-list-check me-2"></i>Serviços cadastrados</h6>
+                <a href="{{ url_for('financas.dashboard') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-wallet2 me-1"></i>Financeiro
+                </a>
+            </div>
+
+            {% if assinaturas %}
+                {% for item in assinaturas %}
+                <div class="subscription-row d-flex flex-wrap align-items-center justify-content-between">
+                    <div class="me-3">
+                        <div class="subscription-title">{{ item.nome }}</div>
+                        <div class="small text-muted">
+                            {{ item.categoria or 'Sem categoria' }} • {{ item.ciclo|capitalize }}
+                            {% if item.observacoes %} • {{ item.observacoes }}{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap align-items-center gap-3 ms-auto">
+                        <div class="text-end">
+                            <div class="fw-bold">{{ dinheiro(item.valor) }}</div>
+                            <div class="small text-muted">{{ dinheiro(item.valor_mensal) }}/mês</div>
+                        </div>
+                        <div class="text-end" style="min-width: 130px;">
+                            <div class="fw-bold">{{ item.data_renovacao.strftime('%d/%m/%Y') if item.data_renovacao else '-' }}</div>
+                            <div class="small text-muted">
+                                {% if item.dias is not none %}
+                                    {% if item.dias < 0 %}atrasada{% elif item.dias == 0 %}hoje{% else %}em {{ item.dias }} dias{% endif %}
+                                {% else %}
+                                    sem data
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if item.ativa %}
+                            <span class="status-pill bg-success-subtle text-success">Ativa</span>
+                        {% else %}
+                            <span class="status-pill bg-secondary-subtle text-secondary">Inativa</span>
+                        {% endif %}
+                        <div class="btn-group">
+                            <a href="{{ url_for('assinaturas.form', id=item.id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <form method="POST" action="{{ url_for('assinaturas.excluir', id=item.id) }}" onsubmit="return confirm('Excluir esta assinatura?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="bi bi-repeat display-5 d-block mb-3"></i>
+                    Nenhuma assinatura cadastrada ainda.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

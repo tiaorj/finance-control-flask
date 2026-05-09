@@ -17,6 +17,7 @@ from flask import render_template
 from routes.formacao import formacao_bp
 from config import Config
 from routes.financas import financas_bp, financas_legacy_bp
+from routes.assinaturas import assinaturas_bp
 
 load_dotenv()
 
@@ -57,6 +58,7 @@ app.register_blueprint(experiencias_bp)
 app.register_blueprint(formacao_bp)
 app.register_blueprint(financas_bp)
 app.register_blueprint(financas_legacy_bp)
+app.register_blueprint(assinaturas_bp)
 app.register_blueprint(main_bp)
 
 # CONFIGURAÇÃO DE E-MAIL (Exemplo Gmail)
