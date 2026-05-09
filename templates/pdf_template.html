@@ -32,21 +32,23 @@
     <table class="container">
         <tr>
             <td class="sidebar">
-                <img src="static/img/minha-foto.jpg" class="profile-img">
-                <div class="name">Sebastião Oliveira</div>
-                <div class="role">Analista de Sistemas Sênior</div>
+                {% if perfil.foto_arquivo %}
+                <img src="static/{{ perfil.foto_arquivo }}" class="profile-img">
+                {% endif %}
+                <div class="name">{{ perfil.nome }}</div>
+                <div class="role">{{ perfil.cargo }}</div>
 
                 <div class="section-header" style="font-size: 11pt;">Resumo</div>
                 <div class="sidebar-text">
-                    Analista de Sistemas Sênior e Arquiteto com +20 anos de experiência. 
-                    Especialista em modernização de sistemas legados e performance de banco de dados.
+                    {{ perfil.resumo }}
                 </div>
 
                 <div class="section-header" style="font-size: 11pt;">Contato</div>
                 <div class="sidebar-text">
-                    <strong>📍 Rio de Janeiro - RJ</strong><br>
-                    <strong>📧 {{ 'tiaorj@gmail.com' }}</strong><br>
-                    <strong>🔗 linkedin.com/in/sebastiao</strong>
+                    {% if perfil.localizacao %}<strong>{{ perfil.localizacao }}</strong><br>{% endif %}
+                    {% if perfil.telefone %}<strong>{{ perfil.telefone }}</strong><br>{% endif %}
+                    {% if perfil.email %}<strong>{{ perfil.email }}</strong><br>{% endif %}
+                    {% if perfil.linkedin %}<strong>{{ perfil.linkedin }}</strong>{% endif %}
                 </div>
             </td>
 

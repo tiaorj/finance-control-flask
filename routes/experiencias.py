@@ -2,6 +2,7 @@ import re
 import unicodedata
 from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask_login import current_user
 from database import get_db_cursor
 from routes.admin import login_required
 
@@ -15,6 +16,7 @@ def slugify(text):
 @experiencias_bp.route('/')
 @login_required
 def lista():
+    usuario_id = int(current_user.get_id())
     with get_db_cursor() as cursor:
         cursor.execute("""
             SELECT E.ExperienciaId, Em.NomeEmpresa, E.Cargo,
@@ -22,8 +24,9 @@ def lista():
                    ISNULL(FORMAT(E.DataFim, 'MM/yyyy'), 'Atual') as Fim
             FROM ExperienciaProfissional E
             JOIN Empresa Em ON E.EmpresaId = Em.EmpresaId
+            WHERE E.UsuarioId = ?
             ORDER BY E.DataInicio DESC
-        """)
+        """, (usuario_id,))
         experiencias = cursor.fetchall()
 
     return render_template('admin/experiencias_lista.html', experiencias=experiencias)
@@ -32,6 +35,7 @@ def lista():
 @experiencias_bp.route('/form/<int:id>', methods=['GET', 'POST'])
 @login_required
 def form(id):
+    usuario_id = int(current_user.get_id())
     if request.method == 'POST':
         nome_empresa = request.form.get('nome_empresa').strip()
         cargo = request.form.get('cargo')
@@ -54,18 +58,27 @@ def form(id):
 
             if id:
                 cursor.execute("""
+                    SELECT ExperienciaId
+                    FROM ExperienciaProfissional
+                    WHERE ExperienciaId = ? AND UsuarioId = ?
+                """, (id, usuario_id))
+                if not cursor.fetchone():
+                    flash('Experiência não encontrada para este usuário.', 'warning')
+                    return redirect(url_for('experiencias_admin.lista'))
+
+                cursor.execute("""
                     UPDATE ExperienciaProfissional
                     SET EmpresaId=?, Cargo=?, ResumoCurto=?, DataInicio=?, DataFim=?
-                    WHERE ExperienciaId=?
-                """, (empresa_id, cargo, resumo, data_inicio, data_fim, id))
+                    WHERE ExperienciaId=? AND UsuarioId=?
+                """, (empresa_id, cargo, resumo, data_inicio, data_fim, id, usuario_id))
                 exp_id = id
                 cursor.execute("DELETE FROM ExperienciaDetalhe WHERE ExperienciaId = ?", (id,))
             else:
                 cursor.execute("""
-                    INSERT INTO ExperienciaProfissional (EmpresaId, Cargo, ResumoCurto, DataInicio, DataFim)
+                    INSERT INTO ExperienciaProfissional (UsuarioId, EmpresaId, Cargo, ResumoCurto, DataInicio, DataFim)
                     OUTPUT INSERTED.ExperienciaId
-                    VALUES (?, ?, ?, ?, ?)
-                """, (empresa_id, cargo, resumo, data_inicio, data_fim))
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (usuario_id, empresa_id, cargo, resumo, data_inicio, data_fim))
                 exp_id = cursor.fetchone()[0]
 
             for desc in conquistas_enviadas:
@@ -89,8 +102,8 @@ def form(id):
                 SELECT E.Cargo, E.ResumoCurto, E.DataInicio, E.DataFim, Em.NomeEmpresa
                 FROM ExperienciaProfissional E
                 JOIN Empresa Em ON E.EmpresaId = Em.EmpresaId
-                WHERE E.ExperienciaId = ?
-            """, (id,))
+                WHERE E.ExperienciaId = ? AND E.UsuarioId = ?
+            """, (id, usuario_id))
             row = cursor.fetchone()
             if row:
                 exp = {
@@ -109,17 +122,20 @@ def form(id):
                            nome_empresa_atual=nome_empresa_atual)
 
 @experiencias_bp.route('/trajetoria')
+@login_required
 def trajetoria_publica():
+    usuario_id = int(current_user.get_id())
     with get_db_cursor() as cursor:
         cursor.execute("""
             SELECT E.*, Em.NomeEmpresa
             FROM ExperienciaProfissional E
             JOIN Empresa Em ON E.EmpresaId = Em.EmpresaId
+            WHERE E.UsuarioId = ?
             ORDER BY
                 CASE WHEN E.DataFim IS NULL THEN 0 ELSE 1 END,
                 E.DataFim DESC,
                 E.DataInicio DESC
-        """)
+        """, (usuario_id,))
         experiencias_raw = cursor.fetchall()
 
         experiencias = []

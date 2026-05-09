@@ -9,18 +9,18 @@ from database import get_db_cursor
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/admin')
 
 
-def _perfil_status(cursor):
+def _perfil_status(cursor, usuario_id):
     checks = [
-        ("Experi&ecirc;ncias", "SELECT COUNT(*) FROM ExperienciaProfissional"),
-        ("Forma&ccedil;&atilde;o", "SELECT COUNT(*) FROM FormacaoAcademica"),
-        ("Projetos", "SELECT COUNT(*) FROM Projeto"),
-        ("Certifica&ccedil;&otilde;es", "SELECT COUNT(*) FROM Certificacoes"),
+        ("Experi&ecirc;ncias", "SELECT COUNT(*) FROM ExperienciaProfissional WHERE UsuarioId = ?"),
+        ("Forma&ccedil;&atilde;o", "SELECT COUNT(*) FROM FormacaoAcademica WHERE UsuarioId = ?"),
+        ("Projetos", "SELECT COUNT(*) FROM Projeto WHERE UsuarioId = ?"),
+        ("Certifica&ccedil;&otilde;es", "SELECT COUNT(*) FROM Certificacoes WHERE UsuarioId = ?"),
     ]
     concluidos = 0
     detalhes = []
 
     for label, query in checks:
-        cursor.execute(query)
+        cursor.execute(query, (usuario_id,))
         total = cursor.fetchone()[0]
         ativo = total > 0
         concluidos += 1 if ativo else 0
@@ -88,7 +88,7 @@ def index():
         """, (usuario_id,))
         proximas_contas = cursor.fetchall()
 
-        perfil_percentual, perfil_itens = _perfil_status(cursor)
+        perfil_percentual, perfil_itens = _perfil_status(cursor, usuario_id)
 
     saldo_atual = float(financeiro.SaldoAtual or 0)
     rendas_recebidas = float(financeiro.RendasRecebidas or 0)

@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app
+from flask_login import current_user, login_required
 from database import get_db_cursor
 from flask_mail import Message
 
@@ -9,10 +10,17 @@ def home():
     return render_template('landing.html')
 
 @empresa_bp.route('/projetos')
+@login_required
 def projetos():
+    usuario_id = int(current_user.get_id())
     with get_db_cursor() as cursor:
         # Busca os projetos da nova tabela conforme sua remodelagem
-        cursor.execute("SELECT Titulo, Descricao, Tecnologias, IconeClass FROM Projeto ORDER BY OrdemExibicao")
+        cursor.execute("""
+            SELECT Titulo, Descricao, Tecnologias, IconeClass
+            FROM Projeto
+            WHERE UsuarioId = ?
+            ORDER BY OrdemExibicao
+        """, (usuario_id,))
         projetos = []
         for row in cursor.fetchall():
             projetos.append({

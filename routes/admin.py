@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from database import get_db_cursor
-from flask_login import UserMixin, login_required, login_user, logout_user
+from flask_login import UserMixin, current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import datetime
 
@@ -113,6 +113,7 @@ def logout():
 @admin_bp.route('/experiencia/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
 def editar_experiencia(id):
+    usuario_id = int(current_user.get_id())
     if request.method == 'POST':
         nome_empresa = request.form.get('nome_empresa')
         cargo = request.form.get('cargo')
@@ -130,8 +131,8 @@ def editar_experiencia(id):
             cursor.execute("""
                 UPDATE ExperienciaProfissional
                 SET EmpresaId = ?, Cargo = ?, ResumoCurto = ?, DataInicio = ?, DataFim = ?
-                WHERE ExperienciaId = ?
-            """, (empresa[0], cargo, resumo, data_inicio, data_fim, id))
+                WHERE ExperienciaId = ? AND UsuarioId = ?
+            """, (empresa[0], cargo, resumo, data_inicio, data_fim, id, usuario_id))
 
         flash('Experiência e empresa atualizadas!', 'success')
         return redirect(url_for('curriculo.especialista'))
@@ -141,15 +142,17 @@ def editar_experiencia(id):
             SELECT E.*, Em.NomeEmpresa
             FROM ExperienciaProfissional E
             JOIN Empresa Em ON E.EmpresaId = Em.EmpresaId
-            WHERE E.ExperienciaId = ?
-        """, (id,))
+            WHERE E.ExperienciaId = ? AND E.UsuarioId = ?
+        """, (id, usuario_id))
         exp = cursor.fetchone()
 
         cursor.execute("SELECT NomeEmpresa FROM Empresa ORDER BY NomeEmpresa")
         empresas = [row[0] for row in cursor.fetchall()]
 
-        cursor.execute("SELECT * FROM ExperienciaDetalhe WHERE ExperienciaId = ?", (id,))
-        detalhes = cursor.fetchall()
+        detalhes = []
+        if exp:
+            cursor.execute("SELECT * FROM ExperienciaDetalhe WHERE ExperienciaId = ?", (id,))
+            detalhes = cursor.fetchall()
 
     nome_empresa_atual = exp.NomeEmpresa if exp else ""
     return render_template('admin/form_experiencia.html',
@@ -159,9 +162,19 @@ def editar_experiencia(id):
 @admin_bp.route('/experiencia/detalhe/adicionar/<int:exp_id>', methods=['POST'])
 @login_required
 def adicionar_conquista(exp_id):
+    usuario_id = int(current_user.get_id())
     descricao = request.form.get('descricao_conquista')
     if descricao:
         with get_db_cursor() as cursor:
+            cursor.execute("""
+                SELECT ExperienciaId
+                FROM ExperienciaProfissional
+                WHERE ExperienciaId = ? AND UsuarioId = ?
+            """, (exp_id, usuario_id))
+            if not cursor.fetchone():
+                flash('Experiência não encontrada para este usuário.', 'warning')
+                return redirect(url_for('experiencias_admin.lista'))
+
             cursor.execute("""
                 INSERT INTO ExperienciaDetalhe (ExperienciaId, DescricaoConquista)
                 VALUES (?, ?)
@@ -173,8 +186,14 @@ def adicionar_conquista(exp_id):
 @admin_bp.route('/experiencia/detalhe/excluir/<int:detalhe_id>/<int:exp_id>', methods=['POST'])
 @login_required
 def excluir_conquista(detalhe_id, exp_id):
+    usuario_id = int(current_user.get_id())
     with get_db_cursor() as cursor:
-        cursor.execute("DELETE FROM ExperienciaDetalhe WHERE ExperienciaDetalheId = ?", (detalhe_id,))
+        cursor.execute("""
+            DELETE D
+            FROM ExperienciaDetalhe D
+            JOIN ExperienciaProfissional E ON D.ExperienciaId = E.ExperienciaId
+            WHERE D.ExperienciaDetalheId = ? AND E.ExperienciaId = ? AND E.UsuarioId = ?
+        """, (detalhe_id, exp_id, usuario_id))
 
     flash('Conquista removida.', 'info')
     return redirect(url_for('admin.editar_experiencia', id=exp_id))
