@@ -85,7 +85,7 @@ def index():
         financeiro = cursor.fetchone()
 
         cursor.execute("""
-            SELECT TOP 4 L.Descricao, L.ValorEstimado, L.DataVencimento, C.Nome AS CategoriaNome
+            SELECT TOP 4 L.LancamentoId, L.Descricao, L.ValorEstimado, L.DataVencimento, C.Nome AS CategoriaNome
             FROM FIN_Lancamentos L
             LEFT JOIN FIN_Categorias C ON L.CategoriaId = C.CategoriaId
             WHERE L.UsuarioId = ?

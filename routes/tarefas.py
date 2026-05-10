@@ -290,6 +290,8 @@ def form(id):
 def concluir(id):
     usuario_id = usuario_atual_id()
     observacao = (request.form.get('observacao') or '').strip() or None
+    next_url = request.form.get('next')
+    destino = next_url if next_url and next_url.startswith('/') and not next_url.startswith('//') else url_for('tarefas.lista')
 
     with get_db_cursor() as cursor:
         garantir_tabelas_tarefas(cursor)
@@ -302,7 +304,7 @@ def concluir(id):
 
         if not tarefa:
             flash('Tarefa nao encontrada.', 'warning')
-            return redirect(url_for('tarefas.lista'))
+            return redirect(destino)
 
         proxima_data = normalizar_data(tarefa.ProximaData) or date.today()
         intervalo_meses = int(tarefa.IntervaloMeses or 1)
@@ -325,7 +327,7 @@ def concluir(id):
         """, (nova_data, id, usuario_id))
 
     flash('Tarefa concluida e reagendada.', 'success')
-    return redirect(url_for('tarefas.lista'))
+    return redirect(destino)
 
 
 @tarefas_bp.route('/pular/<int:id>', methods=['POST'])

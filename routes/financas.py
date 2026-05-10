@@ -15,6 +15,13 @@ def usuario_atual_id():
     return int(current_user.get_id())
 
 
+def destino_local_ou(default_endpoint, **valores):
+    next_url = request.form.get('next') or request.args.get('next')
+    if next_url and next_url.startswith('/') and not next_url.startswith('//'):
+        return next_url
+    return url_for(default_endpoint, **valores)
+
+
 @financas_legacy_bp.route('/dashboard')
 @financas_legacy_bp.route('', strict_slashes=False)
 def legacy_dashboard():
@@ -259,6 +266,7 @@ def adicionar_gasto():
         cursor.execute("""
             SELECT CategoriaId, Nome
             FROM FIN_Categorias
+            WHERE UsuarioId = ?
             ORDER BY Nome
         """, (usuario_id,))
         categorias = cursor.fetchall()
@@ -376,6 +384,15 @@ def dashboard():
             ORDER BY Total DESC
         """, (usuario_id, mes_sel, ano_sel))
         ranking_categorias = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT CategoriaId, Nome
+            FROM FIN_Categorias
+            WHERE UsuarioId = ?
+            ORDER BY Nome
+        """, (usuario_id,))
+        categorias = cursor.fetchall()
+
         resumo_assinaturas = montar_resumo_assinaturas(cursor, usuario_id)
         resumo_metas = montar_resumo_metas(cursor, usuario_id)
 
@@ -395,6 +412,12 @@ def dashboard():
     labels_grafico = [d['Nome'] for d in ranking_categorias]
     valores_grafico = [d['Total'] for d in ranking_categorias]
     cores_grafico = [d['CorHex'] for d in ranking_categorias]
+    ultimo_dia_mes = calendar.monthrange(ano_sel, mes_sel)[1]
+    data_padrao_lancamento = date(
+        ano_sel,
+        mes_sel,
+        min(datetime.now().day, ultimo_dia_mes)
+    ).strftime('%Y-%m-%d')
 
     return render_template('financas/dashboard.html',
                            meses=MESES_LISTA,
@@ -424,11 +447,14 @@ def dashboard():
                            resumo_metas=resumo_metas,
                            labels_evolucao=labels_evolucao,
                            valores_evolucao=valores_evolucao,
-                           ranking_categorias=ranking_categorias)
+                           ranking_categorias=ranking_categorias,
+                           categorias=categorias,
+                           data_padrao_lancamento=data_padrao_lancamento)
 
 @financas_bp.route('/baixar-gasto/<int:id>', methods=['POST'])
 def baixar_gasto(id):
     usuario_id = usuario_atual_id()
+    destino = destino_local_ou('financas.dashboard')
 
     with get_db_cursor() as cursor:
         cursor.execute("""
@@ -452,8 +478,14 @@ def baixar_gasto(id):
             if not gasto.Pago and valor_para_baixa > 0:
                 ajustar_caixa(cursor, usuario_id, gasto.MesReferencia, gasto.AnoReferencia, -valor_para_baixa)
 
+            if request.form.get('next') or request.args.get('next'):
+                flash('Lancamento baixado com sucesso.', 'success')
+                return redirect(destino)
             return {"success": True}, 200
 
+    if request.form.get('next') or request.args.get('next'):
+        flash('Lancamento nao encontrado.', 'warning')
+        return redirect(destino)
     return {"success": False}, 400
 
 @financas_bp.route('/atualizar-valor-estimado/<int:id>', methods=['POST'])

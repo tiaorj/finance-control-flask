@@ -131,6 +131,14 @@
                             <div class="text-end">
                                 <strong>{{ dinheiro(conta.ValorEstimado) }}</strong>
                                 <span>{{ conta.DataVencimento.strftime('%d/%m') if conta.DataVencimento else '-' }}</span>
+                                <form action="{{ url_for('financas.baixar_gasto', id=conta.LancamentoId) }}" method="POST" class="mt-2">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="next" value="{{ url_for('dashboard.index') }}">
+                                    <button type="submit" class="btn btn-sm btn-success fw-bold"
+                                            onclick="return confirm('Confirmar pagamento deste item?');">
+                                        <i class="bi bi-check2-circle me-1"></i>Dar baixa
+                                    </button>
+                                </form>
                             </div>
                         </article>
                     {% else %}
@@ -160,6 +168,13 @@
                             <div class="text-end">
                                 <strong>{{ tarefa.status_texto }}</strong>
                                 <span>{{ tarefa.proxima_data.strftime('%d/%m') if tarefa.proxima_data else '-' }}</span>
+                                <form action="{{ url_for('tarefas.concluir', id=tarefa.id) }}" method="POST" class="mt-2">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="next" value="{{ url_for('dashboard.index') }}">
+                                    <button type="submit" class="btn btn-sm btn-success fw-bold">
+                                        <i class="bi bi-check2-circle me-1"></i>Concluir
+                                    </button>
+                                </form>
                             </div>
                         </article>
                     {% else %}
