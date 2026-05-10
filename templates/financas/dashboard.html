@@ -234,6 +234,38 @@
             {% endif %}
         </div>
 
+        <div class="finance-card bg-white p-3 mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div>
+                    <h6 class="fw-bold mb-1"><i class="bi bi-piggy-bank me-2"></i>Metas financeiras</h6>
+                    <div class="text-muted small">
+                        {{ resumo_metas.ativas }} ativas • reservado
+                        <strong class="text-success">{{ dinheiro(resumo_metas.total_atual) }}</strong>
+                        de <strong>{{ dinheiro(resumo_metas.total_alvo) }}</strong>
+                        • {{ "%.1f"|format(resumo_metas.progresso_geral) }}% completo
+                    </div>
+                </div>
+                <a href="{{ url_for('metas.lista') }}" class="btn btn-sm btn-outline-primary fw-bold">
+                    Ver metas
+                </a>
+            </div>
+            {% if resumo_metas.metas %}
+            <div class="row g-2 mt-3">
+                {% for meta in resumo_metas.metas[:3] %}
+                <div class="col-md-6 col-xl-4">
+                    <div class="border rounded p-2 h-100">
+                        <div class="fw-bold small">{{ meta.nome }}</div>
+                        <div class="progress my-2" style="height: 7px;">
+                            <div class="progress-bar" style="width: {{ meta.progresso }}%; background-color: {{ meta.cor_hex }};"></div>
+                        </div>
+                        <div class="small text-muted">{{ dinheiro(meta.valor_atual) }} de {{ dinheiro(meta.valor_alvo) }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
         <div class="row g-4 mb-4">
             <div class="col-lg-4">
                 <div class="finance-card bg-white h-100 p-3">

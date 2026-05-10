@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="fw-bold text-uppercase mb-0">
+                    {% if lembrete %}Editar{% else %}Novo{% endif %} <span class="text-primary-custom">Lembrete</span>
+                </h2>
+                <a href="{{ url_for('veiculos.lista') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+            </div>
+
+            <form method="POST" class="card shadow-sm border-0">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase">Veiculo</label>
+                            <select name="veiculo_id" class="form-select" required>
+                                <option value="">Selecione...</option>
+                                {% for veiculo in veiculos %}
+                                    {% set selecionado = (lembrete and lembrete.VeiculoId == veiculo.VeiculoId) or (not lembrete and veiculo_id_pre and veiculo_id_pre|int == veiculo.VeiculoId) %}
+                                    <option value="{{ veiculo.VeiculoId }}" {% if selecionado %}selected{% endif %}>{{ veiculo.Apelido }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase">Tipo</label>
+                            <select name="tipo" id="tipo" class="form-select">
+                                {% for valor, label in tipos_lembrete.items() %}
+                                    <option value="{{ valor }}" {% if lembrete and lembrete.Tipo == valor %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label small fw-bold text-uppercase">Titulo</label>
+                            <input type="text" name="titulo" id="titulo" class="form-control" value="{{ lembrete.Titulo if lembrete else '' }}" placeholder="Trocar oleo, pagar IPVA, renovar seguro...">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Data de vencimento</label>
+                            <input type="date" name="data_vencimento" class="form-control"
+                                   value="{{ lembrete.DataVencimento.strftime('%Y-%m-%d') if lembrete and lembrete.DataVencimento and not lembrete.DataVencimento is string else lembrete.DataVencimento if lembrete and lembrete.DataVencimento is string else '' }}">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Km de vencimento</label>
+                            <input type="number" min="0" name="km_vencimento" class="form-control" value="{{ lembrete.KmVencimento if lembrete and lembrete.KmVencimento is not none else '' }}" placeholder="50000">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Valor estimado</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="text" name="valor_estimado" class="form-control" value="{{ (lembrete.ValorEstimado or 0)|formato_real if lembrete and lembrete.ValorEstimado else '' }}" placeholder="350,00">
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase">Recorrencia em meses</label>
+                            <input type="number" min="1" name="recorrencia_meses" class="form-control" value="{{ lembrete.RecorrenciaMeses if lembrete and lembrete.RecorrenciaMeses else '' }}" placeholder="6, 12...">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase">Intervalo em km</label>
+                            <input type="number" min="1" name="intervalo_km" class="form-control" value="{{ lembrete.IntervaloKm if lembrete and lembrete.IntervaloKm else '' }}" placeholder="5000, 10000...">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label small fw-bold text-uppercase">Observacoes</label>
+                            <textarea name="observacoes" class="form-control" rows="3">{{ lembrete.Observacoes if lembrete else '' }}</textarea>
+                        </div>
+
+                        {% if lembrete %}
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="concluido" name="concluido"
+                                       {% if lembrete.Concluido %}checked{% endif %}>
+                                <label class="form-check-label fw-bold" for="concluido">Lembrete concluido</label>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-footer bg-white border-0 p-4 pt-0">
+                    <button type="submit" class="btn btn-primary-custom w-100 fw-bold py-3">
+                        <i class="bi bi-save me-2"></i>Salvar Lembrete
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+const titulosPadrao = {
+    oleo: 'Troca de oleo',
+    ipva: 'IPVA',
+    seguro: 'Seguro',
+    pneus: 'Pneus',
+    licenciamento: 'Licenciamento',
+    revisao: 'Revisao',
+    outro: ''
+};
+
+document.getElementById('tipo')?.addEventListener('change', function() {
+    const titulo = document.getElementById('titulo');
+    if (!titulo || titulo.value.trim()) return;
+    titulo.value = titulosPadrao[this.value] || '';
+});
+</script>
+{% endblock %}

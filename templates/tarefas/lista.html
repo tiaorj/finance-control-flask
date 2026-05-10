@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .tasks-page {
+        background: #f6f8fb;
+        min-height: calc(100vh - 160px);
+    }
+
+    .task-card {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+    }
+
+    .metric-label {
+        color: #64748b;
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+
+    .metric-value {
+        color: #0f172a;
+        font-size: 1.45rem;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+
+    .task-title {
+        color: #0f172a;
+        font-weight: 800;
+    }
+
+    .task-status {
+        border-radius: 999px;
+        display: inline-flex;
+        font-size: .72rem;
+        font-weight: 800;
+        line-height: 1;
+        padding: .42rem .62rem;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .task-status-atrasada {
+        background: #fee2e2;
+        color: #b42318;
+    }
+
+    .task-status-hoje {
+        background: #fff3cd;
+        color: #946200;
+    }
+
+    .task-status-semana {
+        background: #dbeafe;
+        color: #175cd3;
+    }
+
+    .task-status-futura,
+    .task-status-sem_data {
+        background: #ecfdf3;
+        color: #067647;
+    }
+
+    .completion-row {
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        padding: .75rem 0;
+    }
+
+    .completion-row:last-child {
+        border-bottom: 0;
+    }
+
+    .empty-state {
+        color: #64748b;
+        padding: 3rem 1rem;
+        text-align: center;
+    }
+
+    @media (max-width: 575.98px) {
+        .task-actions,
+        .task-actions .btn,
+        .task-actions form {
+            width: 100%;
+        }
+    }
+</style>
+
+<div class="tasks-page py-4">
+    <div class="container-fluid">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+            <div>
+                <h2 class="fw-bold text-dark mb-1">
+                    <i class="bi bi-calendar2-check me-2"></i>Tarefas
+                </h2>
+                <div class="text-muted">Checklist recorrente para compromissos domesticos, documentos e manutencoes.</div>
+            </div>
+
+            <a href="{{ url_for('tarefas.form') }}" class="btn btn-primary fw-bold">
+                <i class="bi bi-plus-circle me-1"></i>Nova Tarefa
+            </a>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-xl-3">
+                <div class="task-card bg-white p-3 h-100">
+                    <div class="metric-label">Atrasadas</div>
+                    <div class="metric-value mt-2 text-danger">{{ resumo.atrasadas }}</div>
+                    <div class="small text-muted mt-2">Precisam de atencao</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="task-card bg-white p-3 h-100">
+                    <div class="metric-label">Hoje</div>
+                    <div class="metric-value mt-2 text-warning">{{ resumo.hoje }}</div>
+                    <div class="small text-muted mt-2">Vencem nesta data</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="task-card bg-white p-3 h-100">
+                    <div class="metric-label">Proximos 7 dias</div>
+                    <div class="metric-value mt-2 text-primary">{{ resumo.semana }}</div>
+                    <div class="small text-muted mt-2">Inclui tarefas de hoje</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="task-card bg-white p-3 h-100">
+                    <div class="metric-label">Ativas</div>
+                    <div class="metric-value mt-2">{{ resumo.ativas }}</div>
+                    <div class="small text-muted mt-2">{{ resumo.do_mes }} no checklist deste mes</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-xl-8">
+                {% if tarefas %}
+                    <div class="row g-3">
+                        {% for tarefa in tarefas %}
+                        <div class="col-lg-6">
+                            <div class="task-card bg-white p-3 h-100">
+                                <div class="d-flex justify-content-between gap-3">
+                                    <div>
+                                        <div class="task-title">{{ tarefa.titulo }}</div>
+                                        <div class="small text-muted">
+                                            {{ tarefa.categoria }} &bull; {{ tarefa.periodicidade_label }}
+                                        </div>
+                                    </div>
+                                    <span class="task-status task-status-{{ tarefa.status }}">{{ tarefa.status_texto }}</span>
+                                </div>
+
+                                <div class="border-top border-bottom py-3 my-3">
+                                    <div class="d-flex justify-content-between gap-3">
+                                        <div>
+                                            <div class="metric-label">Proxima data</div>
+                                            <div class="fw-bold">
+                                                {{ tarefa.proxima_data.strftime('%d/%m/%Y') if tarefa.proxima_data else '-' }}
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <div class="metric-label">Ultima conclusao</div>
+                                            <div class="fw-bold">
+                                                {{ tarefa.ultima_conclusao.strftime('%d/%m/%Y') if tarefa.ultima_conclusao else '-' }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% if tarefa.observacoes %}
+                                        <div class="small text-muted mt-3">{{ tarefa.observacoes }}</div>
+                                    {% endif %}
+                                </div>
+
+                                <form method="POST" action="{{ url_for('tarefas.concluir', id=tarefa.id) }}" class="row g-2">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div class="col-md">
+                                        <input type="text" name="observacao" class="form-control form-control-sm" placeholder="Observacao opcional">
+                                    </div>
+                                    <div class="col-md-auto d-grid">
+                                        <button type="submit" class="btn btn-sm btn-success fw-bold">
+                                            <i class="bi bi-check2-circle me-1"></i>Concluir
+                                        </button>
+                                    </div>
+                                </form>
+
+                                <div class="d-flex flex-wrap gap-2 mt-3 task-actions">
+                                    <a href="{{ url_for('tarefas.form', id=tarefa.id) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil me-1"></i>Editar
+                                    </a>
+                                    <form method="POST" action="{{ url_for('tarefas.pular', id=tarefa.id) }}" onsubmit="return confirm('Reagendar para o proximo ciclo?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                            <i class="bi bi-skip-forward me-1"></i>Pular ciclo
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('tarefas.excluir', id=tarefa.id) }}" onsubmit="return confirm('Excluir esta tarefa?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash me-1"></i>Excluir
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="task-card bg-white empty-state">
+                        <i class="bi bi-calendar2-check display-5 d-block mb-3"></i>
+                        Nenhuma tarefa recorrente criada ainda.
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="col-xl-4">
+                <div class="task-card bg-white p-3 h-100">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-clock-history me-2"></i>Conclusoes recentes</h6>
+                    {% if conclusoes %}
+                        {% for item in conclusoes %}
+                        <div class="completion-row">
+                            <div class="d-flex justify-content-between gap-3">
+                                <div>
+                                    <div class="fw-bold small">{{ item.Titulo }}</div>
+                                    <div class="small text-muted">{{ item.Observacao or 'Concluida' }}</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold text-success">{{ item.DataConclusao.strftime('%d/%m') if item.DataConclusao else '' }}</div>
+                                    <div class="small text-muted">
+                                        prox. {{ item.ProximaDataGerada.strftime('%d/%m') if item.ProximaDataGerada else '-' }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state py-5">Sem conclusoes ainda.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

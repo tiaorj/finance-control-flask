@@ -4,6 +4,7 @@ from datetime import datetime, date
 import calendar
 from flask_login import current_user
 from routes.assinaturas import montar_resumo_assinaturas
+from routes.metas import montar_resumo_metas
 
 financas_bp = Blueprint('financas', __name__, url_prefix='/app/financeiro')
 financas_legacy_bp = Blueprint('financas_legacy', __name__, url_prefix='/financas')
@@ -257,7 +258,6 @@ def adicionar_gasto():
         cursor.execute("""
             SELECT CategoriaId, Nome
             FROM FIN_Categorias
-            WHERE UsuarioId = ?
             ORDER BY Nome
         """, (usuario_id,))
         categorias = cursor.fetchall()
@@ -374,6 +374,7 @@ def dashboard():
         """, (usuario_id, mes_sel, ano_sel))
         ranking_categorias = cursor.fetchall()
         resumo_assinaturas = montar_resumo_assinaturas(cursor, usuario_id)
+        resumo_metas = montar_resumo_metas(cursor, usuario_id)
 
     ranking_categorias = [
         {
@@ -417,6 +418,7 @@ def dashboard():
                            saldo_transportado=saldo_transportado,
                            saldo_em_caixa=saldo_em_caixa_real,
                            resumo_assinaturas=resumo_assinaturas,
+                           resumo_metas=resumo_metas,
                            labels_evolucao=labels_evolucao,
                            valores_evolucao=valores_evolucao,
                            ranking_categorias=ranking_categorias)

@@ -144,6 +144,72 @@
                 <a href="{{ url_for('financas.adicionar_gasto') }}" class="btn btn-primary w-100 fw-bold mt-3">
                     Novo lan&ccedil;amento
                 </a>
+
+                <div class="client-section-title mt-4">
+                    <span class="admin-kicker">Checklist</span>
+                    <h2>Tarefas do m&ecirc;s</h2>
+                </div>
+
+                <div class="client-pending-list">
+                    {% for tarefa in resumo_tarefas.proximas %}
+                        <article>
+                            <div>
+                                <strong>{{ tarefa.titulo }}</strong>
+                                <span>{{ tarefa.categoria }} &bull; {{ tarefa.periodicidade_label }}</span>
+                            </div>
+                            <div class="text-end">
+                                <strong>{{ tarefa.status_texto }}</strong>
+                                <span>{{ tarefa.proxima_data.strftime('%d/%m') if tarefa.proxima_data else '-' }}</span>
+                            </div>
+                        </article>
+                    {% else %}
+                        <div class="client-empty-state">
+                            <i class="bi bi-check2-circle"></i>
+                            <p>Nenhuma tarefa pendente para este m&ecirc;s.</p>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <a href="{{ url_for('tarefas.lista') }}" class="btn btn-outline-primary w-100 fw-bold mt-3">
+                    Abrir checklist
+                </a>
+
+                <div class="client-section-title mt-4">
+                    <span class="admin-kicker">Ve&iacute;culos</span>
+                    <h2>Manuten&ccedil;&otilde;es</h2>
+                </div>
+
+                <div class="client-pending-list">
+                    {% for item in resumo_veiculos.proximos %}
+                        <article>
+                            <div>
+                                <strong>{{ item.titulo }}</strong>
+                                <span>{{ item.veiculo }} &bull; {{ item.tipo_label }}</span>
+                            </div>
+                            <div class="text-end">
+                                <strong>{{ item.status_texto }}</strong>
+                                <span>
+                                    {% if item.data_vencimento %}
+                                        {{ item.data_vencimento.strftime('%d/%m') }}
+                                    {% elif item.km_vencimento %}
+                                        {{ item.km_vencimento }} km
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </article>
+                    {% else %}
+                        <div class="client-empty-state">
+                            <i class="bi bi-check2-circle"></i>
+                            <p>Nenhum alerta de ve&iacute;culo cadastrado.</p>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <a href="{{ url_for('veiculos.lista') }}" class="btn btn-outline-primary w-100 fw-bold mt-3">
+                    Abrir ve&iacute;culos
+                </a>
             </aside>
         </section>
     </div>

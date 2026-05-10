@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="fw-bold text-uppercase mb-0">
+                    {% if meta %}Editar{% else %}Nova{% endif %} <span class="text-primary-custom">Meta</span>
+                </h2>
+                <a href="{{ url_for('metas.lista') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+            </div>
+
+            <form method="POST" class="card shadow-sm border-0">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label small fw-bold text-uppercase">Nome da meta</label>
+                            <input type="text" name="nome" class="form-control" value="{{ meta.Nome if meta else '' }}" placeholder="Reserva de emergência, viagem, entrada do imóvel..." required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Cor</label>
+                            <input type="color" name="cor_hex" class="form-control form-control-color w-100" value="{{ meta.CorHex if meta and meta.CorHex else '#0d6efd' }}">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Valor alvo</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="text" name="valor_alvo" class="form-control" value="{{ (meta.ValorAlvo or 0)|formato_real if meta else '' }}" placeholder="10000,00" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Valor atual</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="text" name="valor_atual" class="form-control" value="{{ (meta.ValorAtual or 0)|formato_real if meta else '0,00' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Data alvo</label>
+                            <input type="date" name="data_alvo" class="form-control"
+                                   value="{{ meta.DataAlvo.strftime('%Y-%m-%d') if meta and meta.DataAlvo and not meta.DataAlvo is string else meta.DataAlvo if meta and meta.DataAlvo is string else '' }}">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label small fw-bold text-uppercase">Observações</label>
+                            <textarea name="observacoes" class="form-control" rows="3">{{ meta.Observacoes if meta else '' }}</textarea>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="ativa" name="ativa"
+                                       {% if not meta or meta.Ativa %}checked{% endif %}>
+                                <label class="form-check-label fw-bold" for="ativa">Meta ativa</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-white border-0 p-4 pt-0">
+                    <button type="submit" class="btn btn-primary-custom w-100 fw-bold py-3">
+                        <i class="bi bi-save me-2"></i>Salvar Meta
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

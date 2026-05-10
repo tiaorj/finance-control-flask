@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="fw-bold text-uppercase mb-0">
+                    {% if veiculo %}Editar{% else %}Novo{% endif %} <span class="text-primary-custom">Veiculo</span>
+                </h2>
+                <a href="{{ url_for('veiculos.lista') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+            </div>
+
+            <form method="POST" class="card shadow-sm border-0">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label small fw-bold text-uppercase">Nome do veiculo</label>
+                            <input type="text" name="apelido" class="form-control" value="{{ veiculo.Apelido if veiculo else '' }}" placeholder="Meu carro, Moto trabalho, Carro da familia..." required>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Tipo</label>
+                            <select name="tipo" class="form-select">
+                                {% for tipo in tipos %}
+                                    <option value="{{ tipo }}" {% if veiculo and veiculo.Tipo == tipo %}selected{% endif %}>{{ tipo|capitalize }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Marca</label>
+                            <input type="text" name="marca" class="form-control" value="{{ veiculo.Marca if veiculo else '' }}" placeholder="Toyota, Honda...">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Modelo</label>
+                            <input type="text" name="modelo" class="form-control" value="{{ veiculo.Modelo if veiculo else '' }}" placeholder="Corolla, CG 160...">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Ano</label>
+                            <input type="number" name="ano" class="form-control" value="{{ veiculo.Ano if veiculo and veiculo.Ano else '' }}" placeholder="2022">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase">Placa</label>
+                            <input type="text" name="placa" class="form-control" value="{{ veiculo.Placa if veiculo else '' }}" placeholder="ABC1D23">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase">Quilometragem atual</label>
+                            <input type="number" min="0" name="quilometragem_atual" class="form-control" value="{{ veiculo.QuilometragemAtual if veiculo and veiculo.QuilometragemAtual is not none else '' }}" placeholder="45000">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label small fw-bold text-uppercase">Observacoes</label>
+                            <textarea name="observacoes" class="form-control" rows="3">{{ veiculo.Observacoes if veiculo else '' }}</textarea>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="ativo" name="ativo"
+                                       {% if not veiculo or veiculo.Ativo %}checked{% endif %}>
+                                <label class="form-check-label fw-bold" for="ativo">Veiculo ativo</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-white border-0 p-4 pt-0">
+                    <button type="submit" class="btn btn-primary-custom w-100 fw-bold py-3">
+                        <i class="bi bi-save me-2"></i>Salvar Veiculo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

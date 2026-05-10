@@ -18,6 +18,9 @@ from routes.formacao import formacao_bp
 from config import Config
 from routes.financas import financas_bp, financas_legacy_bp
 from routes.assinaturas import assinaturas_bp
+from routes.metas import metas_bp
+from routes.tarefas import tarefas_bp
+from routes.veiculos import veiculos_bp
 
 load_dotenv()
 
@@ -59,6 +62,9 @@ app.register_blueprint(formacao_bp)
 app.register_blueprint(financas_bp)
 app.register_blueprint(financas_legacy_bp)
 app.register_blueprint(assinaturas_bp)
+app.register_blueprint(metas_bp)
+app.register_blueprint(tarefas_bp)
+app.register_blueprint(veiculos_bp)
 app.register_blueprint(main_bp)
 
 # CONFIGURAÇÃO DE E-MAIL (Exemplo Gmail)

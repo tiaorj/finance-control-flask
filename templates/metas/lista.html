@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% macro dinheiro(valor) -%}R$ {{ (valor or 0) | formato_real }}{%- endmacro %}
+
+{% block content %}
+<style>
+    .goals-page {
+        background: #f6f8fb;
+        min-height: calc(100vh - 160px);
+    }
+
+    .goal-card {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+    }
+
+    .metric-label {
+        color: #64748b;
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+
+    .metric-value {
+        color: #0f172a;
+        font-size: 1.45rem;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+
+    .goal-title {
+        color: #0f172a;
+        font-weight: 800;
+    }
+
+    .movement-row {
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        padding: .75rem 0;
+    }
+
+    .movement-row:last-child {
+        border-bottom: 0;
+    }
+
+    .empty-state {
+        color: #64748b;
+        padding: 3rem 1rem;
+        text-align: center;
+    }
+</style>
+
+<div class="goals-page py-4">
+    <div class="container-fluid">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+            <div>
+                <h2 class="fw-bold text-dark mb-1">
+                    <i class="bi bi-piggy-bank me-2"></i>Metas
+                </h2>
+                <div class="text-muted">Cofrinhos virtuais para carimbar dinheiro para objetivos futuros.</div>
+            </div>
+
+            <a href="{{ url_for('metas.form') }}" class="btn btn-primary fw-bold">
+                <i class="bi bi-plus-circle me-1"></i>Nova Meta
+            </a>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-xl-3">
+                <div class="goal-card bg-white p-3 h-100">
+                    <div class="metric-label">Reservado</div>
+                    <div class="metric-value mt-2 text-success">{{ dinheiro(resumo.total_atual) }}</div>
+                    <div class="small text-muted mt-2">Total nos cofrinhos ativos</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="goal-card bg-white p-3 h-100">
+                    <div class="metric-label">Objetivo total</div>
+                    <div class="metric-value mt-2 text-primary">{{ dinheiro(resumo.total_alvo) }}</div>
+                    <div class="small text-muted mt-2">Soma das metas ativas</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="goal-card bg-white p-3 h-100">
+                    <div class="metric-label">Falta</div>
+                    <div class="metric-value mt-2 text-warning">{{ dinheiro(resumo.total_restante) }}</div>
+                    <div class="small text-muted mt-2">Para completar tudo</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="goal-card bg-white p-3 h-100">
+                    <div class="metric-label">Progresso geral</div>
+                    <div class="metric-value mt-2">{{ "%.1f"|format(resumo.progresso_geral) }}%</div>
+                    <div class="progress mt-3" style="height: 8px;">
+                        <div class="progress-bar" style="width: {{ resumo.progresso_geral }}%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-xl-8">
+                {% if metas %}
+                    <div class="row g-3">
+                        {% for meta in metas %}
+                        <div class="col-lg-6">
+                            <div class="goal-card bg-white p-3 h-100">
+                                <div class="d-flex justify-content-between gap-3">
+                                    <div>
+                                        <div class="goal-title">{{ meta.nome }}</div>
+                                        <div class="small text-muted">
+                                            {% if meta.data_alvo %}
+                                                {{ meta.data_alvo.strftime('%d/%m/%Y') }}
+                                                {% if meta.dias_restantes is not none %}
+                                                    • {% if meta.dias_restantes < 0 %}data passou{% elif meta.dias_restantes == 0 %}hoje{% else %}em {{ meta.dias_restantes }} dias{% endif %}
+                                                {% endif %}
+                                            {% else %}
+                                                Sem data alvo
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="btn-group align-self-start">
+                                        <a href="{{ url_for('metas.form', id=meta.id) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <form method="POST" action="{{ url_for('metas.excluir', id=meta.id) }}" onsubmit="return confirm('Excluir esta meta?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+
+                                <div class="mt-3">
+                                    <div class="d-flex justify-content-between small fw-bold">
+                                        <span>{{ dinheiro(meta.valor_atual) }}</span>
+                                        <span>{{ dinheiro(meta.valor_alvo) }}</span>
+                                    </div>
+                                    <div class="progress mt-2" style="height: 10px;">
+                                        <div class="progress-bar" style="width: {{ meta.progresso }}%; background-color: {{ meta.cor_hex }};"></div>
+                                    </div>
+                                    <div class="small text-muted mt-2">
+                                        {{ "%.1f"|format(meta.progresso) }}% completo • falta {{ dinheiro(meta.valor_restante) }}
+                                    </div>
+                                </div>
+
+                                <form method="POST" action="{{ url_for('metas.movimentar', id=meta.id) }}" class="row g-2 mt-3">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div class="col-5">
+                                        <select name="tipo" class="form-select form-select-sm">
+                                            <option value="aporte">Aporte</option>
+                                            <option value="retirada">Retirada</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-5">
+                                        <input type="text" name="valor" class="form-control form-control-sm" placeholder="R$">
+                                    </div>
+                                    <div class="col-2 d-grid">
+                                        <button type="submit" class="btn btn-sm btn-success" title="Aplicar movimentação">
+                                            <i class="bi bi-check"></i>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="goal-card bg-white empty-state">
+                        <i class="bi bi-piggy-bank display-5 d-block mb-3"></i>
+                        Nenhuma meta criada ainda.
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="col-xl-4">
+                <div class="goal-card bg-white p-3 h-100">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-clock-history me-2"></i>Movimentos recentes</h6>
+                    {% if movimentacoes %}
+                        {% for mov in movimentacoes %}
+                        <div class="movement-row">
+                            <div class="d-flex justify-content-between gap-3">
+                                <div>
+                                    <div class="fw-bold small">{{ mov.Nome }}</div>
+                                    <div class="small text-muted">{{ mov.Observacao or mov.Tipo|capitalize }}</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold {% if mov.Tipo == 'retirada' %}text-danger{% else %}text-success{% endif %}">
+                                        {% if mov.Tipo == 'retirada' %}-{% else %}+{% endif %}{{ dinheiro(mov.Valor) }}
+                                    </div>
+                                    <div class="small text-muted">{{ mov.DataMovimentacao.strftime('%d/%m') if mov.DataMovimentacao else '' }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state py-5">Sem movimentações ainda.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

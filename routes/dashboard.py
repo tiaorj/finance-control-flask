@@ -4,6 +4,8 @@ from flask import Blueprint, render_template
 from flask_login import current_user, login_required
 
 from database import get_db_cursor
+from routes.tarefas import montar_resumo_tarefas
+from routes.veiculos import montar_resumo_veiculos
 
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/admin')
@@ -89,6 +91,8 @@ def index():
         proximas_contas = cursor.fetchall()
 
         perfil_percentual, perfil_itens = _perfil_status(cursor, usuario_id)
+        resumo_tarefas = montar_resumo_tarefas(cursor, usuario_id)
+        resumo_veiculos = montar_resumo_veiculos(cursor, usuario_id)
 
     saldo_atual = float(financeiro.SaldoAtual or 0)
     rendas_recebidas = float(financeiro.RendasRecebidas or 0)
@@ -97,6 +101,20 @@ def index():
     saldo_previsto = saldo_atual + rendas_a_receber - contas_pendentes
 
     servicos = [
+        {
+            "titulo": "Gestor de ve&iacute;culos",
+            "texto": "Manuten&ccedil;&otilde;es, documentos e alertas por data ou quilometragem.",
+            "icone": "bi-car-front",
+            "url": "veiculos.lista",
+            "anchor": "",
+        },
+        {
+            "titulo": "Checklist dom&eacute;stico",
+            "texto": "Tarefas recorrentes, documentos e lembretes que voltam no m&ecirc;s certo.",
+            "icone": "bi-calendar2-check",
+            "url": "tarefas.lista",
+            "anchor": "",
+        },
         {
             "titulo": "Upgrade financeiro",
             "texto": "Relat&oacute;rios, indicadores avan&ccedil;ados e acompanhamento mensal.",
@@ -149,6 +167,8 @@ def index():
         proximas_contas=proximas_contas,
         perfil_percentual=perfil_percentual,
         perfil_itens=perfil_itens,
+        resumo_tarefas=resumo_tarefas,
+        resumo_veiculos=resumo_veiculos,
         servicos=servicos,
         artigos=artigos,
     )
