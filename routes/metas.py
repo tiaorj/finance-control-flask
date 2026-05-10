@@ -4,6 +4,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 
 from database import get_db_cursor
+from routes.financeiro_integracoes import ajustar_caixa, periodo_atual
 
 
 metas_bp = Blueprint('metas', __name__, url_prefix='/app/metas')
@@ -194,13 +195,37 @@ def form(id):
 
         with get_db_cursor() as cursor:
             garantir_tabelas_metas(cursor)
+            mes_ref, ano_ref = periodo_atual()
             if id:
+                cursor.execute("""
+                    SELECT ValorAtual
+                    FROM FIN_Metas
+                    WHERE MetaId = ? AND UsuarioId = ?
+                """, (id, usuario_id))
+                meta_atual = cursor.fetchone()
+                if not meta_atual:
+                    flash('Meta nÃ£o encontrada.', 'warning')
+                    return redirect(url_for('metas.lista'))
+
+                valor_atual_anterior = float(meta_atual.ValorAtual or 0)
+
                 cursor.execute("""
                     UPDATE FIN_Metas
                     SET Nome = ?, ValorAlvo = ?, ValorAtual = ?, DataAlvo = ?, CorHex = ?,
                         Ativa = ?, Observacoes = ?, DataAtualizacao = SYSUTCDATETIME()
                     WHERE MetaId = ? AND UsuarioId = ?
                 """, (nome, valor_alvo, valor_atual, data_alvo, cor_hex, ativa, observacoes, id, usuario_id))
+
+                delta_meta = valor_atual - valor_atual_anterior
+                if delta_meta:
+                    tipo_movimento = 'aporte' if delta_meta > 0 else 'retirada'
+                    valor_movimento = abs(delta_meta)
+                    ajustar_caixa(cursor, usuario_id, mes_ref, ano_ref, -delta_meta)
+                    cursor.execute("""
+                        INSERT INTO FIN_MetaMovimentacoes (MetaId, UsuarioId, Tipo, Valor, Observacao)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (id, usuario_id, tipo_movimento, valor_movimento, 'Ajuste pelo cadastro da meta'))
+
                 flash('Meta atualizada com sucesso!', 'success')
             else:
                 cursor.execute("""
@@ -208,6 +233,16 @@ def form(id):
                     (UsuarioId, Nome, ValorAlvo, ValorAtual, DataAlvo, CorHex, Ativa, Observacoes)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (usuario_id, nome, valor_alvo, valor_atual, data_alvo, cor_hex, ativa, observacoes))
+                cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
+                nova_meta_id = int(cursor.fetchone()[0])
+
+                if valor_atual > 0:
+                    ajustar_caixa(cursor, usuario_id, mes_ref, ano_ref, -valor_atual)
+                    cursor.execute("""
+                        INSERT INTO FIN_MetaMovimentacoes (MetaId, UsuarioId, Tipo, Valor, Observacao)
+                        VALUES (?, ?, 'aporte', ?, ?)
+                    """, (nova_meta_id, usuario_id, valor_atual, 'Valor inicial reservado na meta'))
+
                 flash('Meta criada com sucesso!', 'success')
 
         return redirect(url_for('metas.lista'))
@@ -255,7 +290,12 @@ def movimentar(id):
             return redirect(url_for('metas.lista'))
 
         valor_atual = float(meta.ValorAtual or 0)
-        novo_valor = valor_atual + valor if tipo == 'aporte' else max(valor_atual - valor, 0)
+        if tipo == 'retirada' and valor_atual <= 0:
+            flash('Esta meta nÃ£o possui valor reservado para retirada.', 'warning')
+            return redirect(url_for('metas.lista'))
+
+        valor_movimentado = valor if tipo == 'aporte' else min(valor, valor_atual)
+        novo_valor = valor_atual + valor_movimentado if tipo == 'aporte' else valor_atual - valor_movimentado
 
         cursor.execute("""
             UPDATE FIN_Metas
@@ -266,7 +306,11 @@ def movimentar(id):
         cursor.execute("""
             INSERT INTO FIN_MetaMovimentacoes (MetaId, UsuarioId, Tipo, Valor, Observacao)
             VALUES (?, ?, ?, ?, ?)
-        """, (id, usuario_id, tipo, valor, observacao))
+        """, (id, usuario_id, tipo, valor_movimentado, observacao))
+
+        mes_ref, ano_ref = periodo_atual()
+        delta_caixa = -valor_movimentado if tipo == 'aporte' else valor_movimentado
+        ajustar_caixa(cursor, usuario_id, mes_ref, ano_ref, delta_caixa)
 
     flash('Meta movimentada com sucesso!', 'success')
     return redirect(url_for('metas.lista'))

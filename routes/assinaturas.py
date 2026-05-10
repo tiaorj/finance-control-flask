@@ -4,6 +4,10 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 
 from database import get_db_cursor
+from routes.financeiro_integracoes import (
+    remover_lancamentos_assinatura_pendentes,
+    sincronizar_assinatura_primeiro_periodo,
+)
 
 
 assinaturas_bp = Blueprint('assinaturas', __name__, url_prefix='/app/assinaturas')
@@ -187,12 +191,15 @@ def form(id):
         with get_db_cursor() as cursor:
             garantir_tabela_assinaturas(cursor)
             if id:
+                remover_lancamentos_assinatura_pendentes(cursor, usuario_id, id)
                 cursor.execute("""
                     UPDATE FIN_Assinaturas
                     SET Nome = ?, Categoria = ?, Valor = ?, Ciclo = ?, DataRenovacao = ?,
                         Ativa = ?, Observacoes = ?, DataAtualizacao = SYSUTCDATETIME()
                     WHERE AssinaturaId = ? AND UsuarioId = ?
                 """, (nome, categoria, valor, ciclo, data_renovacao, ativa, observacoes, id, usuario_id))
+                if ativa:
+                    sincronizar_assinatura_primeiro_periodo(cursor, usuario_id, id)
                 flash('Assinatura atualizada com sucesso!', 'success')
             else:
                 cursor.execute("""
@@ -200,6 +207,10 @@ def form(id):
                     (UsuarioId, Nome, Categoria, Valor, Ciclo, DataRenovacao, Ativa, Observacoes)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (usuario_id, nome, categoria, valor, ciclo, data_renovacao, ativa, observacoes))
+                cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
+                nova_assinatura_id = int(cursor.fetchone()[0])
+                if ativa:
+                    sincronizar_assinatura_primeiro_periodo(cursor, usuario_id, nova_assinatura_id)
                 flash('Assinatura cadastrada com sucesso!', 'success')
 
         return redirect(url_for('assinaturas.lista'))
@@ -224,6 +235,7 @@ def excluir(id):
 
     with get_db_cursor() as cursor:
         garantir_tabela_assinaturas(cursor)
+        remover_lancamentos_assinatura_pendentes(cursor, usuario_id, id, remover_mapeamentos_pagos=True)
         cursor.execute("DELETE FROM FIN_Assinaturas WHERE AssinaturaId = ? AND UsuarioId = ?", (id, usuario_id))
 
     flash('Assinatura removida.', 'warning')

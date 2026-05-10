@@ -4,6 +4,7 @@ from flask import Blueprint, render_template
 from flask_login import current_user, login_required
 
 from database import get_db_cursor
+from routes.financeiro_integracoes import sincronizar_assinaturas_periodo
 from routes.tarefas import montar_resumo_tarefas
 from routes.veiculos import montar_resumo_veiculos
 from routes.garantias import montar_resumo_garantias
@@ -40,6 +41,8 @@ def index():
     hoje = datetime.now()
 
     with get_db_cursor() as cursor:
+        sincronizar_assinaturas_periodo(cursor, usuario_id, hoje.month, hoje.year)
+
         cursor.execute("""
             SELECT
                 ISNULL((

@@ -4,6 +4,7 @@ from datetime import datetime, date
 import calendar
 from flask_login import current_user
 from routes.assinaturas import montar_resumo_assinaturas
+from routes.financeiro_integracoes import sincronizar_assinaturas_periodo
 from routes.metas import montar_resumo_metas
 
 financas_bp = Blueprint('financas', __name__, url_prefix='/app/financeiro')
@@ -279,6 +280,8 @@ def dashboard():
     anos_lista = sorted({ano_atual - 1, ano_atual, ano_sel - 1, ano_sel, ano_sel + 1})
 
     with get_db_cursor() as cursor:
+        sincronizar_assinaturas_periodo(cursor, usuario_id, mes_sel, ano_sel)
+
         cursor.execute("""
             SELECT
                 ISNULL((
