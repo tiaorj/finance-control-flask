@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+{% macro dinheiro(valor) -%}{{ (valor or 0) | formato_real }}{%- endmacro %}
+
+{% block content %}
+<style>
+    .warranty-page {
+        background: #f6f8fb;
+        min-height: calc(100vh - 160px);
+    }
+
+    .warranty-card {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+    }
+
+    .metric-label {
+        color: #64748b;
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+
+    .metric-value {
+        color: #0f172a;
+        font-size: 1.45rem;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+
+    .asset-title {
+        color: #0f172a;
+        font-weight: 800;
+    }
+
+    .warranty-status {
+        border-radius: 999px;
+        display: inline-flex;
+        font-size: .72rem;
+        font-weight: 800;
+        line-height: 1;
+        padding: .42rem .62rem;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .warranty-status-vencida {
+        background: #fee2e2;
+        color: #b42318;
+    }
+
+    .warranty-status-vence_hoje,
+    .warranty-status-vence_breve {
+        background: #fff3cd;
+        color: #946200;
+    }
+
+    .warranty-status-vigente {
+        background: #ecfdf3;
+        color: #067647;
+    }
+
+    .warranty-status-sem_data {
+        background: #e2e8f0;
+        color: #475569;
+    }
+
+    .asset-row {
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        padding: 1rem 0;
+    }
+
+    .asset-row:last-child {
+        border-bottom: 0;
+    }
+
+    .empty-state {
+        color: #64748b;
+        padding: 3rem 1rem;
+        text-align: center;
+    }
+
+    @media (max-width: 575.98px) {
+        .asset-actions,
+        .asset-actions .btn,
+        .asset-actions form {
+            width: 100%;
+        }
+    }
+</style>
+
+<div class="warranty-page py-4">
+    <div class="container-fluid">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+            <div>
+                <h2 class="fw-bold text-dark mb-1">
+                    <i class="bi bi-shield-check me-2"></i>Garantias
+                </h2>
+                <div class="text-muted">Cofre para bens importantes, notas fiscais e prazos de garantia.</div>
+            </div>
+
+            <a href="{{ url_for('garantias.form') }}" class="btn btn-primary fw-bold">
+                <i class="bi bi-plus-circle me-1"></i>Novo Bem
+            </a>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-xl-3">
+                <div class="warranty-card bg-white p-3 h-100">
+                    <div class="metric-label">Bens ativos</div>
+                    <div class="metric-value mt-2">{{ resumo.total }}</div>
+                    <div class="small text-muted mt-2">Itens no cofre</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="warranty-card bg-white p-3 h-100">
+                    <div class="metric-label">Em garantia</div>
+                    <div class="metric-value mt-2 text-success">{{ resumo.vigentes }}</div>
+                    <div class="small text-muted mt-2">Inclui garantias perto do fim</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="warranty-card bg-white p-3 h-100">
+                    <div class="metric-label">Vencem em 30 dias</div>
+                    <div class="metric-value mt-2 text-warning">{{ resumo.vencem_breve }}</div>
+                    <div class="small text-muted mt-2">Bom conferir antes de precisar</div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="warranty-card bg-white p-3 h-100">
+                    <div class="metric-label">Notas guardadas</div>
+                    <div class="metric-value mt-2 text-primary">{{ resumo.com_nota }}</div>
+                    <div class="small text-muted mt-2">{{ dinheiro(resumo.valor_total) }} em bens mapeados</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-xl-8">
+                {% if bens %}
+                    <div class="row g-3">
+                        {% for bem in bens %}
+                        <div class="col-lg-6">
+                            <div class="warranty-card bg-white p-3 h-100">
+                                <div class="d-flex justify-content-between gap-3">
+                                    <div>
+                                        <div class="asset-title">{{ bem.nome }}</div>
+                                        <div class="small text-muted">
+                                            {{ bem.categoria }}
+                                            {% if bem.marca or bem.modelo %}
+                                                &bull; {{ bem.marca or '' }} {{ bem.modelo or '' }}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <span class="warranty-status warranty-status-{{ bem.status }}">{{ bem.status_texto }}</span>
+                                </div>
+
+                                <div class="row g-2 my-3">
+                                    <div class="col-4">
+                                        <div class="metric-label">Compra</div>
+                                        <div class="fw-bold">{{ bem.data_compra.strftime('%d/%m/%Y') if bem.data_compra else '-' }}</div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="metric-label">Garantia</div>
+                                        <div class="fw-bold">{{ bem.meses_garantia }} meses</div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="metric-label">Fim</div>
+                                        <div class="fw-bold">{{ bem.data_fim.strftime('%d/%m/%Y') if bem.data_fim else '-' }}</div>
+                                    </div>
+                                </div>
+
+                                <div class="border-top border-bottom py-2 mb-3">
+                                    <div class="d-flex justify-content-between gap-3 small">
+                                        <span class="text-muted">Valor</span>
+                                        <strong>{{ dinheiro(bem.valor_compra) }}</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between gap-3 small">
+                                        <span class="text-muted">Loja</span>
+                                        <strong class="text-end">{{ bem.local_compra or '-' }}</strong>
+                                    </div>
+                                </div>
+
+                                {% if bem.observacoes %}
+                                    <div class="small text-muted mb-3">{{ bem.observacoes }}</div>
+                                {% endif %}
+
+                                <div class="d-flex flex-wrap gap-2 asset-actions">
+                                    {% if bem.nota_arquivo %}
+                                        <a href="{{ url_for('static', filename=bem.nota_arquivo) }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success">
+                                            <i class="bi bi-file-earmark-text me-1"></i>Arquivo
+                                        </a>
+                                    {% endif %}
+                                    {% if bem.nota_url %}
+                                        <a href="{{ bem.nota_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success">
+                                            <i class="bi bi-link-45deg me-1"></i>Link
+                                        </a>
+                                    {% endif %}
+                                    <a href="{{ url_for('garantias.form', id=bem.id) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil me-1"></i>Editar
+                                    </a>
+                                    <form method="POST" action="{{ url_for('garantias.excluir', id=bem.id) }}" onsubmit="return confirm('Excluir este bem?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash me-1"></i>Excluir
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="warranty-card bg-white empty-state">
+                        <i class="bi bi-shield-check display-5 d-block mb-3"></i>
+                        Nenhum bem cadastrado ainda.
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="col-xl-4">
+                <div class="warranty-card bg-white p-3 h-100">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-calendar2-week me-2"></i>Proximos vencimentos</h6>
+
+                    {% if resumo.proximas %}
+                        {% for item in resumo.proximas %}
+                        <div class="asset-row">
+                            <div class="d-flex justify-content-between gap-3">
+                                <div>
+                                    <div class="fw-bold small">{{ item.nome }}</div>
+                                    <div class="small text-muted">{{ item.categoria }}</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold">{{ item.data_fim.strftime('%d/%m/%Y') if item.data_fim else '-' }}</div>
+                                    <div class="small text-muted">{{ item.status_texto }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state py-5">Sem prazos cadastrados.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

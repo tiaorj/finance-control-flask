@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="fw-bold text-uppercase mb-0">
+                    {% if bem %}Editar{% else %}Novo{% endif %} <span class="text-primary-custom">Bem</span>
+                </h2>
+                <a href="{{ url_for('garantias.lista') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+            </div>
+
+            <form method="POST" enctype="multipart/form-data" class="card shadow-sm border-0">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="nota_arquivo_atual" value="{{ bem.NotaFiscalArquivo if bem and bem.NotaFiscalArquivo else '' }}">
+
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label small fw-bold text-uppercase">Nome do bem</label>
+                            <input type="text" name="nome" class="form-control" value="{{ bem.Nome if bem else '' }}" placeholder="Geladeira, notebook, TV da sala..." required>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Categoria</label>
+                            <select name="categoria" class="form-select">
+                                {% for categoria in categorias %}
+                                    <option value="{{ categoria }}" {% if bem and bem.Categoria == categoria %}selected{% endif %}>{{ categoria }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Marca</label>
+                            <input type="text" name="marca" class="form-control" value="{{ bem.Marca if bem else '' }}" placeholder="Samsung, LG, Dell...">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Modelo</label>
+                            <input type="text" name="modelo" class="form-control" value="{{ bem.Modelo if bem else '' }}" placeholder="Modelo ou identificacao">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Local da compra</label>
+                            <input type="text" name="local_compra" class="form-control" value="{{ bem.LocalCompra if bem else '' }}" placeholder="Loja, marketplace...">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Data da compra</label>
+                            <input type="date" name="data_compra" class="form-control"
+                                   value="{{ bem.DataCompra.strftime('%Y-%m-%d') if bem and bem.DataCompra and not bem.DataCompra is string else bem.DataCompra if bem and bem.DataCompra is string else '' }}" required>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Garantia em meses</label>
+                            <input type="number" min="0" name="meses_garantia" class="form-control" value="{{ bem.MesesGarantia if bem and bem.MesesGarantia is not none else 12 }}" required>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-uppercase">Valor da compra</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="text" name="valor_compra" class="form-control" value="{{ (bem.ValorCompra or 0)|formato_real if bem and bem.ValorCompra else '' }}" placeholder="2500,00">
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase">Link da nota fiscal</label>
+                            <input type="url" name="nota_url" class="form-control" value="{{ bem.NotaFiscalUrl if bem else '' }}" placeholder="https://...">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-uppercase">Arquivo da nota</label>
+                            <input type="file" name="nota_arquivo" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.webp">
+                            {% if bem and bem.NotaFiscalArquivo %}
+                                <div class="small text-muted mt-1">
+                                    Arquivo atual:
+                                    <a href="{{ url_for('static', filename=bem.NotaFiscalArquivo) }}" target="_blank" rel="noopener">abrir nota</a>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label small fw-bold text-uppercase">Observacoes</label>
+                            <textarea name="observacoes" class="form-control" rows="3">{{ bem.Observacoes if bem else '' }}</textarea>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="ativo" name="ativo"
+                                       {% if not bem or bem.Ativo %}checked{% endif %}>
+                                <label class="form-check-label fw-bold" for="ativo">Bem ativo no cofre</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-white border-0 p-4 pt-0">
+                    <button type="submit" class="btn btn-primary-custom w-100 fw-bold py-3">
+                        <i class="bi bi-save me-2"></i>Salvar Bem
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -210,6 +210,35 @@
                 <a href="{{ url_for('veiculos.lista') }}" class="btn btn-outline-primary w-100 fw-bold mt-3">
                     Abrir ve&iacute;culos
                 </a>
+
+                <div class="client-section-title mt-4">
+                    <span class="admin-kicker">Garantias</span>
+                    <h2>Notas fiscais</h2>
+                </div>
+
+                <div class="client-pending-list">
+                    {% for item in resumo_garantias.proximas %}
+                        <article>
+                            <div>
+                                <strong>{{ item.nome }}</strong>
+                                <span>{{ item.categoria }} &bull; {{ item.status_texto }}</span>
+                            </div>
+                            <div class="text-end">
+                                <strong>{{ item.data_fim.strftime('%d/%m') if item.data_fim else '-' }}</strong>
+                                <span>{{ item.meses_garantia }} meses</span>
+                            </div>
+                        </article>
+                    {% else %}
+                        <div class="client-empty-state">
+                            <i class="bi bi-check2-circle"></i>
+                            <p>Nenhuma garantia cadastrada.</p>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <a href="{{ url_for('garantias.lista') }}" class="btn btn-outline-primary w-100 fw-bold mt-3">
+                    Abrir garantias
+                </a>
             </aside>
         </section>
     </div>

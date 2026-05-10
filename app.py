@@ -21,6 +21,7 @@ from routes.assinaturas import assinaturas_bp
 from routes.metas import metas_bp
 from routes.tarefas import tarefas_bp
 from routes.veiculos import veiculos_bp
+from routes.garantias import garantias_bp
 
 load_dotenv()
 
@@ -65,6 +66,7 @@ app.register_blueprint(assinaturas_bp)
 app.register_blueprint(metas_bp)
 app.register_blueprint(tarefas_bp)
 app.register_blueprint(veiculos_bp)
+app.register_blueprint(garantias_bp)
 app.register_blueprint(main_bp)
 
 # CONFIGURAÇÃO DE E-MAIL (Exemplo Gmail)

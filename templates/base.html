@@ -37,7 +37,7 @@
 </head>
 <body>
     {% set endpoint = request.endpoint or '' %}
-    {% set admin_menu_ativo = endpoint.startswith('dashboard.') or endpoint.startswith('financas.') or endpoint.startswith('assinaturas.') or endpoint.startswith('metas.') or endpoint.startswith('tarefas.') or endpoint.startswith('veiculos.') or endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.') or endpoint == 'curriculo.gerar_pdf' %}
+    {% set admin_menu_ativo = endpoint.startswith('dashboard.') or endpoint.startswith('financas.') or endpoint.startswith('assinaturas.') or endpoint.startswith('metas.') or endpoint.startswith('tarefas.') or endpoint.startswith('veiculos.') or endpoint.startswith('garantias.') or endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.') or endpoint == 'curriculo.gerar_pdf' %}
 
     <nav class="navbar navbar-expand-lg navbar-dark sticky-top shadow site-navbar">
         <div class="container">
@@ -120,6 +120,11 @@
                             <li>
                                 <a class="dropdown-item {{ 'active' if endpoint.startswith('veiculos.') else '' }}" href="{{ url_for('veiculos.lista') }}">
                                     <i class="bi bi-car-front me-2"></i>Ve&iacute;culos
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item {{ 'active' if endpoint.startswith('garantias.') else '' }}" href="{{ url_for('garantias.lista') }}">
+                                    <i class="bi bi-shield-check me-2"></i>Garantias
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
