@@ -26,9 +26,162 @@
         body { font-family: 'Inter', sans-serif; }
         h1, h2, h3, h4, .nav-link { font-family: 'Saira Extra Condensed', sans-serif; }
         .navbar { background-color: var(--directi-blue); border-bottom: 3px solid var(--directi-orange); }
-        .site-navbar .nav-link { font-weight: 700; text-transform: uppercase; letter-spacing: 1px; transition: 0.3s; }
+        .site-navbar .nav-link { font-weight: 700; text-transform: uppercase; letter-spacing: 0; transition: 0.3s; }
         .site-navbar .nav-link:hover { color: var(--directi-orange) !important; }
         .main-wrapper { padding-top: 20px; }
+
+        .app-shell {
+            background: #f6f8fb;
+            min-height: 100vh;
+        }
+
+        .app-sidebar {
+            background: #0f172a;
+            border-right: 1px solid rgba(255,255,255,0.08);
+            bottom: 0;
+            color: #dbeafe;
+            left: 0;
+            overflow-y: auto;
+            padding: 1rem;
+            position: fixed;
+            top: 0;
+            width: 284px;
+            z-index: 1030;
+        }
+
+        .app-brand {
+            align-items: center;
+            color: #fff;
+            display: flex;
+            font-size: 1.25rem;
+            font-weight: 800;
+            gap: .25rem;
+            justify-content: flex-start;
+            text-decoration: none;
+        }
+
+        .app-brand span {
+            color: var(--directi-orange);
+        }
+
+        .app-user-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            margin: 1rem 0;
+            padding: .85rem;
+        }
+
+        .app-user-card small,
+        .app-nav-title {
+            color: #94a3b8;
+            display: block;
+            font-size: .72rem;
+            font-weight: 800;
+            letter-spacing: 0;
+            text-transform: uppercase;
+        }
+
+        .app-user-card strong {
+            color: #fff;
+            display: block;
+            line-height: 1.2;
+            margin-top: .2rem;
+        }
+
+        .app-nav-section {
+            margin-top: 1rem;
+        }
+
+        .app-nav-list {
+            display: grid;
+            gap: .25rem;
+            margin-top: .45rem;
+        }
+
+        .app-nav-link {
+            align-items: center;
+            border-radius: 8px;
+            color: #cbd5e1;
+            display: flex;
+            font-weight: 700;
+            gap: .65rem;
+            padding: .62rem .72rem;
+            text-decoration: none;
+        }
+
+        .app-nav-link i {
+            color: #93c5fd;
+            font-size: 1rem;
+            width: 1.15rem;
+        }
+
+        .app-nav-link:hover,
+        .app-nav-link.active {
+            background: rgba(37, 99, 235, 0.22);
+            color: #fff;
+        }
+
+        .app-nav-link.active i {
+            color: #fff;
+        }
+
+        .app-sidebar-footer {
+            border-top: 1px solid rgba(255,255,255,0.08);
+            display: grid;
+            gap: .25rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+        }
+
+        .app-main {
+            margin-left: 284px;
+            min-height: 100vh;
+        }
+
+        .app-mobile-top {
+            align-items: center;
+            background: #0f172a;
+            border-bottom: 3px solid var(--directi-orange);
+            color: #fff;
+            display: none;
+            justify-content: space-between;
+            padding: .75rem 1rem;
+        }
+
+        .app-mobile-top a {
+            color: #fff;
+            font-weight: 800;
+            text-decoration: none;
+        }
+
+        @media (min-width: 992px) {
+            .app-sidebar.collapse {
+                display: block !important;
+            }
+        }
+
+        @media (max-width: 991.98px) {
+            .app-sidebar {
+                border-right: 0;
+                bottom: auto;
+                max-height: calc(100vh - 58px);
+                position: sticky;
+                top: 0;
+                width: 100%;
+            }
+
+            .app-mobile-top {
+                display: flex;
+                position: sticky;
+                top: 0;
+                z-index: 1040;
+            }
+
+            .app-main {
+                margin-left: 0;
+            }
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
@@ -37,8 +190,117 @@
 </head>
 <body>
     {% set endpoint = request.endpoint or '' %}
-    {% set admin_menu_ativo = endpoint.startswith('dashboard.') or endpoint.startswith('financas.') or endpoint.startswith('assinaturas.') or endpoint.startswith('metas.') or endpoint.startswith('tarefas.') or endpoint.startswith('veiculos.') or endpoint.startswith('garantias.') or endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.') or endpoint == 'curriculo.gerar_pdf' %}
+    {% set admin_menu_ativo = endpoint.startswith('dashboard.') or endpoint.startswith('financas.') or endpoint.startswith('assinaturas.') or endpoint.startswith('metas.') or endpoint.startswith('tarefas.') or endpoint.startswith('veiculos.') or endpoint.startswith('garantias.') or endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.') or endpoint.startswith('curriculo.') %}
+    {% set app_shell_ativo = current_user.is_authenticated and admin_menu_ativo %}
 
+    {% if app_shell_ativo %}
+    <div class="app-shell">
+        <div class="app-mobile-top">
+            <a href="{{ url_for('dashboard.index') }}">DIRECT<span class="brand-accent"> TI</span></a>
+            <button class="btn btn-sm btn-outline-light" type="button" data-bs-toggle="collapse" data-bs-target="#appSidebarNav" aria-controls="appSidebarNav" aria-expanded="false" aria-label="Abrir menu do app">
+                <i class="bi bi-list"></i>
+            </button>
+        </div>
+
+        <aside id="appSidebarNav" class="app-sidebar collapse d-lg-block">
+            <a class="app-brand" href="{{ url_for('dashboard.index') }}" aria-label="Direct TI - App">
+                DIRECT<span> TI</span>
+            </a>
+
+            <div class="app-user-card">
+                <small>Area logada</small>
+                <strong>{{ session.usuario_nome or current_user.nome or 'Usuario' }}</strong>
+            </div>
+
+            <nav aria-label="Menu principal do app">
+                <div class="app-nav-section">
+                    <span class="app-nav-title">Geral</span>
+                    <div class="app-nav-list">
+                        <a class="app-nav-link {{ 'active' if endpoint == 'dashboard.index' else '' }}" href="{{ url_for('dashboard.index') }}">
+                            <i class="bi bi-speedometer2"></i>Painel
+                        </a>
+                    </div>
+                </div>
+
+                <div class="app-nav-section">
+                    <span class="app-nav-title">Financeiro</span>
+                    <div class="app-nav-list">
+                        <a class="app-nav-link {{ 'active' if endpoint == 'financas.dashboard' else '' }}" href="{{ url_for('financas.dashboard') }}">
+                            <i class="bi bi-cash-stack"></i>Controle
+                        </a>
+                        <a class="app-nav-link {{ 'active' if endpoint == 'financas.gerenciar_rendas' else '' }}" href="{{ url_for('financas.gerenciar_rendas') }}">
+                            <i class="bi bi-graph-up-arrow"></i>Rendas
+                        </a>
+                        <a class="app-nav-link {{ 'active' if endpoint == 'financas.adicionar_gasto' else '' }}" href="{{ url_for('financas.adicionar_gasto') }}">
+                            <i class="bi bi-plus-circle"></i>Novo gasto
+                        </a>
+                        <a class="app-nav-link {{ 'active' if endpoint.startswith('assinaturas.') else '' }}" href="{{ url_for('assinaturas.lista') }}">
+                            <i class="bi bi-repeat"></i>Assinaturas
+                        </a>
+                        <a class="app-nav-link {{ 'active' if endpoint.startswith('metas.') else '' }}" href="{{ url_for('metas.lista') }}">
+                            <i class="bi bi-piggy-bank"></i>Metas
+                        </a>
+                    </div>
+                </div>
+
+                <div class="app-nav-section">
+                    <span class="app-nav-title">Dia a dia</span>
+                    <div class="app-nav-list">
+                        <a class="app-nav-link {{ 'active' if endpoint.startswith('tarefas.') else '' }}" href="{{ url_for('tarefas.lista') }}">
+                            <i class="bi bi-calendar2-check"></i>Tarefas
+                        </a>
+                        <a class="app-nav-link {{ 'active' if endpoint.startswith('veiculos.') else '' }}" href="{{ url_for('veiculos.lista') }}">
+                            <i class="bi bi-car-front"></i>Veiculos
+                        </a>
+                        <a class="app-nav-link {{ 'active' if endpoint.startswith('garantias.') else '' }}" href="{{ url_for('garantias.lista') }}">
+                            <i class="bi bi-shield-check"></i>Garantias
+                        </a>
+                    </div>
+                </div>
+
+                <div class="app-nav-section">
+                    <span class="app-nav-title">Curriculo</span>
+                    <div class="app-nav-list">
+                        <a class="app-nav-link {{ 'active' if endpoint == 'curriculo.especialista' else '' }}" href="{{ url_for('curriculo.especialista') }}">
+                            <i class="bi bi-person-vcard"></i>Perfil
+                        </a>
+                        <a class="app-nav-link {{ 'active' if endpoint == 'curriculo.editar_perfil' else '' }}" href="{{ url_for('curriculo.editar_perfil') }}">
+                            <i class="bi bi-pencil-square"></i>Dados do perfil
+                        </a>
+                        <a class="app-nav-link {{ 'active' if (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' else '' }}" href="{{ url_for('experiencias_admin.lista') }}">
+                            <i class="bi bi-briefcase"></i>Experiencias
+                        </a>
+                        <a class="app-nav-link {{ 'active' if endpoint.startswith('formacao_admin.') else '' }}" href="{{ url_for('formacao_admin.lista') }}">
+                            <i class="bi bi-mortarboard"></i>Formacao
+                        </a>
+                        <a class="app-nav-link {{ 'active' if endpoint.startswith('projetos_admin.') else '' }}" href="{{ url_for('projetos_admin.lista') }}">
+                            <i class="bi bi-kanban"></i>Projetos
+                        </a>
+                        <a class="app-nav-link {{ 'active' if endpoint.startswith('habilidades_admin.') else '' }}" href="{{ url_for('habilidades_admin.lista') }}">
+                            <i class="bi bi-stars"></i>Habilidades
+                        </a>
+                        <a class="app-nav-link {{ 'active' if endpoint.startswith('certificacoes_admin.') else '' }}" href="{{ url_for('certificacoes_admin.lista') }}">
+                            <i class="bi bi-patch-check"></i>Certificacoes
+                        </a>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="app-sidebar-footer">
+                <a class="app-nav-link" href="{{ url_for('main.index') }}">
+                    <i class="bi bi-globe2"></i>Site publico
+                </a>
+                <a class="app-nav-link" href="{{ url_for('curriculo.gerar_pdf') }}" target="_blank" rel="noopener">
+                    <i class="bi bi-file-pdf"></i>Baixar PDF
+                </a>
+                <a class="app-nav-link" href="{{ url_for('admin.logout') }}">
+                    <i class="bi bi-box-arrow-right"></i>Sair
+                </a>
+            </div>
+        </aside>
+
+        <main class="app-main">
+    {% else %}
     <nav class="navbar navbar-expand-lg navbar-dark sticky-top shadow site-navbar">
         <div class="container">
             <a class="navbar-brand fw-bold fs-3" href="{{ url_for('main.index') }}" aria-label="Direct TI - In&iacute;cio">
@@ -56,89 +318,26 @@
                             Solu&ccedil;&otilde;es
                         </a>
                     </li>
-
                     <li class="nav-item">
-                        <a class="nav-link px-lg-3" href="{{ url_for('main.index') }}#planos">
-                            Planos
-                        </a>
+                        <a class="nav-link px-lg-3" href="{{ url_for('main.index') }}#planos">Planos</a>
                     </li>
-
                     <li class="nav-item">
-                        <a class="nav-link px-lg-3 {{ 'active' if endpoint == 'empresa.projetos' else '' }}" href="{{ url_for('empresa.projetos') }}" {% if endpoint == 'empresa.projetos' %}aria-current="page"{% endif %}>
-                            Cases
-                        </a>
+                        <a class="nav-link px-lg-3 {{ 'active' if endpoint == 'empresa.projetos' else '' }}" href="{{ url_for('empresa.projetos') }}" {% if endpoint == 'empresa.projetos' %}aria-current="page"{% endif %}>Cases</a>
                     </li>
-
                     <li class="nav-item">
-                        <a class="nav-link px-lg-3 {{ 'active' if endpoint == 'empresa.contato' else '' }}" href="{{ url_for('empresa.contato') }}" {% if endpoint == 'empresa.contato' %}aria-current="page"{% endif %}>
-                            Contato
-                        </a>
+                        <a class="nav-link px-lg-3 {{ 'active' if endpoint == 'empresa.contato' else '' }}" href="{{ url_for('empresa.contato') }}" {% if endpoint == 'empresa.contato' %}aria-current="page"{% endif %}>Contato</a>
                     </li>
 
                     {% if current_user.is_authenticated %}
-                    <li class="nav-item dropdown ms-lg-3">
-                        <a class="nav-link dropdown-toggle admin-menu-toggle {{ 'active' if admin_menu_ativo else '' }}" href="#" id="adminDrop" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-grid-3x3-gap me-1"></i>App
+                    <li class="nav-item ms-lg-3">
+                        <a class="nav-platform-login" href="{{ url_for('dashboard.index') }}">
+                            App
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-lg-end shadow-sm admin-dropdown" aria-labelledby="adminDrop">
-                            <li class="dropdown-header">&Aacute;rea interna</li>
-                            <li>
-                                <a class="dropdown-item {{ 'active' if endpoint == 'dashboard.index' else '' }}" href="{{ url_for('dashboard.index') }}">
-                                    <i class="bi bi-speedometer2 me-2"></i>Painel
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item {{ 'active' if endpoint == 'financas.dashboard' else '' }}" href="{{ url_for('financas.dashboard') }}">
-                                    <i class="bi bi-cash-stack me-2"></i>Financeiro
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item {{ 'active' if endpoint == 'financas.gerenciar_rendas' else '' }}" href="{{ url_for('financas.gerenciar_rendas') }}">
-                                    <i class="bi bi-graph-up-arrow me-2"></i>Rendas
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item {{ 'active' if endpoint == 'financas.adicionar_gasto' else '' }}" href="{{ url_for('financas.adicionar_gasto') }}">
-                                    <i class="bi bi-plus-circle me-2"></i>Novo Gasto
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item {{ 'active' if endpoint.startswith('assinaturas.') else '' }}" href="{{ url_for('assinaturas.lista') }}">
-                                    <i class="bi bi-repeat me-2"></i>Assinaturas
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item {{ 'active' if endpoint.startswith('metas.') else '' }}" href="{{ url_for('metas.lista') }}">
-                                    <i class="bi bi-piggy-bank me-2"></i>Metas
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item {{ 'active' if endpoint.startswith('tarefas.') else '' }}" href="{{ url_for('tarefas.lista') }}">
-                                    <i class="bi bi-calendar2-check me-2"></i>Tarefas
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item {{ 'active' if endpoint.startswith('veiculos.') else '' }}" href="{{ url_for('veiculos.lista') }}">
-                                    <i class="bi bi-car-front me-2"></i>Ve&iacute;culos
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item {{ 'active' if endpoint.startswith('garantias.') else '' }}" href="{{ url_for('garantias.lista') }}">
-                                    <i class="bi bi-shield-check me-2"></i>Garantias
-                                </a>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('curriculo.gerar_pdf') }}" target="_blank" rel="noopener">
-                                    <i class="bi bi-file-pdf me-2"></i>Baixar PDF
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item text-danger" href="{{ url_for('admin.logout') }}">
-                                    <i class="bi bi-box-arrow-right me-2"></i>Sair
-                                </a>
-                            </li>
-                        </ul>
+                    </li>
+                    <li class="nav-item ms-lg-2">
+                        <a class="nav-link px-lg-3" href="{{ url_for('admin.logout') }}">
+                            Sair
+                        </a>
                     </li>
                     {% else %}
                     <li class="nav-item ms-lg-3">
@@ -153,7 +352,13 @@
     </nav>
 
     <div class="main-wrapper">
+    {% endif %}
         {% block content %}{% endblock %}
+
+    {% if app_shell_ativo %}
+        </main>
+    </div>
+    {% else %}
     </div>
 
     <footer class="bg-dark text-white-50 py-4 mt-5 border-top border-secondary">
@@ -164,6 +369,7 @@
             <small>Gest&atilde;o financeira, curr&iacute;culos e solu&ccedil;&otilde;es digitais sob medida &copy; 2026</small>
         </div>
     </footer>
+    {% endif %}
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
