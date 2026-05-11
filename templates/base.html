@@ -231,8 +231,11 @@
                         <a class="app-nav-link {{ 'active' if endpoint == 'financas.gerenciar_rendas' else '' }}" href="{{ url_for('financas.gerenciar_rendas') }}">
                             <i class="bi bi-graph-up-arrow"></i>Rendas
                         </a>
+                        <a class="app-nav-link {{ 'active' if endpoint == 'financas.categorias_rendas' else '' }}" href="{{ url_for('financas.categorias_rendas') }}">
+                            <i class="bi bi-tags"></i>Cat. rendas
+                        </a>
                         <a class="app-nav-link {{ 'active' if endpoint == 'financas.categorias' else '' }}" href="{{ url_for('financas.categorias') }}">
-                            <i class="bi bi-tags"></i>Categorias
+                            <i class="bi bi-tags"></i>Cat. gastos
                         </a>
                         <a class="app-nav-link {{ 'active' if endpoint == 'financas.adicionar_gasto' else '' }}" href="{{ url_for('financas.adicionar_gasto') }}">
                             <i class="bi bi-plus-circle"></i>Novo gasto

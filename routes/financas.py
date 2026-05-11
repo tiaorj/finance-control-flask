@@ -38,6 +38,11 @@ def legacy_rendas():
     return redirect(url_for('financas.gerenciar_rendas', **request.args))
 
 
+@financas_legacy_bp.route('/rendas/categorias')
+def legacy_categorias_rendas():
+    return redirect(url_for('financas.categorias_rendas', **request.args))
+
+
 @financas_legacy_bp.route('/categorias')
 def legacy_categorias():
     return redirect(url_for('financas.categorias', **request.args))
@@ -81,6 +86,28 @@ def normalizar_cor_categoria(cor):
     if len(cor) == 7 and cor.startswith('#') and all(c in digitos_hex for c in cor[1:]):
         return cor.lower()
     return COR_CATEGORIA_PADRAO
+
+
+def garantir_estrutura_renda_categorias(cursor):
+    cursor.execute("""
+        IF OBJECT_ID('dbo.FIN_RendaCategorias', 'U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.FIN_RendaCategorias (
+                CategoriaRendaId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                UsuarioId INT NOT NULL,
+                Nome NVARCHAR(80) NOT NULL,
+                CorHex NVARCHAR(7) NOT NULL DEFAULT '#6c757d',
+                DataCriacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+            )
+        END
+    """)
+
+    cursor.execute("""
+        IF COL_LENGTH('dbo.FIN_Rendas', 'CategoriaRendaId') IS NULL
+        BEGIN
+            ALTER TABLE dbo.FIN_Rendas ADD CategoriaRendaId INT NULL
+        END
+    """)
 
 
 def normalizar_periodo(mes=None, ano=None):
@@ -340,6 +367,102 @@ def excluir_categoria(id):
 
     flash('Categoria excluida.', 'success')
     return redirect(url_for('financas.categorias'))
+
+
+@financas_bp.route('/rendas/categorias', methods=['GET', 'POST'])
+def categorias_rendas():
+    usuario_id = usuario_atual_id()
+
+    if request.method == 'POST':
+        nome = (request.form.get('nome') or '').strip()
+        cor_hex = normalizar_cor_categoria(request.form.get('cor_hex'))
+
+        if not nome:
+            flash('Informe o nome da categoria de renda.', 'danger')
+            return redirect(url_for('financas.categorias_rendas'))
+
+        nome = nome[:80]
+
+        with get_db_cursor() as cursor:
+            garantir_estrutura_renda_categorias(cursor)
+            cursor.execute("""
+                SELECT CategoriaRendaId
+                FROM FIN_RendaCategorias
+                WHERE UsuarioId = ? AND Nome = ?
+            """, (usuario_id, nome))
+            if cursor.fetchone():
+                flash('Voce ja possui uma categoria de renda com esse nome.', 'warning')
+                return redirect(url_for('financas.categorias_rendas'))
+
+            cursor.execute("""
+                INSERT INTO FIN_RendaCategorias (UsuarioId, Nome, CorHex)
+                VALUES (?, ?, ?)
+            """, (usuario_id, nome, cor_hex))
+
+        flash('Categoria de renda criada com sucesso.', 'success')
+        return redirect(url_for('financas.categorias_rendas'))
+
+    with get_db_cursor() as cursor:
+        garantir_estrutura_renda_categorias(cursor)
+        cursor.execute("""
+            SELECT
+                C.CategoriaRendaId,
+                C.Nome,
+                C.CorHex,
+                COUNT(R.RendaId) AS TotalRendas,
+                SUM(ISNULL(R.ValorPrevisto, 0)) AS TotalPrevisto,
+                SUM(ISNULL(R.ValorReal, 0)) AS TotalReal
+            FROM FIN_RendaCategorias C
+            LEFT JOIN FIN_Rendas R
+                ON R.CategoriaRendaId = C.CategoriaRendaId
+                AND R.UsuarioId = C.UsuarioId
+            WHERE C.UsuarioId = ?
+            GROUP BY C.CategoriaRendaId, C.Nome, C.CorHex
+            ORDER BY C.Nome
+        """, (usuario_id,))
+        categorias = cursor.fetchall()
+
+    return render_template(
+        'financas/categorias_rendas.html',
+        categorias=categorias,
+        cores_sugeridas=CORES_CATEGORIA_SUGERIDAS,
+        cor_padrao=COR_CATEGORIA_PADRAO,
+    )
+
+
+@financas_bp.route('/rendas/categorias/excluir/<int:id>', methods=['POST'])
+def excluir_categoria_renda(id):
+    usuario_id = usuario_atual_id()
+
+    with get_db_cursor() as cursor:
+        garantir_estrutura_renda_categorias(cursor)
+        cursor.execute("""
+            SELECT CategoriaRendaId
+            FROM FIN_RendaCategorias
+            WHERE CategoriaRendaId = ? AND UsuarioId = ?
+        """, (id, usuario_id))
+        if not cursor.fetchone():
+            flash('Categoria de renda nao encontrada.', 'warning')
+            return redirect(url_for('financas.categorias_rendas'))
+
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM FIN_Rendas
+            WHERE CategoriaRendaId = ? AND UsuarioId = ?
+        """, (id, usuario_id))
+        total_rendas = int(cursor.fetchone()[0] or 0)
+
+        if total_rendas > 0:
+            flash('Esta categoria ja esta em uso e nao pode ser excluida.', 'warning')
+            return redirect(url_for('financas.categorias_rendas'))
+
+        cursor.execute("""
+            DELETE FROM FIN_RendaCategorias
+            WHERE CategoriaRendaId = ? AND UsuarioId = ?
+        """, (id, usuario_id))
+
+    flash('Categoria de renda excluida.', 'success')
+    return redirect(url_for('financas.categorias_rendas'))
 
 
 @financas_bp.route('/adicionar-gasto', methods=['GET', 'POST'])
@@ -697,6 +820,7 @@ def gerenciar_rendas():
 
     if request.method == 'POST':
         descricao = request.form.get('descricao')
+        categoria_renda_id = request.form.get('categoria_renda_id') or None
         v_previsto = request.form.get('valor_previsto', '0')
         v_real = request.form.get('valor_real', '0')
         data_receb = request.form.get('data_recebimento')
@@ -709,21 +833,46 @@ def gerenciar_rendas():
         dt = datetime.strptime(data_receb, '%Y-%m-%d')
 
         with get_db_cursor() as cursor:
+            garantir_estrutura_renda_categorias(cursor)
+            if categoria_renda_id:
+                cursor.execute("""
+                    SELECT CategoriaRendaId
+                    FROM FIN_RendaCategorias
+                    WHERE CategoriaRendaId = ? AND UsuarioId = ?
+                """, (categoria_renda_id, usuario_id))
+                if not cursor.fetchone():
+                    flash('Selecione uma categoria de renda valida.', 'danger')
+                    return redirect(url_for('financas.gerenciar_rendas', mes=mes, ano=ano))
+
             cursor.execute("""
                 INSERT INTO FIN_Rendas
-                (UsuarioId, Descricao, ValorPrevisto, ValorReal, DataRecebimento, MesReferencia, AnoReferencia)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (usuario_id, descricao, valor_previsto, valor_real, data_receb, dt.month, dt.year))
+                (UsuarioId, CategoriaRendaId, Descricao, ValorPrevisto, ValorReal, DataRecebimento, MesReferencia, AnoReferencia)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (usuario_id, categoria_renda_id, descricao, valor_previsto, valor_real, data_receb, dt.month, dt.year))
 
         flash('Renda registrada com sucesso!', 'success')
         return redirect(url_for('financas.gerenciar_rendas', mes=dt.month, ano=dt.year))
 
     with get_db_cursor() as cursor:
+        garantir_estrutura_renda_categorias(cursor)
         cursor.execute("""
-            SELECT * FROM FIN_Rendas
-            WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
+            SELECT R.*, C.Nome AS CategoriaNome, C.CorHex AS CategoriaCorHex
+            FROM FIN_Rendas R
+            LEFT JOIN FIN_RendaCategorias C
+                ON C.CategoriaRendaId = R.CategoriaRendaId
+                AND C.UsuarioId = R.UsuarioId
+            WHERE R.UsuarioId = ? AND R.MesReferencia = ? AND R.AnoReferencia = ?
+            ORDER BY R.DataRecebimento ASC, R.RendaId ASC
         """, (usuario_id, mes, ano))
         rendas_rows = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT CategoriaRendaId, Nome, CorHex
+            FROM FIN_RendaCategorias
+            WHERE UsuarioId = ?
+            ORDER BY Nome
+        """, (usuario_id,))
+        categorias_renda = cursor.fetchall()
 
         cursor.execute("""
             SELECT SaldoAtual
@@ -740,6 +889,9 @@ def gerenciar_rendas():
         valor_a_receber = max(valor_previsto - valor_real, 0)
         rendas.append({
             'RendaId': renda.RendaId,
+            'CategoriaRendaId': renda.CategoriaRendaId,
+            'CategoriaNome': renda.CategoriaNome,
+            'CategoriaCorHex': renda.CategoriaCorHex,
             'Descricao': renda.Descricao,
             'ValorPrevisto': valor_previsto,
             'ValorReal': valor_real,
@@ -747,7 +899,15 @@ def gerenciar_rendas():
             'Recebida': valor_a_receber == 0 and valor_previsto > 0,
         })
 
-    return render_template('financas/rendas.html', rendas=rendas, mes=mes, ano=ano, saldo_atual=saldo_atual)
+    return render_template(
+        'financas/rendas.html',
+        rendas=rendas,
+        categorias_renda=categorias_renda,
+        cor_padrao=COR_CATEGORIA_PADRAO,
+        mes=mes,
+        ano=ano,
+        saldo_atual=saldo_atual,
+    )
 
 @financas_bp.route('/deletar-renda/<int:id>', methods=['POST'])
 def deletar_renda(id):
@@ -759,20 +919,31 @@ def deletar_renda(id):
 @financas_bp.route('/editar-renda/<int:id>', methods=['POST'])
 def editar_renda(id):
     usuario_id = usuario_atual_id()
-    dados = request.get_json()
+    dados = request.get_json() or {}
 
     # Tratamento para garantir que o SQL receba o tipo correto
     try:
         desc = dados.get('descricao')
+        categoria_renda_id = dados.get('categoria_renda_id') or None
         v_prev = parse_money(dados.get('valor_previsto'))
         v_real = parse_money(dados.get('valor_real'))
 
         with get_db_cursor() as cursor:
+            garantir_estrutura_renda_categorias(cursor)
+            if categoria_renda_id:
+                cursor.execute("""
+                    SELECT CategoriaRendaId
+                    FROM FIN_RendaCategorias
+                    WHERE CategoriaRendaId = ? AND UsuarioId = ?
+                """, (categoria_renda_id, usuario_id))
+                if not cursor.fetchone():
+                    return {"success": False, "message": "Categoria de renda invalida."}, 400
+
             cursor.execute("""
                 UPDATE FIN_Rendas
-                SET Descricao = ?, ValorPrevisto = ?, ValorReal = ?
+                SET CategoriaRendaId = ?, Descricao = ?, ValorPrevisto = ?, ValorReal = ?
                 WHERE RendaId = ? AND UsuarioId = ?
-            """, (desc, v_prev, v_real, id, usuario_id))
+            """, (categoria_renda_id, desc, v_prev, v_real, id, usuario_id))
         return {"success": True}, 200
     except Exception as e:
         return {"success": False, "message": str(e)}, 400

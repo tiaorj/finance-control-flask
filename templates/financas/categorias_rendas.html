@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% macro dinheiro(valor) -%}R$ {{ (valor or 0) | formato_real }}{%- endmacro %}
+
+{% block content %}
+<style>
+    .finance-page {
+        background: #f6f8fb;
+        min-height: calc(100vh - 160px);
+    }
+
+    .finance-card {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+    }
+
+    .category-swatch {
+        border: 2px solid #fff;
+        border-radius: 999px;
+        box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.18);
+        height: 28px;
+        width: 28px;
+    }
+
+    .category-dot-lg {
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        border-radius: 999px;
+        display: inline-block;
+        height: 18px;
+        width: 18px;
+    }
+
+    .table-finance th {
+        color: #64748b;
+        font-size: .76rem;
+        letter-spacing: .03em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .table-finance td {
+        vertical-align: middle;
+    }
+</style>
+
+<div class="finance-page py-4">
+    <div class="container-fluid">
+        <div class="d-flex flex-wrap justify-content-between align-items-start mb-3 gap-3">
+            <div>
+                <h2 class="fw-bold text-dark mb-1">
+                    <i class="bi bi-tags me-2"></i>Categorias de rendas
+                </h2>
+                <div class="text-muted">Organize a origem do dinheiro que entra.</div>
+            </div>
+
+            <a href="{{ url_for('financas.gerenciar_rendas') }}" class="btn btn-outline-primary fw-bold">
+                <i class="bi bi-arrow-left me-1"></i>Voltar para rendas
+            </a>
+        </div>
+
+        <div class="finance-card bg-white p-3 mb-4">
+            <form method="POST" action="{{ url_for('financas.categorias_rendas') }}" class="row g-3 align-items-end">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="col-md-5 col-xl-4">
+                    <label class="form-label small fw-bold text-muted mb-1">Nome da categoria</label>
+                    <input type="text" name="nome" class="form-control" maxlength="80" placeholder="Ex: Salario" required>
+                </div>
+
+                <div class="col-md-3 col-xl-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Cor</label>
+                    <input type="color" id="corCategoriaRenda" name="cor_hex" class="form-control form-control-color w-100" value="{{ cor_padrao }}">
+                </div>
+
+                <div class="col-md-4 col-xl-4">
+                    <label class="form-label small fw-bold text-muted mb-1">Cores rapidas</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for cor in cores_sugeridas %}
+                            <button type="button"
+                                    class="category-swatch"
+                                    style="background-color: {{ cor }};"
+                                    aria-label="Selecionar cor {{ cor }}"
+                                    title="{{ cor }}"
+                                    onclick="document.getElementById('corCategoriaRenda').value='{{ cor }}'"></button>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="col-xl-2 d-grid">
+                    <button type="submit" class="btn btn-primary fw-bold">
+                        <i class="bi bi-plus-circle me-1"></i>Adicionar
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="finance-card bg-white">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 p-3 border-bottom">
+                <h6 class="fw-bold mb-0">Minhas categorias de renda</h6>
+                <span class="badge text-bg-light">{{ categorias|length }} cadastradas</span>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 table-finance">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Categoria</th>
+                            <th class="text-center">Rendas</th>
+                            <th class="text-end">Previsto</th>
+                            <th class="text-end">Recebido</th>
+                            <th class="text-end pe-3">Acao</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for categoria in categorias %}
+                            {% set total_rendas = categoria.TotalRendas or 0 %}
+                            <tr>
+                                <td class="ps-3">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="category-dot-lg" style="background-color: {{ categoria.CorHex or cor_padrao }};"></span>
+                                        <strong>{{ categoria.Nome }}</strong>
+                                    </div>
+                                </td>
+                                <td class="text-center">{{ total_rendas }}</td>
+                                <td class="text-end">{{ dinheiro(categoria.TotalPrevisto) }}</td>
+                                <td class="text-end text-success fw-bold">{{ dinheiro(categoria.TotalReal) }}</td>
+                                <td class="text-end pe-3">
+                                    {% if total_rendas %}
+                                        <span class="badge text-bg-secondary">Em uso</span>
+                                    {% else %}
+                                        <form action="{{ url_for('financas.excluir_categoria_renda', id=categoria.CategoriaRendaId) }}" method="POST" class="d-inline"
+                                              onsubmit="return confirm('Excluir esta categoria de renda?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger fw-bold">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-5">
+                                    Nenhuma categoria de renda cadastrada.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
