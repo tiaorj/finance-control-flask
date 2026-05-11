@@ -252,6 +252,14 @@
                         Salvar
                     </button>
                 </div>
+
+                {% if not categorias %}
+                    <div class="col-12">
+                        <a href="{{ url_for('financas.categorias') }}" class="btn btn-sm btn-outline-primary fw-bold">
+                            <i class="bi bi-tags me-1"></i>Criar primeira categoria
+                        </a>
+                    </div>
+                {% endif %}
             </form>
         </div>
 

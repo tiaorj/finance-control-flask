@@ -37,6 +37,12 @@ def legacy_adicionar_gasto():
 def legacy_rendas():
     return redirect(url_for('financas.gerenciar_rendas', **request.args))
 
+
+@financas_legacy_bp.route('/categorias')
+def legacy_categorias():
+    return redirect(url_for('financas.categorias', **request.args))
+
+
 def parse_money(valor, default=0.0):
     if valor is None:
         return default
@@ -56,11 +62,25 @@ MESES_LISTA = [
 ]
 
 NOMES_MESES = dict(MESES_LISTA)
+COR_CATEGORIA_PADRAO = '#6c757d'
+CORES_CATEGORIA_SUGERIDAS = [
+    '#0d6efd', '#198754', '#dc3545', '#fd7e14',
+    '#6f42c1', '#20c997', '#0dcaf0', '#ffc107',
+    '#d63384', '#6c757d', '#0f172a', '#8b5cf6',
+]
 
 
 def periodo_atual():
     hoje = datetime.now()
     return hoje.month, hoje.year
+
+
+def normalizar_cor_categoria(cor):
+    cor = (cor or COR_CATEGORIA_PADRAO).strip()
+    digitos_hex = '0123456789abcdefABCDEF'
+    if len(cor) == 7 and cor.startswith('#') and all(c in digitos_hex for c in cor[1:]):
+        return cor.lower()
+    return COR_CATEGORIA_PADRAO
 
 
 def normalizar_periodo(mes=None, ano=None):
@@ -228,6 +248,100 @@ def exigir_login():
         next_url = request.full_path if request.query_string else request.path
         return redirect(url_for('admin.login', next=next_url))
 
+
+@financas_bp.route('/categorias', methods=['GET', 'POST'])
+def categorias():
+    usuario_id = usuario_atual_id()
+
+    if request.method == 'POST':
+        nome = (request.form.get('nome') or '').strip()
+        cor_hex = normalizar_cor_categoria(request.form.get('cor_hex'))
+
+        if not nome:
+            flash('Informe o nome da categoria.', 'danger')
+            return redirect(url_for('financas.categorias'))
+
+        nome = nome[:80]
+
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                SELECT CategoriaId
+                FROM FIN_Categorias
+                WHERE UsuarioId = ? AND Nome = ?
+            """, (usuario_id, nome))
+            if cursor.fetchone():
+                flash('Voce ja possui uma categoria com esse nome.', 'warning')
+                return redirect(url_for('financas.categorias'))
+
+            cursor.execute("""
+                INSERT INTO FIN_Categorias (UsuarioId, Nome, CorHex)
+                VALUES (?, ?, ?)
+            """, (usuario_id, nome, cor_hex))
+
+        flash('Categoria criada com sucesso.', 'success')
+        return redirect(url_for('financas.categorias'))
+
+    with get_db_cursor() as cursor:
+        cursor.execute("""
+            SELECT
+                C.CategoriaId,
+                C.Nome,
+                C.CorHex,
+                COUNT(L.LancamentoId) AS TotalLancamentos,
+                SUM(CASE WHEN L.Pago = 0 THEN 1 ELSE 0 END) AS Pendentes,
+                SUM(CASE WHEN L.Pago = 1 THEN 1 ELSE 0 END) AS Pagos
+            FROM FIN_Categorias C
+            LEFT JOIN FIN_Lancamentos L
+                ON L.CategoriaId = C.CategoriaId
+                AND L.UsuarioId = C.UsuarioId
+            WHERE C.UsuarioId = ?
+            GROUP BY C.CategoriaId, C.Nome, C.CorHex
+            ORDER BY C.Nome
+        """, (usuario_id,))
+        categorias = cursor.fetchall()
+
+    return render_template(
+        'financas/categorias.html',
+        categorias=categorias,
+        cores_sugeridas=CORES_CATEGORIA_SUGERIDAS,
+        cor_padrao=COR_CATEGORIA_PADRAO,
+    )
+
+
+@financas_bp.route('/categorias/excluir/<int:id>', methods=['POST'])
+def excluir_categoria(id):
+    usuario_id = usuario_atual_id()
+
+    with get_db_cursor() as cursor:
+        cursor.execute("""
+            SELECT CategoriaId
+            FROM FIN_Categorias
+            WHERE CategoriaId = ? AND UsuarioId = ?
+        """, (id, usuario_id))
+        if not cursor.fetchone():
+            flash('Categoria nao encontrada.', 'warning')
+            return redirect(url_for('financas.categorias'))
+
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM FIN_Lancamentos
+            WHERE CategoriaId = ? AND UsuarioId = ?
+        """, (id, usuario_id))
+        total_lancamentos = int(cursor.fetchone()[0] or 0)
+
+        if total_lancamentos > 0:
+            flash('Esta categoria ja esta em uso e nao pode ser excluida.', 'warning')
+            return redirect(url_for('financas.categorias'))
+
+        cursor.execute("""
+            DELETE FROM FIN_Categorias
+            WHERE CategoriaId = ? AND UsuarioId = ?
+        """, (id, usuario_id))
+
+    flash('Categoria excluida.', 'success')
+    return redirect(url_for('financas.categorias'))
+
+
 @financas_bp.route('/adicionar-gasto', methods=['GET', 'POST'])
 def adicionar_gasto():
     usuario_id = usuario_atual_id()
@@ -253,6 +367,15 @@ def adicionar_gasto():
         ano = dt.year
 
         with get_db_cursor() as cursor:
+            cursor.execute("""
+                SELECT CategoriaId
+                FROM FIN_Categorias
+                WHERE CategoriaId = ? AND UsuarioId = ?
+            """, (categoria_id, usuario_id))
+            if not cursor.fetchone():
+                flash('Selecione uma categoria valida.', 'danger')
+                return redirect(url_for('financas.adicionar_gasto', mes=mes_sel, ano=ano_sel))
+
             cursor.execute("""
                 INSERT INTO FIN_Lancamentos
                 (UsuarioId, CategoriaId, Descricao, ValorEstimado, DataVencimento, MesReferencia, AnoReferencia, Pago)
