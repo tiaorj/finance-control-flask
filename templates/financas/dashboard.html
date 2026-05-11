@@ -203,6 +203,58 @@
             </div>
         </div>
 
+        <div class="finance-card bg-white p-3 mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <h6 class="fw-bold mb-1"><i class="bi bi-activity me-2"></i>Fluxo de Caixa Projetado</h6>
+                    <div class="text-muted small">Linha diaria cruzando saldo, rendas previstas e contas do periodo.</div>
+                </div>
+                {% if fluxo_caixa.risco_descoberto %}
+                    <div class="alert alert-danger py-2 px-3 mb-0 small fw-bold">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Risco de descoberto em {{ "%02d"|format(fluxo_caixa.primeiro_dia_negativo) }}/{{ "%02d"|format(mes_sel) }}
+                    </div>
+                {% else %}
+                    <div class="alert alert-success py-2 px-3 mb-0 small fw-bold">
+                        <i class="bi bi-check-circle me-1"></i>Sem saldo negativo projetado
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="row g-3 align-items-stretch">
+                <div class="col-lg-9">
+                    <div class="chart-box">
+                        <canvas id="graficoFluxoCaixa"></canvas>
+                    </div>
+                </div>
+                <div class="col-lg-3">
+                    <div class="h-100 d-flex flex-column gap-2">
+                        <div class="border rounded p-2">
+                            <div class="small text-muted fw-bold text-uppercase">Saldo inicial estimado</div>
+                            <div class="fw-bold">{{ dinheiro(fluxo_caixa.saldo_inicial) }}</div>
+                        </div>
+                        <div class="border rounded p-2">
+                            <div class="small text-muted fw-bold text-uppercase">Entradas no periodo</div>
+                            <div class="fw-bold text-success">{{ dinheiro(fluxo_caixa.total_entradas) }}</div>
+                        </div>
+                        <div class="border rounded p-2">
+                            <div class="small text-muted fw-bold text-uppercase">Saidas no periodo</div>
+                            <div class="fw-bold text-danger">{{ dinheiro(fluxo_caixa.total_saidas) }}</div>
+                        </div>
+                        <div class="border rounded p-2">
+                            <div class="small text-muted fw-bold text-uppercase">Menor saldo</div>
+                            <div class="fw-bold {% if fluxo_caixa.saldo_minimo < 0 %}text-danger{% else %}text-primary{% endif %}">
+                                {{ dinheiro(fluxo_caixa.saldo_minimo) }}
+                            </div>
+                            {% if fluxo_caixa.dia_saldo_minimo %}
+                                <div class="small text-muted">Dia {{ "%02d"|format(fluxo_caixa.dia_saldo_minimo) }}/{{ "%02d"|format(mes_sel) }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {% if resumo_carteiras.ativas %}
         <div class="finance-card bg-white p-3 mb-4">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
@@ -659,6 +711,92 @@ function salvarValor(id) {
     })
     .catch(error => console.error('Erro:', error));
 }
+
+function formatCurrencyBR(value) {
+    return 'R$ ' + Number(value || 0).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+(function renderGraficoFluxoCaixa() {
+    const canvas = document.getElementById('graficoFluxoCaixa');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const fluxoColor = {{ ('#dc3545' if fluxo_caixa.risco_descoberto else '#198754') | tojson }};
+    new Chart(canvas.getContext('2d'), {
+        data: {
+            labels: {{ fluxo_caixa.labels | tojson }},
+            datasets: [
+                {
+                    type: 'bar',
+                    label: 'Entradas',
+                    data: {{ fluxo_caixa.entradas | tojson }},
+                    backgroundColor: 'rgba(25, 135, 84, 0.22)',
+                    borderColor: 'rgba(25, 135, 84, 0.65)',
+                    borderWidth: 1,
+                    order: 2
+                },
+                {
+                    type: 'bar',
+                    label: 'Saidas',
+                    data: {{ fluxo_caixa.saidas_negativas | tojson }},
+                    backgroundColor: 'rgba(220, 53, 69, 0.20)',
+                    borderColor: 'rgba(220, 53, 69, 0.62)',
+                    borderWidth: 1,
+                    order: 2
+                },
+                {
+                    type: 'line',
+                    label: 'Saldo projetado',
+                    data: {{ fluxo_caixa.saldos | tojson }},
+                    borderColor: fluxoColor,
+                    backgroundColor: fluxoColor + '22',
+                    fill: false,
+                    tension: 0.32,
+                    borderWidth: 3,
+                    pointRadius: 2.5,
+                    pointHoverRadius: 5,
+                    order: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { boxWidth: 10, font: { size: 11 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const valor = context.dataset.label === 'Saidas'
+                                ? Math.abs(context.parsed.y || 0)
+                                : context.parsed.y || 0;
+                            return context.dataset.label + ': ' + formatCurrencyBR(valor);
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 },
+                    grid: { display: false }
+                },
+                y: {
+                    ticks: {
+                        callback: function(value) {
+                            return 'R$ ' + Number(value).toLocaleString('pt-BR');
+                        }
+                    }
+                }
+            }
+        }
+    });
+})();
 
 (function renderGraficoGastos() {
     const canvas = document.getElementById('graficoGastos');

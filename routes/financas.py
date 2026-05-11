@@ -715,6 +715,101 @@ def saldo_transportado_periodo(cursor, usuario_id, mes, ano, profundidade=12):
     return saldo_transportado
 
 
+def montar_fluxo_caixa_diario(cursor, usuario_id, mes, ano, saldo_disponivel):
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    entradas_por_dia = {dia: 0.0 for dia in range(1, ultimo_dia + 1)}
+    saidas_por_dia = {dia: 0.0 for dia in range(1, ultimo_dia + 1)}
+    entradas_recebidas = 0.0
+    saidas_pagas = 0.0
+
+    cursor.execute("""
+        SELECT Descricao, ValorPrevisto, ISNULL(ValorReal, 0) AS ValorReal, DataRecebimento
+        FROM FIN_Rendas
+        WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
+        ORDER BY DataRecebimento, RendaId
+    """, (usuario_id, mes, ano))
+    rendas_periodo = cursor.fetchall()
+
+    for renda in rendas_periodo:
+        data_ref = normalizar_data(renda.DataRecebimento) or date(ano, mes, 1)
+        dia = min(max(data_ref.day, 1), ultimo_dia)
+        valor_real = float(renda.ValorReal or 0)
+        valor_previsto = float(renda.ValorPrevisto or 0)
+        valor = valor_real if valor_real > 0 else valor_previsto
+        if valor <= 0:
+            continue
+        entradas_por_dia[dia] += valor
+        if valor_real > 0:
+            entradas_recebidas += valor_real
+
+    cursor.execute("""
+        SELECT Descricao, ValorEstimado, ISNULL(ValorReal, 0) AS ValorReal, Pago, DataVencimento
+        FROM FIN_Lancamentos
+        WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
+        ORDER BY DataVencimento, LancamentoId
+    """, (usuario_id, mes, ano))
+    lancamentos_periodo = cursor.fetchall()
+
+    for lancamento in lancamentos_periodo:
+        data_ref = normalizar_data(lancamento.DataVencimento) or date(ano, mes, 1)
+        dia = min(max(data_ref.day, 1), ultimo_dia)
+        valor_real = float(lancamento.ValorReal or 0)
+        valor_estimado = float(lancamento.ValorEstimado or 0)
+        pago = bool(lancamento.Pago)
+        valor = valor_real if pago and valor_real > 0 else valor_estimado
+        if valor <= 0:
+            continue
+        saidas_por_dia[dia] += valor
+        if pago and valor_real > 0:
+            saidas_pagas += valor_real
+
+    saldo_inicial = float(saldo_disponivel or 0) - entradas_recebidas + saidas_pagas
+    saldo_dia = saldo_inicial
+    labels = []
+    entradas = []
+    saidas = []
+    saldos = []
+    saldo_minimo = None
+    dia_saldo_minimo = None
+    primeiro_risco = None
+    saldo_primeiro_risco = None
+
+    for dia in range(1, ultimo_dia + 1):
+        saldo_dia += entradas_por_dia[dia]
+        saldo_dia -= saidas_por_dia[dia]
+        saldo_arredondado = round(saldo_dia, 2)
+
+        labels.append(f'{dia:02d}/{mes:02d}')
+        entradas.append(round(entradas_por_dia[dia], 2))
+        saidas.append(round(saidas_por_dia[dia], 2))
+        saldos.append(saldo_arredondado)
+
+        if saldo_minimo is None or saldo_arredondado < saldo_minimo:
+            saldo_minimo = saldo_arredondado
+            dia_saldo_minimo = dia
+
+        if primeiro_risco is None and saldo_arredondado < 0:
+            primeiro_risco = dia
+            saldo_primeiro_risco = saldo_arredondado
+
+    return {
+        'labels': labels,
+        'saldos': saldos,
+        'entradas': entradas,
+        'saidas': saidas,
+        'saidas_negativas': [-valor for valor in saidas],
+        'saldo_inicial': round(saldo_inicial, 2),
+        'saldo_final': saldos[-1] if saldos else round(saldo_inicial, 2),
+        'saldo_minimo': saldo_minimo if saldo_minimo is not None else round(saldo_inicial, 2),
+        'dia_saldo_minimo': dia_saldo_minimo,
+        'primeiro_dia_negativo': primeiro_risco,
+        'saldo_primeiro_dia_negativo': saldo_primeiro_risco,
+        'risco_descoberto': primeiro_risco is not None,
+        'total_entradas': round(sum(entradas), 2),
+        'total_saidas': round(sum(saidas), 2),
+    }
+
+
 @financas_bp.before_request
 def exigir_login():
     if not current_user.is_authenticated:
@@ -1456,6 +1551,13 @@ def dashboard():
         lancamentos = cursor.fetchall()
 
         saldo_transportado = saldo_transportado_periodo(cursor, usuario_id, mes_sel, ano_sel)
+        fluxo_caixa = montar_fluxo_caixa_diario(
+            cursor,
+            usuario_id,
+            mes_sel,
+            ano_sel,
+            saldo_bancario + saldo_transportado,
+        )
 
         cursor.execute("""
             SELECT TOP 6 
@@ -1545,6 +1647,7 @@ def dashboard():
                            saldo_bancario=saldo_bancario,
                            saldo_transportado=saldo_transportado,
                            saldo_em_caixa=saldo_em_caixa_real,
+                           fluxo_caixa=fluxo_caixa,
                            resumo_assinaturas=resumo_assinaturas,
                            resumo_metas=resumo_metas,
                            carteiras=carteiras,
