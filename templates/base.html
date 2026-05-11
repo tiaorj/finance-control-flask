@@ -64,6 +64,15 @@
             color: var(--directi-orange);
         }
 
+        .app-brand-caption {
+            color: #94a3b8;
+            font-size: .74rem;
+            font-weight: 700;
+            letter-spacing: 0;
+            margin-top: .2rem;
+            text-transform: uppercase;
+        }
+
         .app-user-card {
             background: rgba(255,255,255,0.06);
             border: 1px solid rgba(255,255,255,0.08);
@@ -110,6 +119,31 @@
             text-decoration: none;
         }
 
+        .app-nav-link.app-nav-primary {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .app-nav-copy {
+            display: flex;
+            flex-direction: column;
+            gap: .12rem;
+            line-height: 1.1;
+        }
+
+        .app-nav-copy strong {
+            color: inherit;
+            font-size: .94rem;
+            line-height: 1.15;
+        }
+
+        .app-nav-copy small {
+            color: #94a3b8;
+            font-size: .7rem;
+            font-weight: 600;
+            letter-spacing: 0;
+        }
+
         .app-nav-link i {
             color: #93c5fd;
             font-size: 1rem;
@@ -124,6 +158,58 @@
 
         .app-nav-link.active i {
             color: #fff;
+        }
+
+        .app-nav-link:hover .app-nav-copy small,
+        .app-nav-link.active .app-nav-copy small {
+            color: #bfdbfe;
+        }
+
+        .app-nav-subtitle {
+            color: #64748b;
+            display: block;
+            font-size: .68rem;
+            font-weight: 800;
+            letter-spacing: 0;
+            margin: .45rem 0 .15rem;
+            text-transform: uppercase;
+        }
+
+        .app-nav-sublist {
+            border-left: 1px solid rgba(148, 163, 184, 0.28);
+            display: grid;
+            gap: .1rem;
+            margin: .35rem 0 0 1.08rem;
+            padding-left: .65rem;
+        }
+
+        .app-nav-sublink {
+            align-items: center;
+            border-radius: 6px;
+            color: #94a3b8;
+            display: flex;
+            font-size: .84rem;
+            font-weight: 700;
+            gap: .45rem;
+            padding: .38rem .5rem;
+            text-decoration: none;
+        }
+
+        .app-nav-sublink i {
+            color: #64748b;
+            font-size: .86rem;
+            width: .95rem;
+        }
+
+        .app-nav-sublink:hover,
+        .app-nav-sublink.active {
+            background: rgba(37, 99, 235, 0.16);
+            color: #fff;
+        }
+
+        .app-nav-sublink.active i,
+        .app-nav-sublink:hover i {
+            color: #bfdbfe;
         }
 
         .app-sidebar-footer {
@@ -190,6 +276,8 @@
 </head>
 <body>
     {% set endpoint = request.endpoint or '' %}
+    {% set financeiro_config_ativo = endpoint in ['financas.adicionar_gasto', 'financas.categorias', 'financas.categorias_rendas'] %}
+    {% set curriculo_admin_ativo = endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.') %}
     {% set admin_menu_ativo = endpoint.startswith('dashboard.') or endpoint.startswith('financas.') or endpoint.startswith('assinaturas.') or endpoint.startswith('metas.') or endpoint.startswith('tarefas.') or endpoint.startswith('veiculos.') or endpoint.startswith('garantias.') or endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.') or endpoint.startswith('curriculo.') %}
     {% set app_shell_ativo = current_user.is_authenticated and admin_menu_ativo %}
 
@@ -203,9 +291,12 @@
         </div>
 
         <aside id="appSidebarNav" class="app-sidebar collapse d-lg-block">
-            <a class="app-brand" href="{{ url_for('dashboard.index') }}" aria-label="Direct TI - App">
-                DIRECT<span> TI</span>
-            </a>
+            <div>
+                <a class="app-brand" href="{{ url_for('dashboard.index') }}" aria-label="Direct TI - App">
+                    DIRECT<span> TI</span>
+                </a>
+                <div class="app-brand-caption">Portal de gest&atilde;o</div>
+            </div>
 
             <div class="app-user-card">
                 <small>Area logada</small>
@@ -214,10 +305,14 @@
 
             <nav aria-label="Menu principal do app">
                 <div class="app-nav-section">
-                    <span class="app-nav-title">Geral</span>
+                    <span class="app-nav-title">In&iacute;cio</span>
                     <div class="app-nav-list">
-                        <a class="app-nav-link {{ 'active' if endpoint == 'dashboard.index' else '' }}" href="{{ url_for('dashboard.index') }}">
-                            <i class="bi bi-speedometer2"></i>Painel
+                        <a class="app-nav-link app-nav-primary {{ 'active' if endpoint == 'dashboard.index' else '' }}" href="{{ url_for('dashboard.index') }}">
+                            <i class="bi bi-speedometer2"></i>
+                            <span class="app-nav-copy">
+                                <strong>Painel geral</strong>
+                                <small>Resumo, alertas e tarefas</small>
+                            </span>
                         </a>
                     </div>
                 </div>
@@ -226,81 +321,133 @@
                     <span class="app-nav-title">Financeiro</span>
                     <div class="app-nav-list">
                         <a class="app-nav-link {{ 'active' if endpoint == 'financas.dashboard' else '' }}" href="{{ url_for('financas.dashboard') }}">
-                            <i class="bi bi-cash-stack"></i>Controle
+                            <i class="bi bi-activity"></i>
+                            <span class="app-nav-copy">
+                                <strong>Fluxo financeiro</strong>
+                                <small>Saldo, contas e proje&ccedil;&otilde;es</small>
+                            </span>
                         </a>
                         <a class="app-nav-link {{ 'active' if endpoint == 'financas.gerenciar_rendas' else '' }}" href="{{ url_for('financas.gerenciar_rendas') }}">
-                            <i class="bi bi-graph-up-arrow"></i>Rendas
+                            <i class="bi bi-graph-up-arrow"></i>
+                            <span class="app-nav-copy">
+                                <strong>Entradas</strong>
+                                <small>Rendas e recebimentos</small>
+                            </span>
                         </a>
                         <a class="app-nav-link {{ 'active' if endpoint == 'financas.rendas_recorrentes' else '' }}" href="{{ url_for('financas.rendas_recorrentes') }}">
-                            <i class="bi bi-arrow-repeat"></i>Rendas fixas
+                            <i class="bi bi-arrow-repeat"></i>
+                            <span class="app-nav-copy">
+                                <strong>Entradas fixas</strong>
+                                <small>Sal&aacute;rio, pro-labore e alugu&eacute;is</small>
+                            </span>
                         </a>
                         <a class="app-nav-link {{ 'active' if endpoint == 'financas.carteiras' else '' }}" href="{{ url_for('financas.carteiras') }}">
-                            <i class="bi bi-wallet2"></i>Carteiras
-                        </a>
-                        <a class="app-nav-link {{ 'active' if endpoint == 'financas.categorias_rendas' else '' }}" href="{{ url_for('financas.categorias_rendas') }}">
-                            <i class="bi bi-tags"></i>Cat. rendas
-                        </a>
-                        <a class="app-nav-link {{ 'active' if endpoint == 'financas.categorias' else '' }}" href="{{ url_for('financas.categorias') }}">
-                            <i class="bi bi-tags"></i>Cat. gastos
-                        </a>
-                        <a class="app-nav-link {{ 'active' if endpoint == 'financas.adicionar_gasto' else '' }}" href="{{ url_for('financas.adicionar_gasto') }}">
-                            <i class="bi bi-plus-circle"></i>Novo gasto
+                            <i class="bi bi-wallet2"></i>
+                            <span class="app-nav-copy">
+                                <strong>Contas e carteiras</strong>
+                                <small>Bancos, dinheiro e saldos</small>
+                            </span>
                         </a>
                         <a class="app-nav-link {{ 'active' if endpoint.startswith('assinaturas.') else '' }}" href="{{ url_for('assinaturas.lista') }}">
-                            <i class="bi bi-repeat"></i>Assinaturas
+                            <i class="bi bi-repeat"></i>
+                            <span class="app-nav-copy">
+                                <strong>Assinaturas</strong>
+                                <small>Servi&ccedil;os recorrentes</small>
+                            </span>
                         </a>
                         <a class="app-nav-link {{ 'active' if endpoint.startswith('metas.') else '' }}" href="{{ url_for('metas.lista') }}">
-                            <i class="bi bi-piggy-bank"></i>Metas
+                            <i class="bi bi-piggy-bank"></i>
+                            <span class="app-nav-copy">
+                                <strong>Metas</strong>
+                                <small>Reservas e objetivos</small>
+                            </span>
                         </a>
+
+                        <div class="app-nav-sublist">
+                            <span class="app-nav-subtitle">Atalhos e configura&ccedil;&otilde;es</span>
+                            <a class="app-nav-sublink {{ 'active' if endpoint == 'financas.adicionar_gasto' else '' }}" href="{{ url_for('financas.adicionar_gasto') }}">
+                                <i class="bi bi-plus-circle"></i>Novo lan&ccedil;amento
+                            </a>
+                            <a class="app-nav-sublink {{ 'active' if endpoint == 'financas.categorias' else '' }}" href="{{ url_for('financas.categorias') }}">
+                                <i class="bi bi-tags"></i>Categorias de gastos
+                            </a>
+                            <a class="app-nav-sublink {{ 'active' if endpoint == 'financas.categorias_rendas' else '' }}" href="{{ url_for('financas.categorias_rendas') }}">
+                                <i class="bi bi-tags"></i>Categorias de entradas
+                            </a>
+                        </div>
                     </div>
                 </div>
 
                 <div class="app-nav-section">
-                    <span class="app-nav-title">Dia a dia</span>
+                    <span class="app-nav-title">Rotina</span>
                     <div class="app-nav-list">
                         <a class="app-nav-link {{ 'active' if endpoint.startswith('tarefas.') else '' }}" href="{{ url_for('tarefas.lista') }}">
-                            <i class="bi bi-calendar2-check"></i>Tarefas
+                            <i class="bi bi-calendar2-check"></i>
+                            <span class="app-nav-copy">
+                                <strong>Checklist</strong>
+                                <small>Tarefas recorrentes</small>
+                            </span>
                         </a>
                         <a class="app-nav-link {{ 'active' if endpoint.startswith('veiculos.') else '' }}" href="{{ url_for('veiculos.lista') }}">
-                            <i class="bi bi-car-front"></i>Veiculos
+                            <i class="bi bi-car-front"></i>
+                            <span class="app-nav-copy">
+                                <strong>Ve&iacute;culos</strong>
+                                <small>Manuten&ccedil;&atilde;o e documentos</small>
+                            </span>
                         </a>
                         <a class="app-nav-link {{ 'active' if endpoint.startswith('garantias.') else '' }}" href="{{ url_for('garantias.lista') }}">
-                            <i class="bi bi-shield-check"></i>Garantias
+                            <i class="bi bi-shield-check"></i>
+                            <span class="app-nav-copy">
+                                <strong>Garantias</strong>
+                                <small>Notas fiscais e prazos</small>
+                            </span>
                         </a>
                     </div>
                 </div>
 
                 <div class="app-nav-section">
-                    <span class="app-nav-title">Curriculo</span>
+                    <span class="app-nav-title">Perfil profissional</span>
                     <div class="app-nav-list">
                         <a class="app-nav-link {{ 'active' if endpoint == 'curriculo.especialista' else '' }}" href="{{ url_for('curriculo.especialista') }}">
-                            <i class="bi bi-person-vcard"></i>Perfil
+                            <i class="bi bi-person-vcard"></i>
+                            <span class="app-nav-copy">
+                                <strong>Perfil p&uacute;blico</strong>
+                                <small>Visualiza&ccedil;&atilde;o do curr&iacute;culo</small>
+                            </span>
                         </a>
                         <a class="app-nav-link {{ 'active' if endpoint == 'curriculo.editar_perfil' else '' }}" href="{{ url_for('curriculo.editar_perfil') }}">
-                            <i class="bi bi-pencil-square"></i>Dados do perfil
+                            <i class="bi bi-pencil-square"></i>
+                            <span class="app-nav-copy">
+                                <strong>Dados principais</strong>
+                                <small>Nome, foto e resumo</small>
+                            </span>
                         </a>
-                        <a class="app-nav-link {{ 'active' if (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' else '' }}" href="{{ url_for('experiencias_admin.lista') }}">
-                            <i class="bi bi-briefcase"></i>Experiencias
-                        </a>
-                        <a class="app-nav-link {{ 'active' if endpoint.startswith('formacao_admin.') else '' }}" href="{{ url_for('formacao_admin.lista') }}">
-                            <i class="bi bi-mortarboard"></i>Formacao
-                        </a>
-                        <a class="app-nav-link {{ 'active' if endpoint.startswith('projetos_admin.') else '' }}" href="{{ url_for('projetos_admin.lista') }}">
-                            <i class="bi bi-kanban"></i>Projetos
-                        </a>
-                        <a class="app-nav-link {{ 'active' if endpoint.startswith('habilidades_admin.') else '' }}" href="{{ url_for('habilidades_admin.lista') }}">
-                            <i class="bi bi-stars"></i>Habilidades
-                        </a>
-                        <a class="app-nav-link {{ 'active' if endpoint.startswith('certificacoes_admin.') else '' }}" href="{{ url_for('certificacoes_admin.lista') }}">
-                            <i class="bi bi-patch-check"></i>Certificacoes
-                        </a>
+
+                        <div class="app-nav-sublist">
+                            <span class="app-nav-subtitle">Se&ccedil;&otilde;es do curr&iacute;culo</span>
+                            <a class="app-nav-sublink {{ 'active' if (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' else '' }}" href="{{ url_for('experiencias_admin.lista') }}">
+                                <i class="bi bi-briefcase"></i>Experi&ecirc;ncias
+                            </a>
+                            <a class="app-nav-sublink {{ 'active' if endpoint.startswith('formacao_admin.') else '' }}" href="{{ url_for('formacao_admin.lista') }}">
+                                <i class="bi bi-mortarboard"></i>Forma&ccedil;&atilde;o
+                            </a>
+                            <a class="app-nav-sublink {{ 'active' if endpoint.startswith('projetos_admin.') else '' }}" href="{{ url_for('projetos_admin.lista') }}">
+                                <i class="bi bi-kanban"></i>Projetos
+                            </a>
+                            <a class="app-nav-sublink {{ 'active' if endpoint.startswith('habilidades_admin.') else '' }}" href="{{ url_for('habilidades_admin.lista') }}">
+                                <i class="bi bi-stars"></i>Habilidades
+                            </a>
+                            <a class="app-nav-sublink {{ 'active' if endpoint.startswith('certificacoes_admin.') else '' }}" href="{{ url_for('certificacoes_admin.lista') }}">
+                                <i class="bi bi-patch-check"></i>Certifica&ccedil;&otilde;es
+                            </a>
+                        </div>
                     </div>
                 </div>
             </nav>
 
             <div class="app-sidebar-footer">
                 <a class="app-nav-link" href="{{ url_for('main.index') }}">
-                    <i class="bi bi-globe2"></i>Site publico
+                    <i class="bi bi-globe2"></i>Site p&uacute;blico
                 </a>
                 <a class="app-nav-link" href="{{ url_for('curriculo.gerar_pdf') }}" target="_blank" rel="noopener">
                     <i class="bi bi-file-pdf"></i>Baixar PDF
