@@ -38,6 +38,11 @@ def legacy_rendas():
     return redirect(url_for('financas.gerenciar_rendas', **request.args))
 
 
+@financas_legacy_bp.route('/carteiras')
+def legacy_carteiras():
+    return redirect(url_for('financas.carteiras', **request.args))
+
+
 @financas_legacy_bp.route('/rendas/categorias')
 def legacy_categorias_rendas():
     return redirect(url_for('financas.categorias_rendas', **request.args))
@@ -72,6 +77,14 @@ CORES_CATEGORIA_SUGERIDAS = [
     '#0d6efd', '#198754', '#dc3545', '#fd7e14',
     '#6f42c1', '#20c997', '#0dcaf0', '#ffc107',
     '#d63384', '#6c757d', '#0f172a', '#8b5cf6',
+]
+TIPOS_CARTEIRA = [
+    ('conta_corrente', 'Conta corrente'),
+    ('poupanca', 'Poupanca'),
+    ('carteira', 'Dinheiro/carteira'),
+    ('investimento', 'Investimento'),
+    ('empresa', 'Conta da empresa'),
+    ('outro', 'Outro'),
 ]
 
 
@@ -108,6 +121,44 @@ def garantir_estrutura_renda_categorias(cursor):
             ALTER TABLE dbo.FIN_Rendas ADD CategoriaRendaId INT NULL
         END
     """)
+
+
+def garantir_estrutura_carteiras(cursor):
+    cursor.execute("""
+        IF OBJECT_ID('dbo.FIN_Carteiras', 'U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.FIN_Carteiras (
+                CarteiraId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                UsuarioId INT NOT NULL,
+                Nome NVARCHAR(100) NOT NULL,
+                Tipo NVARCHAR(40) NOT NULL DEFAULT 'conta_corrente',
+                SaldoAtual DECIMAL(18,2) NOT NULL DEFAULT 0,
+                CorHex NVARCHAR(7) NOT NULL DEFAULT '#0d6efd',
+                Ativa BIT NOT NULL DEFAULT 1,
+                DataCriacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                DataAtualizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+            )
+        END
+    """)
+
+    cursor.execute("""
+        IF COL_LENGTH('dbo.FIN_Rendas', 'CarteiraId') IS NULL
+        BEGIN
+            ALTER TABLE dbo.FIN_Rendas ADD CarteiraId INT NULL
+        END
+    """)
+
+    cursor.execute("""
+        IF COL_LENGTH('dbo.FIN_Lancamentos', 'CarteiraId') IS NULL
+        BEGIN
+            ALTER TABLE dbo.FIN_Lancamentos ADD CarteiraId INT NULL
+        END
+    """)
+
+
+def tipo_carteira_valido(tipo):
+    tipos_validos = {item[0] for item in TIPOS_CARTEIRA}
+    return tipo if tipo in tipos_validos else 'outro'
 
 
 def normalizar_periodo(mes=None, ano=None):
@@ -155,6 +206,80 @@ def ajustar_caixa(cursor, usuario_id, mes, ano, delta):
             INSERT INTO FIN_Caixa (UsuarioId, MesReferencia, AnoReferencia, SaldoAtual, DataAtualizacao)
             VALUES (?, ?, ?, ?, GETDATE())
         """, (usuario_id, mes, ano, delta))
+
+
+def obter_resumo_carteiras(cursor, usuario_id):
+    garantir_estrutura_carteiras(cursor)
+    cursor.execute("""
+        SELECT
+            COUNT(*) AS TotalCarteiras,
+            SUM(CASE WHEN Ativa = 1 THEN 1 ELSE 0 END) AS Ativas,
+            SUM(CASE WHEN Ativa = 1 THEN ISNULL(SaldoAtual, 0) ELSE 0 END) AS SaldoTotal
+        FROM FIN_Carteiras
+        WHERE UsuarioId = ?
+    """, (usuario_id,))
+    resumo = cursor.fetchone()
+    return {
+        'total': int(resumo.TotalCarteiras or 0) if resumo else 0,
+        'ativas': int(resumo.Ativas or 0) if resumo else 0,
+        'saldo_total': float(resumo.SaldoTotal or 0) if resumo else 0.0,
+    }
+
+
+def listar_carteiras_ativas(cursor, usuario_id):
+    garantir_estrutura_carteiras(cursor)
+    cursor.execute("""
+        SELECT CarteiraId, Nome, Tipo, SaldoAtual, CorHex
+        FROM FIN_Carteiras
+        WHERE UsuarioId = ? AND Ativa = 1
+        ORDER BY Nome
+    """, (usuario_id,))
+    return cursor.fetchall()
+
+
+def carteira_ativa_existe(cursor, usuario_id, carteira_id):
+    if not carteira_id:
+        return False
+
+    cursor.execute("""
+        SELECT CarteiraId
+        FROM FIN_Carteiras
+        WHERE CarteiraId = ? AND UsuarioId = ? AND Ativa = 1
+    """, (carteira_id, usuario_id))
+    return cursor.fetchone() is not None
+
+
+def movimentar_carteira(cursor, usuario_id, carteira_id, delta):
+    if not carteira_id or not delta:
+        return False
+
+    cursor.execute("""
+        UPDATE FIN_Carteiras
+        SET SaldoAtual = ISNULL(SaldoAtual, 0) + ?,
+            DataAtualizacao = SYSUTCDATETIME()
+        WHERE CarteiraId = ? AND UsuarioId = ? AND Ativa = 1
+    """, (delta, carteira_id, usuario_id))
+    return cursor.rowcount > 0
+
+
+def sincronizar_caixa_com_carteiras(cursor, usuario_id, mes, ano):
+    resumo = obter_resumo_carteiras(cursor, usuario_id)
+    if resumo['ativas'] == 0:
+        return None
+
+    cursor.execute("""
+        UPDATE FIN_Caixa
+        SET SaldoAtual = ?, DataAtualizacao = GETDATE()
+        WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
+    """, (resumo['saldo_total'], usuario_id, mes, ano))
+
+    if cursor.rowcount == 0:
+        cursor.execute("""
+            INSERT INTO FIN_Caixa (UsuarioId, MesReferencia, AnoReferencia, SaldoAtual, DataAtualizacao)
+            VALUES (?, ?, ?, ?, GETDATE())
+        """, (usuario_id, mes, ano, resumo['saldo_total']))
+
+    return resumo['saldo_total']
 
 
 def chave_periodo(mes, ano):
@@ -274,6 +399,156 @@ def exigir_login():
     if not current_user.is_authenticated:
         next_url = request.full_path if request.query_string else request.path
         return redirect(url_for('admin.login', next=next_url))
+
+
+@financas_bp.route('/carteiras', methods=['GET', 'POST'])
+def carteiras():
+    usuario_id = usuario_atual_id()
+    mes_atual, ano_atual = periodo_atual()
+
+    if request.method == 'POST':
+        nome = (request.form.get('nome') or '').strip()
+        tipo = tipo_carteira_valido(request.form.get('tipo') or 'conta_corrente')
+        saldo_atual = parse_money(request.form.get('saldo_atual'))
+        cor_hex = normalizar_cor_categoria(request.form.get('cor_hex') or '#0d6efd')
+
+        if not nome:
+            flash('Informe o nome da carteira.', 'danger')
+            return redirect(url_for('financas.carteiras'))
+
+        with get_db_cursor() as cursor:
+            garantir_estrutura_carteiras(cursor)
+            cursor.execute("""
+                SELECT CarteiraId
+                FROM FIN_Carteiras
+                WHERE UsuarioId = ? AND Nome = ?
+            """, (usuario_id, nome[:100]))
+            if cursor.fetchone():
+                flash('Voce ja possui uma carteira com esse nome.', 'warning')
+                return redirect(url_for('financas.carteiras'))
+
+            cursor.execute("""
+                INSERT INTO FIN_Carteiras (UsuarioId, Nome, Tipo, SaldoAtual, CorHex, Ativa)
+                VALUES (?, ?, ?, ?, ?, 1)
+            """, (usuario_id, nome[:100], tipo, saldo_atual, cor_hex))
+            sincronizar_caixa_com_carteiras(cursor, usuario_id, mes_atual, ano_atual)
+
+        flash('Carteira criada com sucesso.', 'success')
+        return redirect(url_for('financas.carteiras'))
+
+    with get_db_cursor() as cursor:
+        garantir_estrutura_carteiras(cursor)
+        cursor.execute("""
+            SELECT
+                C.CarteiraId,
+                C.Nome,
+                C.Tipo,
+                C.SaldoAtual,
+                C.CorHex,
+                C.Ativa,
+                ISNULL(R.TotalRendas, 0) AS TotalRendas,
+                ISNULL(L.TotalLancamentos, 0) AS TotalLancamentos
+            FROM FIN_Carteiras C
+            OUTER APPLY (
+                SELECT COUNT(*) AS TotalRendas
+                FROM FIN_Rendas R
+                WHERE R.CarteiraId = C.CarteiraId AND R.UsuarioId = C.UsuarioId
+            ) R
+            OUTER APPLY (
+                SELECT COUNT(*) AS TotalLancamentos
+                FROM FIN_Lancamentos L
+                WHERE L.CarteiraId = C.CarteiraId AND L.UsuarioId = C.UsuarioId
+            ) L
+            WHERE C.UsuarioId = ?
+            ORDER BY C.Ativa DESC, C.Nome
+        """, (usuario_id,))
+        carteiras_lista = cursor.fetchall()
+        resumo = obter_resumo_carteiras(cursor, usuario_id)
+
+    return render_template(
+        'financas/carteiras.html',
+        carteiras=carteiras_lista,
+        resumo_carteiras=resumo,
+        tipos_carteira=TIPOS_CARTEIRA,
+        cores_sugeridas=CORES_CATEGORIA_SUGERIDAS,
+        cor_padrao='#0d6efd',
+    )
+
+
+@financas_bp.route('/carteiras/editar/<int:id>', methods=['POST'])
+def editar_carteira(id):
+    usuario_id = usuario_atual_id()
+    mes_atual, ano_atual = periodo_atual()
+    nome = (request.form.get('nome') or '').strip()
+    tipo = tipo_carteira_valido(request.form.get('tipo') or 'outro')
+    saldo_atual = parse_money(request.form.get('saldo_atual'))
+    cor_hex = normalizar_cor_categoria(request.form.get('cor_hex') or '#0d6efd')
+    ativa = 1 if request.form.get('ativa') == '1' else 0
+
+    if not nome:
+        flash('Informe o nome da carteira.', 'danger')
+        return redirect(url_for('financas.carteiras'))
+
+    with get_db_cursor() as cursor:
+        garantir_estrutura_carteiras(cursor)
+        cursor.execute("""
+            UPDATE FIN_Carteiras
+            SET Nome = ?, Tipo = ?, SaldoAtual = ?, CorHex = ?, Ativa = ?,
+                DataAtualizacao = SYSUTCDATETIME()
+            WHERE CarteiraId = ? AND UsuarioId = ?
+        """, (nome[:100], tipo, saldo_atual, cor_hex, ativa, id, usuario_id))
+
+        if cursor.rowcount == 0:
+            flash('Carteira nao encontrada.', 'warning')
+            return redirect(url_for('financas.carteiras'))
+
+        sincronizar_caixa_com_carteiras(cursor, usuario_id, mes_atual, ano_atual)
+
+    flash('Carteira atualizada.', 'success')
+    return redirect(url_for('financas.carteiras'))
+
+
+@financas_bp.route('/carteiras/excluir/<int:id>', methods=['POST'])
+def excluir_carteira(id):
+    usuario_id = usuario_atual_id()
+    mes_atual, ano_atual = periodo_atual()
+
+    with get_db_cursor() as cursor:
+        garantir_estrutura_carteiras(cursor)
+        cursor.execute("""
+            SELECT CarteiraId
+            FROM FIN_Carteiras
+            WHERE CarteiraId = ? AND UsuarioId = ?
+        """, (id, usuario_id))
+        if not cursor.fetchone():
+            flash('Carteira nao encontrada.', 'warning')
+            return redirect(url_for('financas.carteiras'))
+
+        cursor.execute("""
+            SELECT
+                (SELECT COUNT(*) FROM FIN_Rendas WHERE CarteiraId = ? AND UsuarioId = ?) AS TotalRendas,
+                (SELECT COUNT(*) FROM FIN_Lancamentos WHERE CarteiraId = ? AND UsuarioId = ?) AS TotalLancamentos
+        """, (id, usuario_id, id, usuario_id))
+        uso = cursor.fetchone()
+        total_uso = int((uso.TotalRendas or 0) + (uso.TotalLancamentos or 0))
+
+        if total_uso:
+            cursor.execute("""
+                UPDATE FIN_Carteiras
+                SET Ativa = 0, DataAtualizacao = SYSUTCDATETIME()
+                WHERE CarteiraId = ? AND UsuarioId = ?
+            """, (id, usuario_id))
+            flash('Carteira desativada porque ja possui movimentacoes.', 'info')
+        else:
+            cursor.execute("""
+                DELETE FROM FIN_Carteiras
+                WHERE CarteiraId = ? AND UsuarioId = ?
+            """, (id, usuario_id))
+            flash('Carteira excluida.', 'success')
+
+        sincronizar_caixa_com_carteiras(cursor, usuario_id, mes_atual, ano_atual)
+
+    return redirect(url_for('financas.carteiras'))
 
 
 @financas_bp.route('/categorias', methods=['GET', 'POST'])
@@ -535,6 +810,7 @@ def dashboard():
 
     with get_db_cursor() as cursor:
         sincronizar_assinaturas_periodo(cursor, usuario_id, mes_sel, ano_sel)
+        garantir_estrutura_carteiras(cursor)
 
         cursor.execute("""
             SELECT
@@ -589,11 +865,21 @@ def dashboard():
         contas_pendentes_mes = float(resumo_mes.ContasPendentesMes or 0)
         pagas_acumuladas = float(resumo_mes.PagasAcumuladas or 0)
         saldo_bancario = float(resumo_mes.SaldoBancario or 0)
+        carteiras = listar_carteiras_ativas(cursor, usuario_id)
+        resumo_carteiras = obter_resumo_carteiras(cursor, usuario_id)
+
+        if resumo_carteiras['ativas'] > 0 and mes_sel == mes_atual and ano_sel == ano_atual:
+            saldo_bancario = resumo_carteiras['saldo_total']
+            sincronizar_caixa_com_carteiras(cursor, usuario_id, mes_sel, ano_sel)
 
         cursor.execute("""
-            SELECT L.*, C.Nome as CategoriaNome, C.CorHex
+            SELECT L.*, C.Nome as CategoriaNome, C.CorHex,
+                   W.Nome AS CarteiraNome, W.CorHex AS CarteiraCorHex
             FROM FIN_Lancamentos L
             JOIN FIN_Categorias C ON L.CategoriaId = C.CategoriaId
+            LEFT JOIN FIN_Carteiras W
+                ON W.CarteiraId = L.CarteiraId
+                AND W.UsuarioId = L.UsuarioId
             WHERE L.UsuarioId = ? AND L.MesReferencia = ? AND L.AnoReferencia = ?
             ORDER BY L.DataVencimento ASC
         """, (usuario_id, mes_sel, ano_sel))
@@ -691,6 +977,8 @@ def dashboard():
                            saldo_em_caixa=saldo_em_caixa_real,
                            resumo_assinaturas=resumo_assinaturas,
                            resumo_metas=resumo_metas,
+                           carteiras=carteiras,
+                           resumo_carteiras=resumo_carteiras,
                            labels_evolucao=labels_evolucao,
                            valores_evolucao=valores_evolucao,
                            ranking_categorias=ranking_categorias,
@@ -701,10 +989,13 @@ def dashboard():
 def baixar_gasto(id):
     usuario_id = usuario_atual_id()
     destino = destino_local_ou('financas.dashboard')
+    dados = request.get_json(silent=True) or {}
+    carteira_id = request.form.get('carteira_id') or dados.get('carteira_id') or None
 
     with get_db_cursor() as cursor:
+        garantir_estrutura_carteiras(cursor)
         cursor.execute("""
-            SELECT ValorEstimado, ISNULL(ValorReal, 0) AS ValorReal, Pago, MesReferencia, AnoReferencia
+            SELECT ValorEstimado, ISNULL(ValorReal, 0) AS ValorReal, Pago, CarteiraId, MesReferencia, AnoReferencia
             FROM FIN_Lancamentos
             WHERE LancamentoId = ? AND UsuarioId = ?
         """, (id, usuario_id))
@@ -714,14 +1005,26 @@ def baixar_gasto(id):
             valor_estimado = float(gasto.ValorEstimado or 0)
             valor_real_atual = float(gasto.ValorReal or 0)
             valor_para_baixa = valor_real_atual if valor_real_atual > 0 else valor_estimado
+            carteira_baixa = gasto.CarteiraId if gasto.Pago else carteira_id
+
+            resumo_carteiras = obter_resumo_carteiras(cursor, usuario_id)
+            if not gasto.Pago and valor_para_baixa > 0 and resumo_carteiras['ativas'] > 0:
+                if not carteira_ativa_existe(cursor, usuario_id, carteira_baixa):
+                    if request.form.get('next') or request.args.get('next'):
+                        flash('Selecione a carteira usada no pagamento.', 'warning')
+                        return redirect(destino)
+                    return {"success": False, "message": "Selecione a carteira usada no pagamento."}, 400
+            elif not carteira_ativa_existe(cursor, usuario_id, carteira_baixa):
+                carteira_baixa = None
 
             cursor.execute("""
                 UPDATE FIN_Lancamentos
-                SET Pago = 1, ValorReal = ?
+                SET Pago = 1, ValorReal = ?, CarteiraId = ?
                 WHERE LancamentoId = ? AND UsuarioId = ?
-            """, (valor_para_baixa, id, usuario_id))
+            """, (valor_para_baixa, carteira_baixa, id, usuario_id))
 
             if not gasto.Pago and valor_para_baixa > 0:
+                movimentar_carteira(cursor, usuario_id, carteira_baixa, -valor_para_baixa)
                 ajustar_caixa(cursor, usuario_id, gasto.MesReferencia, gasto.AnoReferencia, -valor_para_baixa)
 
             if request.form.get('next') or request.args.get('next'):
@@ -774,6 +1077,7 @@ def atualizar_valor_real(id):
     usuario_id = usuario_atual_id()
     dados = request.get_json() or {}
     valor_bruto = dados.get('valor', '0')
+    carteira_id = dados.get('carteira_id')
 
     try:
         valor_float = parse_money(valor_bruto)
@@ -781,8 +1085,9 @@ def atualizar_valor_real(id):
             return {"success": False, "message": "Informe um valor real maior ou igual a zero."}, 400
 
         with get_db_cursor() as cursor:
+            garantir_estrutura_carteiras(cursor)
             cursor.execute("""
-                SELECT ISNULL(ValorReal, 0) AS ValorReal, Pago, MesReferencia, AnoReferencia
+                SELECT ISNULL(ValorReal, 0) AS ValorReal, Pago, CarteiraId, MesReferencia, AnoReferencia
                 FROM FIN_Lancamentos
                 WHERE LancamentoId = ? AND UsuarioId = ?
             """, (id, usuario_id))
@@ -794,12 +1099,26 @@ def atualizar_valor_real(id):
             valor_real_anterior = float(gasto.ValorReal or 0) if gasto.Pago else 0.0
             pago = 1 if valor_float > 0 else 0
             diferenca_caixa = valor_real_anterior - valor_float
+            carteira_anterior = gasto.CarteiraId
+            carteira_nova = carteira_id if carteira_id is not None else carteira_anterior
+
+            if carteira_nova and not carteira_ativa_existe(cursor, usuario_id, carteira_nova):
+                return {"success": False, "message": "Carteira invalida."}, 400
+
+            if not pago:
+                carteira_nova = None
 
             cursor.execute("""
                 UPDATE FIN_Lancamentos
-                SET ValorReal = ?, Pago = ?
+                SET ValorReal = ?, Pago = ?, CarteiraId = ?
                 WHERE LancamentoId = ? AND UsuarioId = ?
-            """, (valor_float, pago, id, usuario_id))
+            """, (valor_float, pago, carteira_nova, id, usuario_id))
+
+            if carteira_anterior == carteira_nova:
+                movimentar_carteira(cursor, usuario_id, carteira_nova, diferenca_caixa)
+            else:
+                movimentar_carteira(cursor, usuario_id, carteira_anterior, valor_real_anterior)
+                movimentar_carteira(cursor, usuario_id, carteira_nova, -valor_float)
 
             # Ao informar o valor real no dashboard, abate o gasto do caixa.
             # Se o valor for editado depois, movimenta apenas a diferença para evitar duplicidade.
@@ -821,6 +1140,7 @@ def gerenciar_rendas():
     if request.method == 'POST':
         descricao = request.form.get('descricao')
         categoria_renda_id = request.form.get('categoria_renda_id') or None
+        carteira_id = request.form.get('carteira_id') or None
         v_previsto = request.form.get('valor_previsto', '0')
         v_real = request.form.get('valor_real', '0')
         data_receb = request.form.get('data_recebimento')
@@ -834,6 +1154,7 @@ def gerenciar_rendas():
 
         with get_db_cursor() as cursor:
             garantir_estrutura_renda_categorias(cursor)
+            garantir_estrutura_carteiras(cursor)
             if categoria_renda_id:
                 cursor.execute("""
                     SELECT CategoriaRendaId
@@ -844,23 +1165,41 @@ def gerenciar_rendas():
                     flash('Selecione uma categoria de renda valida.', 'danger')
                     return redirect(url_for('financas.gerenciar_rendas', mes=mes, ano=ano))
 
+            resumo_carteiras = obter_resumo_carteiras(cursor, usuario_id)
+            if valor_real > 0 and resumo_carteiras['ativas'] > 0:
+                if not carteira_ativa_existe(cursor, usuario_id, carteira_id):
+                    flash('Selecione a carteira onde a renda caiu.', 'danger')
+                    return redirect(url_for('financas.gerenciar_rendas', mes=mes, ano=ano))
+            elif not carteira_ativa_existe(cursor, usuario_id, carteira_id):
+                carteira_id = None
+
             cursor.execute("""
                 INSERT INTO FIN_Rendas
-                (UsuarioId, CategoriaRendaId, Descricao, ValorPrevisto, ValorReal, DataRecebimento, MesReferencia, AnoReferencia)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (usuario_id, categoria_renda_id, descricao, valor_previsto, valor_real, data_receb, dt.month, dt.year))
+                (UsuarioId, CategoriaRendaId, CarteiraId, Descricao, ValorPrevisto, ValorReal, DataRecebimento, MesReferencia, AnoReferencia)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (usuario_id, categoria_renda_id, carteira_id, descricao, valor_previsto, valor_real, data_receb, dt.month, dt.year))
+
+            if valor_real > 0:
+                if carteira_id:
+                    movimentar_carteira(cursor, usuario_id, carteira_id, valor_real)
+                ajustar_caixa(cursor, usuario_id, dt.month, dt.year, valor_real)
 
         flash('Renda registrada com sucesso!', 'success')
         return redirect(url_for('financas.gerenciar_rendas', mes=dt.month, ano=dt.year))
 
     with get_db_cursor() as cursor:
         garantir_estrutura_renda_categorias(cursor)
+        garantir_estrutura_carteiras(cursor)
         cursor.execute("""
-            SELECT R.*, C.Nome AS CategoriaNome, C.CorHex AS CategoriaCorHex
+            SELECT R.*, C.Nome AS CategoriaNome, C.CorHex AS CategoriaCorHex,
+                   W.Nome AS CarteiraNome, W.CorHex AS CarteiraCorHex
             FROM FIN_Rendas R
             LEFT JOIN FIN_RendaCategorias C
                 ON C.CategoriaRendaId = R.CategoriaRendaId
                 AND C.UsuarioId = R.UsuarioId
+            LEFT JOIN FIN_Carteiras W
+                ON W.CarteiraId = R.CarteiraId
+                AND W.UsuarioId = R.UsuarioId
             WHERE R.UsuarioId = ? AND R.MesReferencia = ? AND R.AnoReferencia = ?
             ORDER BY R.DataRecebimento ASC, R.RendaId ASC
         """, (usuario_id, mes, ano))
@@ -873,6 +1212,9 @@ def gerenciar_rendas():
             ORDER BY Nome
         """, (usuario_id,))
         categorias_renda = cursor.fetchall()
+
+        carteiras = listar_carteiras_ativas(cursor, usuario_id)
+        resumo_carteiras = obter_resumo_carteiras(cursor, usuario_id)
 
         cursor.execute("""
             SELECT SaldoAtual
@@ -892,6 +1234,9 @@ def gerenciar_rendas():
             'CategoriaRendaId': renda.CategoriaRendaId,
             'CategoriaNome': renda.CategoriaNome,
             'CategoriaCorHex': renda.CategoriaCorHex,
+            'CarteiraId': renda.CarteiraId,
+            'CarteiraNome': renda.CarteiraNome,
+            'CarteiraCorHex': renda.CarteiraCorHex,
             'Descricao': renda.Descricao,
             'ValorPrevisto': valor_previsto,
             'ValorReal': valor_real,
@@ -903,6 +1248,8 @@ def gerenciar_rendas():
         'financas/rendas.html',
         rendas=rendas,
         categorias_renda=categorias_renda,
+        carteiras=carteiras,
+        resumo_carteiras=resumo_carteiras,
         cor_padrao=COR_CATEGORIA_PADRAO,
         mes=mes,
         ano=ano,
@@ -913,6 +1260,19 @@ def gerenciar_rendas():
 def deletar_renda(id):
     usuario_id = usuario_atual_id()
     with get_db_cursor() as cursor:
+        garantir_estrutura_carteiras(cursor)
+        cursor.execute("""
+            SELECT ISNULL(ValorReal, 0) AS ValorReal, CarteiraId, MesReferencia, AnoReferencia
+            FROM FIN_Rendas
+            WHERE RendaId = ? AND UsuarioId = ?
+        """, (id, usuario_id))
+        renda = cursor.fetchone()
+
+        if renda and float(renda.ValorReal or 0) > 0:
+            valor_real = float(renda.ValorReal or 0)
+            movimentar_carteira(cursor, usuario_id, renda.CarteiraId, -valor_real)
+            ajustar_caixa(cursor, usuario_id, renda.MesReferencia, renda.AnoReferencia, -valor_real)
+
         cursor.execute("DELETE FROM FIN_Rendas WHERE RendaId = ? AND UsuarioId = ?", (id, usuario_id))
     return {"success": True}, 200
 
@@ -925,11 +1285,13 @@ def editar_renda(id):
     try:
         desc = dados.get('descricao')
         categoria_renda_id = dados.get('categoria_renda_id') or None
+        carteira_id = dados.get('carteira_id') or None
         v_prev = parse_money(dados.get('valor_previsto'))
         v_real = parse_money(dados.get('valor_real'))
 
         with get_db_cursor() as cursor:
             garantir_estrutura_renda_categorias(cursor)
+            garantir_estrutura_carteiras(cursor)
             if categoria_renda_id:
                 cursor.execute("""
                     SELECT CategoriaRendaId
@@ -940,10 +1302,38 @@ def editar_renda(id):
                     return {"success": False, "message": "Categoria de renda invalida."}, 400
 
             cursor.execute("""
-                UPDATE FIN_Rendas
-                SET CategoriaRendaId = ?, Descricao = ?, ValorPrevisto = ?, ValorReal = ?
+                SELECT ISNULL(ValorReal, 0) AS ValorReal, CarteiraId, MesReferencia, AnoReferencia
+                FROM FIN_Rendas
                 WHERE RendaId = ? AND UsuarioId = ?
-            """, (categoria_renda_id, desc, v_prev, v_real, id, usuario_id))
+            """, (id, usuario_id))
+            renda_atual = cursor.fetchone()
+            if not renda_atual:
+                return {"success": False, "message": "Renda nao encontrada."}, 404
+
+            resumo_carteiras = obter_resumo_carteiras(cursor, usuario_id)
+            if v_real > 0 and resumo_carteiras['ativas'] > 0:
+                if not carteira_ativa_existe(cursor, usuario_id, carteira_id):
+                    return {"success": False, "message": "Selecione uma carteira valida."}, 400
+            elif not carteira_ativa_existe(cursor, usuario_id, carteira_id):
+                carteira_id = None
+
+            valor_real_anterior = float(renda_atual.ValorReal or 0)
+            carteira_anterior = renda_atual.CarteiraId
+            diferenca_caixa = v_real - valor_real_anterior
+
+            if carteira_anterior == carteira_id:
+                movimentar_carteira(cursor, usuario_id, carteira_id, diferenca_caixa)
+            else:
+                movimentar_carteira(cursor, usuario_id, carteira_anterior, -valor_real_anterior)
+                movimentar_carteira(cursor, usuario_id, carteira_id, v_real)
+
+            cursor.execute("""
+                UPDATE FIN_Rendas
+                SET CategoriaRendaId = ?, CarteiraId = ?, Descricao = ?, ValorPrevisto = ?, ValorReal = ?
+                WHERE RendaId = ? AND UsuarioId = ?
+            """, (categoria_renda_id, carteira_id, desc, v_prev, v_real, id, usuario_id))
+
+            ajustar_caixa(cursor, usuario_id, renda_atual.MesReferencia, renda_atual.AnoReferencia, diferenca_caixa)
         return {"success": True}, 200
     except Exception as e:
         return {"success": False, "message": str(e)}, 400
@@ -953,15 +1343,18 @@ def deletar_gasto(id):
     usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
+        garantir_estrutura_carteiras(cursor)
         cursor.execute("""
-            SELECT ISNULL(ValorReal, 0) AS ValorReal, Pago, MesReferencia, AnoReferencia
+            SELECT ISNULL(ValorReal, 0) AS ValorReal, Pago, CarteiraId, MesReferencia, AnoReferencia
             FROM FIN_Lancamentos
             WHERE LancamentoId = ? AND UsuarioId = ?
         """, (id, usuario_id))
         gasto = cursor.fetchone()
 
         if gasto and gasto.Pago and float(gasto.ValorReal or 0) > 0:
-            ajustar_caixa(cursor, usuario_id, gasto.MesReferencia, gasto.AnoReferencia, float(gasto.ValorReal or 0))
+            valor_real = float(gasto.ValorReal or 0)
+            movimentar_carteira(cursor, usuario_id, gasto.CarteiraId, valor_real)
+            ajustar_caixa(cursor, usuario_id, gasto.MesReferencia, gasto.AnoReferencia, valor_real)
 
         cursor.execute("DELETE FROM FIN_Lancamentos WHERE LancamentoId = ? AND UsuarioId = ?", (id, usuario_id))
 
@@ -1003,8 +1396,10 @@ def receber_renda(id):
     hoje = datetime.now()
     mes_ref = hoje.month
     ano_ref = hoje.year
+    carteira_id = request.form.get('carteira_id') or None
 
     with get_db_cursor() as cursor:
+        garantir_estrutura_carteiras(cursor)
         cursor.execute("""
             SELECT ValorPrevisto, ISNULL(ValorReal, 0) AS ValorReal, MesReferencia, AnoReferencia
             FROM FIN_Rendas
@@ -1018,14 +1413,23 @@ def receber_renda(id):
             valor_a_creditar = valor_previsto if valor_real_atual <= 0 else 0
             mes_ref = renda.MesReferencia
             ano_ref = renda.AnoReferencia
+            resumo_carteiras = obter_resumo_carteiras(cursor, usuario_id)
+
+            if valor_a_creditar > 0 and resumo_carteiras['ativas'] > 0:
+                if not carteira_ativa_existe(cursor, usuario_id, carteira_id):
+                    flash('Selecione a carteira onde a renda caiu.', 'warning')
+                    return redirect(url_for('financas.gerenciar_rendas', mes=mes_ref, ano=ano_ref))
+            elif not carteira_ativa_existe(cursor, usuario_id, carteira_id):
+                carteira_id = None
 
             cursor.execute("""
                 UPDATE FIN_Rendas
-                SET ValorReal = ValorPrevisto
+                SET ValorReal = ValorPrevisto, CarteiraId = ?
                 WHERE RendaId = ? AND UsuarioId = ?
-            """, (id, usuario_id))
+            """, (carteira_id, id, usuario_id))
 
             if valor_a_creditar > 0:
+                movimentar_carteira(cursor, usuario_id, carteira_id, valor_a_creditar)
                 cursor.execute("""
                     UPDATE FIN_Caixa
                     SET SaldoAtual = ISNULL(SaldoAtual, 0) + ?, DataAtualizacao = GETDATE()
@@ -1048,8 +1452,9 @@ def reabrir_renda(id):
     ano_ref = hoje.year
 
     with get_db_cursor() as cursor:
+        garantir_estrutura_carteiras(cursor)
         cursor.execute("""
-            SELECT ValorPrevisto, ISNULL(ValorReal, 0) AS ValorReal, MesReferencia, AnoReferencia
+            SELECT ValorPrevisto, ISNULL(ValorReal, 0) AS ValorReal, CarteiraId, MesReferencia, AnoReferencia
             FROM FIN_Rendas
             WHERE RendaId = ? AND UsuarioId = ?
         """, (id, usuario_id))
@@ -1062,11 +1467,12 @@ def reabrir_renda(id):
 
             cursor.execute("""
                 UPDATE FIN_Rendas
-                SET ValorReal = 0
+                SET ValorReal = 0, CarteiraId = NULL
                 WHERE RendaId = ? AND UsuarioId = ?
             """, (id, usuario_id))
 
             if valor_a_estornar > 0:
+                movimentar_carteira(cursor, usuario_id, renda.CarteiraId, -valor_a_estornar)
                 cursor.execute("""
                     UPDATE FIN_Caixa
                     SET SaldoAtual = ISNULL(SaldoAtual, 0) - ?, DataAtualizacao = GETDATE()

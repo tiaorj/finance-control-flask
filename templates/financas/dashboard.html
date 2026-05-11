@@ -203,6 +203,26 @@
             </div>
         </div>
 
+        {% if resumo_carteiras.ativas %}
+        <div class="finance-card bg-white p-3 mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <h6 class="fw-bold mb-1"><i class="bi bi-wallet2 me-2"></i>Carteiras</h6>
+                    <div class="text-muted small">Saldo real distribuido em {{ resumo_carteiras.ativas }} carteira(s).</div>
+                </div>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <strong class="text-success">{{ dinheiro(resumo_carteiras.saldo_total) }}</strong>
+                    {% for carteira in carteiras[:3] %}
+                        <span class="badge rounded-pill" style="background-color: {{ carteira.CorHex or '#6c757d' }};">
+                            {{ carteira.Nome }}: {{ dinheiro(carteira.SaldoAtual) }}
+                        </span>
+                    {% endfor %}
+                    <a href="{{ url_for('financas.carteiras') }}" class="btn btn-sm btn-outline-primary fw-bold">Gerenciar</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <div id="novoLancamentoRapido" class="finance-card bg-white p-3 mb-4">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
                 <div>
@@ -346,10 +366,27 @@
                                 <td class="text-center" id="status-container-{{ l.LancamentoId }}">
                                     {% if l.Pago %}
                                         <span class="text-success fw-bold"><i class="bi bi-check-circle-fill me-1"></i>Pago</span>
+                                        {% if l.CarteiraNome %}
+                                            <div class="small mt-1">
+                                                <span class="badge rounded-pill" style="background-color: {{ l.CarteiraCorHex or '#6c757d' }};">
+                                                    {{ l.CarteiraNome }}
+                                                </span>
+                                            </div>
+                                        {% endif %}
                                     {% else %}
-                                        <button onclick="darBaixa({{ l.LancamentoId }})" class="btn btn-sm btn-outline-danger fw-bold">
-                                            <i class="bi bi-arrow-down-circle me-1"></i>Baixar
-                                        </button>
+                                        <div class="d-flex flex-column gap-1 align-items-center">
+                                            {% if carteiras %}
+                                                <select id="carteira-baixa-{{ l.LancamentoId }}" class="form-select form-select-sm" style="min-width: 150px;">
+                                                    <option value="">Carteira...</option>
+                                                    {% for carteira in carteiras %}
+                                                        <option value="{{ carteira.CarteiraId }}">{{ carteira.Nome }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            {% endif %}
+                                            <button onclick="darBaixa({{ l.LancamentoId }})" class="btn btn-sm btn-outline-danger fw-bold">
+                                                <i class="bi bi-arrow-down-circle me-1"></i>Baixar
+                                            </button>
+                                        </div>
                                     {% endif %}
                                     <button class="btn btn-sm text-danger p-1" onclick="deletarGasto({{ l.LancamentoId }})" title="Excluir">
                                         <i class="bi bi-trash"></i>
@@ -543,13 +580,22 @@ function deletarGasto(id) {
 
 function darBaixa(id) {
     if (!confirm("Confirmar pagamento deste item?")) return;
+    const carteiraSelect = document.getElementById(`carteira-baixa-${id}`);
+    const carteiraId = carteiraSelect?.value || null;
+
+    if (carteiraSelect && !carteiraId) {
+        alert("Selecione a carteira usada no pagamento.");
+        carteiraSelect.focus();
+        return;
+    }
 
     fetch(routeWithId(financeRoutes.baixarGasto, id), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': window.csrfToken
-        }
+        },
+        body: JSON.stringify({ carteira_id: carteiraId })
     })
     .then(response => {
         if (response.ok) window.location.reload();

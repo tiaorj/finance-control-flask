@@ -231,6 +231,9 @@
                         <a class="app-nav-link {{ 'active' if endpoint == 'financas.gerenciar_rendas' else '' }}" href="{{ url_for('financas.gerenciar_rendas') }}">
                             <i class="bi bi-graph-up-arrow"></i>Rendas
                         </a>
+                        <a class="app-nav-link {{ 'active' if endpoint == 'financas.carteiras' else '' }}" href="{{ url_for('financas.carteiras') }}">
+                            <i class="bi bi-wallet2"></i>Carteiras
+                        </a>
                         <a class="app-nav-link {{ 'active' if endpoint == 'financas.categorias_rendas' else '' }}" href="{{ url_for('financas.categorias_rendas') }}">
                             <i class="bi bi-tags"></i>Cat. rendas
                         </a>

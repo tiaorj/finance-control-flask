@@ -5,9 +5,27 @@
 <div class="container py-5">
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-primary text-white fw-bold">
-            <i class="bi bi-bank me-2"></i>Atualizar Saldo em Conta
+            <i class="bi bi-bank me-2"></i>{% if resumo_carteiras.ativas %}Carteiras{% else %}Atualizar Saldo em Conta{% endif %}
         </div>
         <div class="card-body">
+            {% if resumo_carteiras.ativas %}
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div>
+                        <div class="text-muted small fw-bold text-uppercase">Saldo total nas carteiras</div>
+                        <div class="h4 fw-bold text-success mb-0">{{ dinheiro(resumo_carteiras.saldo_total) }}</div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for carteira in carteiras[:3] %}
+                            <span class="badge rounded-pill" style="background-color: {{ carteira.CorHex or cor_padrao }};">
+                                {{ carteira.Nome }}: {{ dinheiro(carteira.SaldoAtual) }}
+                            </span>
+                        {% endfor %}
+                        <a href="{{ url_for('financas.carteiras') }}" class="btn btn-sm btn-outline-primary fw-bold">
+                            Gerenciar carteiras
+                        </a>
+                    </div>
+                </div>
+            {% else %}
             <form method="POST" action="{{ url_for('financas.atualizar_saldo', mes=mes, ano=ano) }}" class="d-flex flex-wrap align-items-center gap-3">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <label for="saldo_conta" class="form-label mb-0 fw-bold">Saldo atual no banco:</label>
@@ -16,10 +34,12 @@
                     <input type="text" id="saldo_conta" class="form-control" name="saldo_conta" value="{{ saldo_atual | formato_real }}" placeholder="0,00" required>
                 </div>
                 <button type="submit" class="btn btn-primary fw-bold">Atualizar</button>
+                <a href="{{ url_for('financas.carteiras') }}" class="btn btn-outline-primary fw-bold">Criar carteiras</a>
             </form>
             <div class="form-text mt-2 text-muted">
-                <i class="bi bi-info-circle"></i> Quando receber uma renda, atualize este saldo pelo valor real da sua conta bancária.
+                <i class="bi bi-info-circle"></i> Com carteiras, rendas recebidas atualizam o saldo automaticamente.
             </div>
+            {% endif %}
         </div>
     </div>
 
@@ -57,6 +77,20 @@
                         <div class="mb-3">
                             <label class="form-label">Valor Real Recebido</label>
                             <input type="text" name="valor_real" class="form-control" value="0,00" placeholder="0,00">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Carteira de destino</label>
+                            <select name="carteira_id" class="form-select">
+                                <option value="">Selecione...</option>
+                                {% for carteira in carteiras %}
+                                    <option value="{{ carteira.CarteiraId }}">{{ carteira.Nome }}</option>
+                                {% endfor %}
+                            </select>
+                            {% if not carteiras %}
+                                <a href="{{ url_for('financas.carteiras') }}" class="btn btn-sm btn-outline-primary fw-bold mt-2">
+                                    <i class="bi bi-wallet2 me-1"></i>Criar carteira
+                                </a>
+                            {% endif %}
                         </div>
                         <div class="mb-4">
                             <label class="form-label">Data do Recebimento</label>
@@ -97,6 +131,7 @@
                                 <tr>
                                     <th>Descrição</th>
                                     <th>Categoria</th>
+                                    <th>Carteira</th>
                                     <th class="text-end">Previsto</th>
                                     <th class="text-end">Recebido</th>
                                     <th class="text-end">A receber</th>
@@ -121,6 +156,20 @@
                                                 {% for categoria in categorias_renda %}
                                                     <option value="{{ categoria.CategoriaRendaId }}" {% if r.CategoriaRendaId == categoria.CategoriaRendaId %}selected{% endif %}>
                                                         {{ categoria.Nome }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <span id="wallet-text-{{ r.RendaId }}" class="badge rounded-pill"
+                                                  style="background-color: {{ r.CarteiraCorHex or '#6c757d' }};">
+                                                {{ r.CarteiraNome or 'A receber' }}
+                                            </span>
+                                            <select id="wallet-edit-{{ r.RendaId }}" class="form-select form-select-sm d-none">
+                                                <option value="">Sem carteira</option>
+                                                {% for carteira in carteiras %}
+                                                    <option value="{{ carteira.CarteiraId }}" {% if r.CarteiraId == carteira.CarteiraId %}selected{% endif %}>
+                                                        {{ carteira.Nome }}
                                                     </option>
                                                 {% endfor %}
                                             </select>
@@ -154,8 +203,16 @@
                                         </td>
                                         <td class="text-center">
                                             {% if not r.Recebida %}
-                                                <form action="{{ url_for('financas.receber_renda', id=r.RendaId) }}" method="POST" class="d-inline">
+                                                <form action="{{ url_for('financas.receber_renda', id=r.RendaId) }}" method="POST" class="d-flex justify-content-center gap-1">
                                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    {% if carteiras %}
+                                                        <select name="carteira_id" class="form-select form-select-sm" style="max-width: 150px;" required>
+                                                            <option value="">Carteira...</option>
+                                                            {% for carteira in carteiras %}
+                                                                <option value="{{ carteira.CarteiraId }}">{{ carteira.Nome }}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    {% endif %}
                                                     <button type="submit" class="btn btn-sm btn-outline-success border-0" title="Marcar como recebido">
                                                         <i class="bi bi-check-circle-fill"></i>
                                                     </button>
@@ -173,7 +230,7 @@
                                     </tr>
                                 {% else %}
                                     <tr>
-                                        <td colspan="7" class="text-center text-muted py-4">Nenhuma renda encontrada neste período.</td>
+                                        <td colspan="8" class="text-center text-muted py-4">Nenhuma renda encontrada neste período.</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
@@ -200,6 +257,8 @@ function iniciarEdicaoRenda(id) {
     document.getElementById(`desc-edit-${id}`).classList.remove('d-none');
     document.getElementById(`cat-text-${id}`).classList.add('d-none');
     document.getElementById(`cat-edit-${id}`).classList.remove('d-none');
+    document.getElementById(`wallet-text-${id}`).classList.add('d-none');
+    document.getElementById(`wallet-edit-${id}`).classList.remove('d-none');
     document.getElementById(`prev-text-${id}`).classList.add('d-none');
     document.getElementById(`prev-edit-${id}`).classList.remove('d-none');
     document.getElementById(`real-text-${id}`).classList.add('d-none');
@@ -213,6 +272,7 @@ function salvarEdicaoRenda(id) {
     const payload = {
         descricao: document.getElementById(`desc-edit-${id}`).value,
         categoria_renda_id: document.getElementById(`cat-edit-${id}`).value,
+        carteira_id: document.getElementById(`wallet-edit-${id}`).value,
         valor_previsto: document.getElementById(`prev-edit-${id}`).value,
         valor_real: document.getElementById(`real-edit-${id}`).value
     };

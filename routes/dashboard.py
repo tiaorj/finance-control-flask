@@ -5,6 +5,12 @@ from flask_login import current_user, login_required
 
 from database import get_db_cursor
 from routes.financeiro_integracoes import sincronizar_assinaturas_periodo
+from routes.financas import (
+    garantir_estrutura_carteiras,
+    listar_carteiras_ativas,
+    obter_resumo_carteiras,
+    sincronizar_caixa_com_carteiras,
+)
 from routes.tarefas import montar_resumo_tarefas
 from routes.veiculos import montar_resumo_veiculos
 from routes.garantias import montar_resumo_garantias
@@ -42,6 +48,7 @@ def index():
 
     with get_db_cursor() as cursor:
         sincronizar_assinaturas_periodo(cursor, usuario_id, hoje.month, hoje.year)
+        garantir_estrutura_carteiras(cursor)
 
         cursor.execute("""
             SELECT
@@ -83,6 +90,11 @@ def index():
             usuario_id, hoje.month, hoje.year,
         ))
         financeiro = cursor.fetchone()
+        carteiras = listar_carteiras_ativas(cursor, usuario_id)
+        resumo_carteiras = obter_resumo_carteiras(cursor, usuario_id)
+
+        if resumo_carteiras['ativas'] > 0:
+            sincronizar_caixa_com_carteiras(cursor, usuario_id, hoje.month, hoje.year)
 
         cursor.execute("""
             SELECT TOP 4 L.LancamentoId, L.Descricao, L.ValorEstimado, L.DataVencimento, C.Nome AS CategoriaNome
@@ -99,7 +111,7 @@ def index():
         resumo_veiculos = montar_resumo_veiculos(cursor, usuario_id)
         resumo_garantias = montar_resumo_garantias(cursor, usuario_id)
 
-    saldo_atual = float(financeiro.SaldoAtual or 0)
+    saldo_atual = resumo_carteiras['saldo_total'] if resumo_carteiras['ativas'] > 0 else float(financeiro.SaldoAtual or 0)
     rendas_recebidas = float(financeiro.RendasRecebidas or 0)
     rendas_a_receber = float(financeiro.RendasAReceber or 0)
     contas_pendentes = float(financeiro.ContasPendentes or 0)
@@ -182,6 +194,8 @@ def index():
         resumo_tarefas=resumo_tarefas,
         resumo_veiculos=resumo_veiculos,
         resumo_garantias=resumo_garantias,
+        carteiras=carteiras,
+        resumo_carteiras=resumo_carteiras,
         servicos=servicos,
         artigos=artigos,
     )
