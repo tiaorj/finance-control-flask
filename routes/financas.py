@@ -48,6 +48,11 @@ def legacy_categorias_rendas():
     return redirect(url_for('financas.categorias_rendas', **request.args))
 
 
+@financas_legacy_bp.route('/rendas/recorrentes')
+def legacy_rendas_recorrentes():
+    return redirect(url_for('financas.rendas_recorrentes', **request.args))
+
+
 @financas_legacy_bp.route('/categorias')
 def legacy_categorias():
     return redirect(url_for('financas.categorias', **request.args))
@@ -86,6 +91,14 @@ TIPOS_CARTEIRA = [
     ('empresa', 'Conta da empresa'),
     ('outro', 'Outro'),
 ]
+PERIODICIDADES_RENDA = {
+    'mensal': {'label': 'Mensal', 'meses': 1},
+    'bimestral': {'label': 'Bimestral', 'meses': 2},
+    'trimestral': {'label': 'Trimestral', 'meses': 3},
+    'semestral': {'label': 'Semestral', 'meses': 6},
+    'anual': {'label': 'Anual', 'meses': 12},
+    'personalizado': {'label': 'Personalizado', 'meses': None},
+}
 
 
 def periodo_atual():
@@ -156,9 +169,103 @@ def garantir_estrutura_carteiras(cursor):
     """)
 
 
+def garantir_estrutura_rendas_recorrentes(cursor):
+    garantir_estrutura_renda_categorias(cursor)
+    garantir_estrutura_carteiras(cursor)
+
+    cursor.execute("""
+        IF OBJECT_ID('dbo.FIN_RendasRecorrentes', 'U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.FIN_RendasRecorrentes (
+                RendaRecorrenteId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                UsuarioId INT NOT NULL,
+                CategoriaRendaId INT NULL,
+                CarteiraId INT NULL,
+                Descricao NVARCHAR(140) NOT NULL,
+                ValorPrevisto DECIMAL(18,2) NOT NULL DEFAULT 0,
+                DiaRecebimento INT NOT NULL,
+                Periodicidade NVARCHAR(20) NOT NULL DEFAULT 'mensal',
+                IntervaloMeses INT NOT NULL DEFAULT 1,
+                DataInicio DATE NOT NULL,
+                DataFim DATE NULL,
+                Ativa BIT NOT NULL DEFAULT 1,
+                DataCriacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                DataAtualizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                CONSTRAINT FK_FIN_RendasRecorrentes_Usuarios
+                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
+                CONSTRAINT CK_FIN_RendasRecorrentes_Dia
+                    CHECK (DiaRecebimento BETWEEN 1 AND 31),
+                CONSTRAINT CK_FIN_RendasRecorrentes_Intervalo
+                    CHECK (IntervaloMeses > 0),
+                CONSTRAINT CK_FIN_RendasRecorrentes_Periodicidade
+                    CHECK (Periodicidade IN ('mensal', 'bimestral', 'trimestral', 'semestral', 'anual', 'personalizado'))
+            )
+        END
+    """)
+
+    cursor.execute("""
+        IF OBJECT_ID('dbo.FIN_RendaRecorrenteOcorrencias', 'U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.FIN_RendaRecorrenteOcorrencias (
+                OcorrenciaId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                UsuarioId INT NOT NULL,
+                RendaRecorrenteId INT NOT NULL,
+                RendaId INT NOT NULL,
+                MesReferencia INT NOT NULL,
+                AnoReferencia INT NOT NULL,
+                DataSincronizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                CONSTRAINT FK_FIN_RendaRecorrenteOcorrencias_Usuarios
+                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
+                CONSTRAINT FK_FIN_RendaRecorrenteOcorrencias_Recorrentes
+                    FOREIGN KEY (RendaRecorrenteId) REFERENCES dbo.FIN_RendasRecorrentes(RendaRecorrenteId)
+            )
+        END
+
+        IF NOT EXISTS (
+            SELECT 1
+            FROM sys.indexes
+            WHERE name = 'UX_FIN_RendaRecorrenteOcorrencias_Periodo'
+              AND object_id = OBJECT_ID('dbo.FIN_RendaRecorrenteOcorrencias')
+        )
+        BEGIN
+            CREATE UNIQUE INDEX UX_FIN_RendaRecorrenteOcorrencias_Periodo
+            ON dbo.FIN_RendaRecorrenteOcorrencias (UsuarioId, RendaRecorrenteId, MesReferencia, AnoReferencia)
+        END
+    """)
+
+    cursor.execute("""
+        IF COL_LENGTH('dbo.FIN_Rendas', 'RendaRecorrenteId') IS NULL
+        BEGIN
+            ALTER TABLE dbo.FIN_Rendas ADD RendaRecorrenteId INT NULL
+        END
+    """)
+
+
 def tipo_carteira_valido(tipo):
     tipos_validos = {item[0] for item in TIPOS_CARTEIRA}
     return tipo if tipo in tipos_validos else 'outro'
+
+
+def periodicidade_renda_valida(periodicidade):
+    return periodicidade if periodicidade in PERIODICIDADES_RENDA else 'mensal'
+
+
+def intervalo_renda(periodicidade, intervalo_personalizado=None):
+    periodicidade = periodicidade_renda_valida(periodicidade)
+    if periodicidade != 'personalizado':
+        return PERIODICIDADES_RENDA[periodicidade]['meses']
+
+    try:
+        return max(int(intervalo_personalizado or 1), 1)
+    except (TypeError, ValueError):
+        return 1
+
+
+def rotulo_periodicidade_renda(periodicidade, intervalo_meses):
+    periodicidade = periodicidade_renda_valida(periodicidade)
+    if periodicidade == 'personalizado':
+        return f'A cada {intervalo_meses or 1} meses'
+    return PERIODICIDADES_RENDA[periodicidade]['label']
 
 
 def normalizar_periodo(mes=None, ano=None):
@@ -184,11 +291,48 @@ def periodo_proximo(mes, ano):
     return (1, ano + 1) if mes == 12 else (mes + 1, ano)
 
 
+def chave_periodo(mes, ano):
+    return ano * 12 + mes
+
+
+def normalizar_data(valor):
+    if isinstance(valor, datetime):
+        return valor.date()
+    if isinstance(valor, date):
+        return valor
+    if isinstance(valor, str) and valor:
+        return datetime.strptime(valor[:10], '%Y-%m-%d').date()
+    return None
+
+
 def data_vencimento_no_destino(data_origem, mes_destino, ano_destino):
     dia_origem = getattr(data_origem, 'day', None) or 10
     ultimo_dia = calendar.monthrange(ano_destino, mes_destino)[1]
     dia = min(dia_origem, ultimo_dia)
     return date(ano_destino, mes_destino, dia)
+
+
+def data_recebimento_recorrente(renda_recorrente, mes, ano):
+    data_inicio = normalizar_data(renda_recorrente.DataInicio)
+    if not data_inicio:
+        return None
+
+    periodo_inicio = chave_periodo(data_inicio.month, data_inicio.year)
+    periodo_destino = chave_periodo(mes, ano)
+    if periodo_destino < periodo_inicio:
+        return None
+
+    intervalo = max(int(renda_recorrente.IntervaloMeses or 1), 1)
+    if (periodo_destino - periodo_inicio) % intervalo != 0:
+        return None
+
+    dia = min(int(renda_recorrente.DiaRecebimento or data_inicio.day), calendar.monthrange(ano, mes)[1])
+    data_ocorrencia = date(ano, mes, dia)
+    data_fim = normalizar_data(renda_recorrente.DataFim)
+    if data_fim and data_ocorrencia > data_fim:
+        return None
+
+    return data_ocorrencia
 
 
 def ajustar_caixa(cursor, usuario_id, mes, ano, delta):
@@ -282,8 +426,185 @@ def sincronizar_caixa_com_carteiras(cursor, usuario_id, mes, ano):
     return resumo['saldo_total']
 
 
-def chave_periodo(mes, ano):
-    return ano * 12 + mes
+def criar_ocorrencia_renda_recorrente(cursor, usuario_id, renda_recorrente, data_recebimento, mes, ano):
+    carteira_id = renda_recorrente.CarteiraId
+    if not carteira_ativa_existe(cursor, usuario_id, carteira_id):
+        carteira_id = None
+
+    cursor.execute("""
+        INSERT INTO FIN_Rendas
+        (UsuarioId, CategoriaRendaId, CarteiraId, RendaRecorrenteId, Descricao,
+         ValorPrevisto, ValorReal, DataRecebimento, MesReferencia, AnoReferencia)
+        VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+    """, (
+        usuario_id,
+        renda_recorrente.CategoriaRendaId,
+        carteira_id,
+        renda_recorrente.RendaRecorrenteId,
+        renda_recorrente.Descricao,
+        float(renda_recorrente.ValorPrevisto or 0),
+        data_recebimento,
+        mes,
+        ano,
+    ))
+    cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
+    return int(cursor.fetchone()[0])
+
+
+def sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, mes, ano, renda_recorrente_id=None):
+    garantir_estrutura_rendas_recorrentes(cursor)
+
+    params = [usuario_id]
+    filtro = ''
+    if renda_recorrente_id:
+        filtro = ' AND RendaRecorrenteId = ?'
+        params.append(renda_recorrente_id)
+
+    cursor.execute(f"""
+        SELECT RendaRecorrenteId, UsuarioId, CategoriaRendaId, CarteiraId, Descricao,
+               ValorPrevisto, DiaRecebimento, Periodicidade, IntervaloMeses,
+               DataInicio, DataFim, Ativa
+        FROM FIN_RendasRecorrentes
+        WHERE UsuarioId = ? AND Ativa = 1{filtro}
+        ORDER BY Descricao ASC
+    """, tuple(params))
+    recorrentes = cursor.fetchall()
+
+    for recorrente in recorrentes:
+        data_recebimento = data_recebimento_recorrente(recorrente, mes, ano)
+        if not data_recebimento:
+            continue
+
+        cursor.execute("""
+            SELECT O.OcorrenciaId, O.RendaId, R.RendaId AS RendaExistente
+            FROM FIN_RendaRecorrenteOcorrencias O
+            LEFT JOIN FIN_Rendas R
+                ON R.RendaId = O.RendaId AND R.UsuarioId = O.UsuarioId
+            WHERE O.UsuarioId = ? AND O.RendaRecorrenteId = ?
+              AND O.MesReferencia = ? AND O.AnoReferencia = ?
+        """, (usuario_id, recorrente.RendaRecorrenteId, mes, ano))
+        ocorrencia = cursor.fetchone()
+
+        if ocorrencia and ocorrencia.RendaExistente:
+            continue
+
+        renda_id = criar_ocorrencia_renda_recorrente(cursor, usuario_id, recorrente, data_recebimento, mes, ano)
+
+        if ocorrencia:
+            cursor.execute("""
+                UPDATE FIN_RendaRecorrenteOcorrencias
+                SET RendaId = ?, DataSincronizacao = SYSUTCDATETIME()
+                WHERE OcorrenciaId = ? AND UsuarioId = ?
+            """, (renda_id, ocorrencia.OcorrenciaId, usuario_id))
+        else:
+            cursor.execute("""
+                INSERT INTO FIN_RendaRecorrenteOcorrencias
+                (UsuarioId, RendaRecorrenteId, RendaId, MesReferencia, AnoReferencia)
+                VALUES (?, ?, ?, ?, ?)
+            """, (usuario_id, recorrente.RendaRecorrenteId, renda_id, mes, ano))
+
+
+def sincronizar_renda_recorrente_primeiro_periodo(cursor, usuario_id, renda_recorrente_id):
+    cursor.execute("""
+        SELECT DataInicio
+        FROM FIN_RendasRecorrentes
+        WHERE UsuarioId = ? AND RendaRecorrenteId = ? AND Ativa = 1
+    """, (usuario_id, renda_recorrente_id))
+    recorrente = cursor.fetchone()
+
+    if not recorrente:
+        return
+
+    data_inicio = normalizar_data(recorrente.DataInicio)
+    if data_inicio:
+        sincronizar_rendas_recorrentes_periodo(
+            cursor, usuario_id, data_inicio.month, data_inicio.year, renda_recorrente_id
+        )
+
+
+def remover_ocorrencias_renda_recorrente_pendentes(cursor, usuario_id, renda_recorrente_id):
+    garantir_estrutura_rendas_recorrentes(cursor)
+    cursor.execute("""
+        SELECT O.OcorrenciaId, O.RendaId, ISNULL(R.ValorReal, 0) AS ValorReal
+        FROM FIN_RendaRecorrenteOcorrencias O
+        LEFT JOIN FIN_Rendas R
+            ON R.RendaId = O.RendaId AND R.UsuarioId = O.UsuarioId
+        WHERE O.UsuarioId = ? AND O.RendaRecorrenteId = ?
+    """, (usuario_id, renda_recorrente_id))
+    ocorrencias = cursor.fetchall()
+
+    for ocorrencia in ocorrencias:
+        valor_real = float(ocorrencia.ValorReal or 0)
+        if valor_real <= 0:
+            cursor.execute("""
+                DELETE FROM FIN_Rendas
+                WHERE RendaId = ? AND UsuarioId = ? AND ISNULL(ValorReal, 0) <= 0
+            """, (ocorrencia.RendaId, usuario_id))
+            cursor.execute("""
+                DELETE FROM FIN_RendaRecorrenteOcorrencias
+                WHERE OcorrenciaId = ? AND UsuarioId = ?
+            """, (ocorrencia.OcorrenciaId, usuario_id))
+
+
+def total_ocorrencias_renda_recorrente_recebidas(cursor, usuario_id, renda_recorrente_id):
+    garantir_estrutura_rendas_recorrentes(cursor)
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM FIN_RendaRecorrenteOcorrencias O
+        JOIN FIN_Rendas R
+            ON R.RendaId = O.RendaId AND R.UsuarioId = O.UsuarioId
+        WHERE O.UsuarioId = ? AND O.RendaRecorrenteId = ?
+          AND ISNULL(R.ValorReal, 0) > 0
+    """, (usuario_id, renda_recorrente_id))
+    return int(cursor.fetchone()[0] or 0)
+
+
+def ler_dados_renda_recorrente_form():
+    descricao = (request.form.get('descricao') or '').strip()
+    if not descricao:
+        return None, 'Informe a descricao da renda recorrente.'
+
+    valor_previsto = parse_money(request.form.get('valor_previsto'))
+    if valor_previsto < 0:
+        return None, 'Informe um valor previsto maior ou igual a zero.'
+
+    try:
+        data_inicio = normalizar_data(request.form.get('data_inicio'))
+    except (TypeError, ValueError):
+        return None, 'Informe uma data de inicio valida.'
+
+    if not data_inicio:
+        return None, 'Informe a data de inicio da recorrencia.'
+
+    try:
+        data_fim = normalizar_data(request.form.get('data_fim')) if request.form.get('data_fim') else None
+    except (TypeError, ValueError):
+        return None, 'Informe uma data final valida.'
+
+    if data_fim and data_fim < data_inicio:
+        return None, 'A data final precisa ser maior ou igual a data de inicio.'
+
+    periodicidade = periodicidade_renda_valida(request.form.get('periodicidade') or 'mensal')
+    intervalo_meses = intervalo_renda(periodicidade, request.form.get('intervalo_meses'))
+
+    try:
+        dia_recebimento = int(request.form.get('dia_recebimento') or data_inicio.day)
+    except (TypeError, ValueError):
+        dia_recebimento = data_inicio.day
+    dia_recebimento = min(max(dia_recebimento, 1), 31)
+
+    return {
+        'descricao': descricao[:140],
+        'categoria_renda_id': request.form.get('categoria_renda_id') or None,
+        'carteira_id': request.form.get('carteira_id') or None,
+        'valor_previsto': valor_previsto,
+        'dia_recebimento': dia_recebimento,
+        'periodicidade': periodicidade,
+        'intervalo_meses': intervalo_meses,
+        'data_inicio': data_inicio,
+        'data_fim': data_fim,
+        'ativa': 1 if request.form.get('ativa', 'on') == 'on' else 0,
+    }, None
 
 
 def periodo_por_chave(chave):
@@ -740,6 +1061,254 @@ def excluir_categoria_renda(id):
     return redirect(url_for('financas.categorias_rendas'))
 
 
+@financas_bp.route('/rendas/recorrentes', methods=['GET', 'POST'])
+def rendas_recorrentes():
+    usuario_id = usuario_atual_id()
+    mes_atual, ano_atual = periodo_atual()
+
+    if request.method == 'POST':
+        dados, erro = ler_dados_renda_recorrente_form()
+        if erro:
+            flash(erro, 'danger')
+            return redirect(url_for('financas.rendas_recorrentes'))
+
+        with get_db_cursor() as cursor:
+            garantir_estrutura_rendas_recorrentes(cursor)
+
+            if dados['categoria_renda_id']:
+                cursor.execute("""
+                    SELECT CategoriaRendaId
+                    FROM FIN_RendaCategorias
+                    WHERE CategoriaRendaId = ? AND UsuarioId = ?
+                """, (dados['categoria_renda_id'], usuario_id))
+                if not cursor.fetchone():
+                    flash('Selecione uma categoria de renda valida.', 'danger')
+                    return redirect(url_for('financas.rendas_recorrentes'))
+
+            if not carteira_ativa_existe(cursor, usuario_id, dados['carteira_id']):
+                dados['carteira_id'] = None
+
+            cursor.execute("""
+                INSERT INTO FIN_RendasRecorrentes
+                (UsuarioId, CategoriaRendaId, CarteiraId, Descricao, ValorPrevisto,
+                 DiaRecebimento, Periodicidade, IntervaloMeses, DataInicio, DataFim, Ativa)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                usuario_id,
+                dados['categoria_renda_id'],
+                dados['carteira_id'],
+                dados['descricao'],
+                dados['valor_previsto'],
+                dados['dia_recebimento'],
+                dados['periodicidade'],
+                dados['intervalo_meses'],
+                dados['data_inicio'],
+                dados['data_fim'],
+                dados['ativa'],
+            ))
+            cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
+            renda_recorrente_id = int(cursor.fetchone()[0])
+
+            if dados['ativa']:
+                sincronizar_renda_recorrente_primeiro_periodo(cursor, usuario_id, renda_recorrente_id)
+                sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, mes_atual, ano_atual, renda_recorrente_id)
+
+        flash('Renda recorrente criada com sucesso.', 'success')
+        return redirect(url_for('financas.rendas_recorrentes'))
+
+    with get_db_cursor() as cursor:
+        garantir_estrutura_rendas_recorrentes(cursor)
+        sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, mes_atual, ano_atual)
+
+        cursor.execute("""
+            SELECT
+                RR.RendaRecorrenteId, RR.CategoriaRendaId, RR.CarteiraId,
+                RR.Descricao, RR.ValorPrevisto, RR.DiaRecebimento,
+                RR.Periodicidade, RR.IntervaloMeses, RR.DataInicio, RR.DataFim,
+                RR.Ativa, RR.DataAtualizacao,
+                C.Nome AS CategoriaNome, C.CorHex AS CategoriaCorHex,
+                W.Nome AS CarteiraNome, W.CorHex AS CarteiraCorHex,
+                ISNULL(O.TotalOcorrencias, 0) AS TotalOcorrencias,
+                ISNULL(O.Recebidas, 0) AS Recebidas
+            FROM FIN_RendasRecorrentes RR
+            LEFT JOIN FIN_RendaCategorias C
+                ON C.CategoriaRendaId = RR.CategoriaRendaId
+                AND C.UsuarioId = RR.UsuarioId
+            LEFT JOIN FIN_Carteiras W
+                ON W.CarteiraId = RR.CarteiraId
+                AND W.UsuarioId = RR.UsuarioId
+            OUTER APPLY (
+                SELECT
+                    COUNT(*) AS TotalOcorrencias,
+                    SUM(CASE WHEN ISNULL(R.ValorReal, 0) > 0 THEN 1 ELSE 0 END) AS Recebidas
+                FROM FIN_RendaRecorrenteOcorrencias O
+                LEFT JOIN FIN_Rendas R
+                    ON R.RendaId = O.RendaId
+                    AND R.UsuarioId = O.UsuarioId
+                WHERE O.UsuarioId = RR.UsuarioId
+                  AND O.RendaRecorrenteId = RR.RendaRecorrenteId
+            ) O
+            WHERE RR.UsuarioId = ?
+            ORDER BY RR.Ativa DESC, RR.Descricao ASC
+        """, (usuario_id,))
+        recorrentes_rows = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT CategoriaRendaId, Nome, CorHex
+            FROM FIN_RendaCategorias
+            WHERE UsuarioId = ?
+            ORDER BY Nome
+        """, (usuario_id,))
+        categorias_renda = cursor.fetchall()
+
+        carteiras = listar_carteiras_ativas(cursor, usuario_id)
+
+    chave_atual = chave_periodo(mes_atual, ano_atual)
+    recorrentes = []
+    for row in recorrentes_rows:
+        proxima_data = None
+        for offset in range(0, 37):
+            mes_ref, ano_ref = periodo_por_chave(chave_atual + offset)
+            candidata = data_recebimento_recorrente(row, mes_ref, ano_ref)
+            if candidata and candidata >= date.today():
+                proxima_data = candidata
+                break
+
+        recorrentes.append({
+            'RendaRecorrenteId': row.RendaRecorrenteId,
+            'CategoriaRendaId': row.CategoriaRendaId,
+            'CarteiraId': row.CarteiraId,
+            'Descricao': row.Descricao,
+            'ValorPrevisto': float(row.ValorPrevisto or 0),
+            'DiaRecebimento': row.DiaRecebimento,
+            'Periodicidade': row.Periodicidade,
+            'IntervaloMeses': int(row.IntervaloMeses or 1),
+            'PeriodicidadeLabel': rotulo_periodicidade_renda(row.Periodicidade, row.IntervaloMeses),
+            'DataInicio': normalizar_data(row.DataInicio),
+            'DataFim': normalizar_data(row.DataFim),
+            'Ativa': bool(row.Ativa),
+            'CategoriaNome': row.CategoriaNome,
+            'CategoriaCorHex': row.CategoriaCorHex,
+            'CarteiraNome': row.CarteiraNome,
+            'CarteiraCorHex': row.CarteiraCorHex,
+            'TotalOcorrencias': int(row.TotalOcorrencias or 0),
+            'Recebidas': int(row.Recebidas or 0),
+            'ProximaData': proxima_data,
+        })
+
+    return render_template(
+        'financas/rendas_recorrentes.html',
+        recorrentes=recorrentes,
+        categorias_renda=categorias_renda,
+        carteiras=carteiras,
+        periodicidades=PERIODICIDADES_RENDA,
+        cor_padrao=COR_CATEGORIA_PADRAO,
+    )
+
+
+@financas_bp.route('/rendas/recorrentes/editar/<int:id>', methods=['POST'])
+def editar_renda_recorrente(id):
+    usuario_id = usuario_atual_id()
+    mes_atual, ano_atual = periodo_atual()
+    dados, erro = ler_dados_renda_recorrente_form()
+
+    if erro:
+        flash(erro, 'danger')
+        return redirect(url_for('financas.rendas_recorrentes'))
+
+    with get_db_cursor() as cursor:
+        garantir_estrutura_rendas_recorrentes(cursor)
+        cursor.execute("""
+            SELECT RendaRecorrenteId
+            FROM FIN_RendasRecorrentes
+            WHERE RendaRecorrenteId = ? AND UsuarioId = ?
+        """, (id, usuario_id))
+        if not cursor.fetchone():
+            flash('Renda recorrente nao encontrada.', 'warning')
+            return redirect(url_for('financas.rendas_recorrentes'))
+
+        if dados['categoria_renda_id']:
+            cursor.execute("""
+                SELECT CategoriaRendaId
+                FROM FIN_RendaCategorias
+                WHERE CategoriaRendaId = ? AND UsuarioId = ?
+            """, (dados['categoria_renda_id'], usuario_id))
+            if not cursor.fetchone():
+                flash('Selecione uma categoria de renda valida.', 'danger')
+                return redirect(url_for('financas.rendas_recorrentes'))
+
+        if not carteira_ativa_existe(cursor, usuario_id, dados['carteira_id']):
+            dados['carteira_id'] = None
+
+        remover_ocorrencias_renda_recorrente_pendentes(cursor, usuario_id, id)
+        cursor.execute("""
+            UPDATE FIN_RendasRecorrentes
+            SET CategoriaRendaId = ?, CarteiraId = ?, Descricao = ?, ValorPrevisto = ?,
+                DiaRecebimento = ?, Periodicidade = ?, IntervaloMeses = ?,
+                DataInicio = ?, DataFim = ?, Ativa = ?, DataAtualizacao = SYSUTCDATETIME()
+            WHERE RendaRecorrenteId = ? AND UsuarioId = ?
+        """, (
+            dados['categoria_renda_id'],
+            dados['carteira_id'],
+            dados['descricao'],
+            dados['valor_previsto'],
+            dados['dia_recebimento'],
+            dados['periodicidade'],
+            dados['intervalo_meses'],
+            dados['data_inicio'],
+            dados['data_fim'],
+            dados['ativa'],
+            id,
+            usuario_id,
+        ))
+
+        if dados['ativa']:
+            sincronizar_renda_recorrente_primeiro_periodo(cursor, usuario_id, id)
+            sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, mes_atual, ano_atual, id)
+
+    flash('Renda recorrente atualizada.', 'success')
+    return redirect(url_for('financas.rendas_recorrentes'))
+
+
+@financas_bp.route('/rendas/recorrentes/excluir/<int:id>', methods=['POST'])
+def excluir_renda_recorrente(id):
+    usuario_id = usuario_atual_id()
+
+    with get_db_cursor() as cursor:
+        garantir_estrutura_rendas_recorrentes(cursor)
+        cursor.execute("""
+            SELECT RendaRecorrenteId
+            FROM FIN_RendasRecorrentes
+            WHERE RendaRecorrenteId = ? AND UsuarioId = ?
+        """, (id, usuario_id))
+        if not cursor.fetchone():
+            flash('Renda recorrente nao encontrada.', 'warning')
+            return redirect(url_for('financas.rendas_recorrentes'))
+
+        recebidas = total_ocorrencias_renda_recorrente_recebidas(cursor, usuario_id, id)
+        remover_ocorrencias_renda_recorrente_pendentes(cursor, usuario_id, id)
+
+        if recebidas:
+            cursor.execute("""
+                UPDATE FIN_RendasRecorrentes
+                SET Ativa = 0, DataAtualizacao = SYSUTCDATETIME()
+                WHERE RendaRecorrenteId = ? AND UsuarioId = ?
+            """, (id, usuario_id))
+            flash('Renda recorrente desativada para preservar historico recebido.', 'info')
+        else:
+            cursor.execute("""
+                DELETE FROM FIN_RendaRecorrenteOcorrencias
+                WHERE RendaRecorrenteId = ? AND UsuarioId = ?
+            """, (id, usuario_id))
+            cursor.execute("""
+                DELETE FROM FIN_RendasRecorrentes
+                WHERE RendaRecorrenteId = ? AND UsuarioId = ?
+            """, (id, usuario_id))
+            flash('Renda recorrente excluida.', 'success')
+
+    return redirect(url_for('financas.rendas_recorrentes'))
+
+
 @financas_bp.route('/adicionar-gasto', methods=['GET', 'POST'])
 def adicionar_gasto():
     usuario_id = usuario_atual_id()
@@ -810,6 +1379,7 @@ def dashboard():
 
     with get_db_cursor() as cursor:
         sincronizar_assinaturas_periodo(cursor, usuario_id, mes_sel, ano_sel)
+        sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, mes_sel, ano_sel)
         garantir_estrutura_carteiras(cursor)
 
         cursor.execute("""
@@ -1144,17 +1714,30 @@ def gerenciar_rendas():
         v_previsto = request.form.get('valor_previsto', '0')
         v_real = request.form.get('valor_real', '0')
         data_receb = request.form.get('data_recebimento')
+        recorrente = request.form.get('recorrente') == 'on'
+        periodicidade_recorrente = periodicidade_renda_valida(
+            request.form.get('periodicidade_recorrente') or 'mensal'
+        )
+        intervalo_recorrente = intervalo_renda(
+            periodicidade_recorrente,
+            request.form.get('intervalo_recorrente')
+        )
 
         # Converte string vazia ou inválida para 0.0 e evita erro de conversão no SQL Server.
         valor_previsto = parse_money(v_previsto)
         valor_real = parse_money(v_real)
 
         data_receb = request.form.get('data_recebimento')
-        dt = datetime.strptime(data_receb, '%Y-%m-%d')
+        try:
+            dt = datetime.strptime(data_receb, '%Y-%m-%d')
+        except (TypeError, ValueError):
+            flash('Informe uma data de recebimento valida.', 'danger')
+            return redirect(url_for('financas.gerenciar_rendas', mes=mes, ano=ano))
 
         with get_db_cursor() as cursor:
             garantir_estrutura_renda_categorias(cursor)
             garantir_estrutura_carteiras(cursor)
+            garantir_estrutura_rendas_recorrentes(cursor)
             if categoria_renda_id:
                 cursor.execute("""
                     SELECT CategoriaRendaId
@@ -1173,26 +1756,71 @@ def gerenciar_rendas():
             elif not carteira_ativa_existe(cursor, usuario_id, carteira_id):
                 carteira_id = None
 
+            renda_recorrente_id = None
+            if recorrente:
+                cursor.execute("""
+                    INSERT INTO FIN_RendasRecorrentes
+                    (UsuarioId, CategoriaRendaId, CarteiraId, Descricao, ValorPrevisto,
+                     DiaRecebimento, Periodicidade, IntervaloMeses, DataInicio, DataFim, Ativa)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 1)
+                """, (
+                    usuario_id,
+                    categoria_renda_id,
+                    carteira_id,
+                    descricao,
+                    valor_previsto,
+                    dt.day,
+                    periodicidade_recorrente,
+                    intervalo_recorrente,
+                    dt.date(),
+                ))
+                cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
+                renda_recorrente_id = int(cursor.fetchone()[0])
+
             cursor.execute("""
                 INSERT INTO FIN_Rendas
-                (UsuarioId, CategoriaRendaId, CarteiraId, Descricao, ValorPrevisto, ValorReal, DataRecebimento, MesReferencia, AnoReferencia)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (usuario_id, categoria_renda_id, carteira_id, descricao, valor_previsto, valor_real, data_receb, dt.month, dt.year))
+                (UsuarioId, CategoriaRendaId, CarteiraId, RendaRecorrenteId, Descricao,
+                 ValorPrevisto, ValorReal, DataRecebimento, MesReferencia, AnoReferencia)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                usuario_id,
+                categoria_renda_id,
+                carteira_id,
+                renda_recorrente_id,
+                descricao,
+                valor_previsto,
+                valor_real,
+                data_receb,
+                dt.month,
+                dt.year,
+            ))
+            cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
+            renda_id = int(cursor.fetchone()[0])
+
+            if renda_recorrente_id:
+                cursor.execute("""
+                    INSERT INTO FIN_RendaRecorrenteOcorrencias
+                    (UsuarioId, RendaRecorrenteId, RendaId, MesReferencia, AnoReferencia)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (usuario_id, renda_recorrente_id, renda_id, dt.month, dt.year))
 
             if valor_real > 0:
                 if carteira_id:
                     movimentar_carteira(cursor, usuario_id, carteira_id, valor_real)
                 ajustar_caixa(cursor, usuario_id, dt.month, dt.year, valor_real)
 
-        flash('Renda registrada com sucesso!', 'success')
+        flash('Renda recorrente criada com sucesso!' if recorrente else 'Renda registrada com sucesso!', 'success')
         return redirect(url_for('financas.gerenciar_rendas', mes=dt.month, ano=dt.year))
 
     with get_db_cursor() as cursor:
         garantir_estrutura_renda_categorias(cursor)
         garantir_estrutura_carteiras(cursor)
+        sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, mes, ano)
         cursor.execute("""
             SELECT R.*, C.Nome AS CategoriaNome, C.CorHex AS CategoriaCorHex,
-                   W.Nome AS CarteiraNome, W.CorHex AS CarteiraCorHex
+                   W.Nome AS CarteiraNome, W.CorHex AS CarteiraCorHex,
+                   RR.Periodicidade AS RecorrenciaPeriodicidade,
+                   RR.IntervaloMeses AS RecorrenciaIntervaloMeses
             FROM FIN_Rendas R
             LEFT JOIN FIN_RendaCategorias C
                 ON C.CategoriaRendaId = R.CategoriaRendaId
@@ -1200,6 +1828,9 @@ def gerenciar_rendas():
             LEFT JOIN FIN_Carteiras W
                 ON W.CarteiraId = R.CarteiraId
                 AND W.UsuarioId = R.UsuarioId
+            LEFT JOIN FIN_RendasRecorrentes RR
+                ON RR.RendaRecorrenteId = R.RendaRecorrenteId
+                AND RR.UsuarioId = R.UsuarioId
             WHERE R.UsuarioId = ? AND R.MesReferencia = ? AND R.AnoReferencia = ?
             ORDER BY R.DataRecebimento ASC, R.RendaId ASC
         """, (usuario_id, mes, ano))
@@ -1231,6 +1862,12 @@ def gerenciar_rendas():
         valor_a_receber = max(valor_previsto - valor_real, 0)
         rendas.append({
             'RendaId': renda.RendaId,
+            'RendaRecorrenteId': renda.RendaRecorrenteId,
+            'Recorrente': bool(renda.RendaRecorrenteId),
+            'RecorrenciaLabel': rotulo_periodicidade_renda(
+                renda.RecorrenciaPeriodicidade,
+                renda.RecorrenciaIntervaloMeses
+            ) if renda.RendaRecorrenteId else None,
             'CategoriaRendaId': renda.CategoriaRendaId,
             'CategoriaNome': renda.CategoriaNome,
             'CategoriaCorHex': renda.CategoriaCorHex,
@@ -1251,6 +1888,7 @@ def gerenciar_rendas():
         carteiras=carteiras,
         resumo_carteiras=resumo_carteiras,
         cor_padrao=COR_CATEGORIA_PADRAO,
+        periodicidades_renda=PERIODICIDADES_RENDA,
         mes=mes,
         ano=ano,
         saldo_atual=saldo_atual,
@@ -1261,6 +1899,7 @@ def deletar_renda(id):
     usuario_id = usuario_atual_id()
     with get_db_cursor() as cursor:
         garantir_estrutura_carteiras(cursor)
+        garantir_estrutura_rendas_recorrentes(cursor)
         cursor.execute("""
             SELECT ISNULL(ValorReal, 0) AS ValorReal, CarteiraId, MesReferencia, AnoReferencia
             FROM FIN_Rendas
@@ -1273,6 +1912,10 @@ def deletar_renda(id):
             movimentar_carteira(cursor, usuario_id, renda.CarteiraId, -valor_real)
             ajustar_caixa(cursor, usuario_id, renda.MesReferencia, renda.AnoReferencia, -valor_real)
 
+        cursor.execute("""
+            DELETE FROM FIN_RendaRecorrenteOcorrencias
+            WHERE RendaId = ? AND UsuarioId = ?
+        """, (id, usuario_id))
         cursor.execute("DELETE FROM FIN_Rendas WHERE RendaId = ? AND UsuarioId = ?", (id, usuario_id))
     return {"success": True}, 200
 

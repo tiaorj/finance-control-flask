@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% macro dinheiro(valor) -%}R$ {{ (valor or 0) | formato_real }}{%- endmacro %}
+
+{% block content %}
+<style>
+    .finance-page {
+        background: #f6f8fb;
+        min-height: calc(100vh - 160px);
+    }
+
+    .finance-card {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+    }
+
+    .table-finance th {
+        color: #64748b;
+        font-size: .76rem;
+        letter-spacing: .03em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .wallet-dot {
+        border-radius: 999px;
+        display: inline-block;
+        height: 10px;
+        width: 10px;
+    }
+</style>
+
+<div class="finance-page py-4">
+    <div class="container-fluid">
+        <div class="d-flex flex-wrap justify-content-between align-items-start mb-3 gap-3">
+            <div>
+                <h2 class="fw-bold text-dark mb-1">
+                    <i class="bi bi-arrow-repeat me-2"></i>Rendas recorrentes
+                </h2>
+                <div class="text-muted">Salario, pro-labore, alugueis e outras entradas que voltam todo ciclo.</div>
+            </div>
+
+            <a href="{{ url_for('financas.gerenciar_rendas') }}" class="btn btn-outline-primary fw-bold">
+                <i class="bi bi-arrow-left me-1"></i>Voltar para rendas
+            </a>
+        </div>
+
+        <div class="finance-card bg-white p-3 mb-4">
+            <form method="POST" action="{{ url_for('financas.rendas_recorrentes') }}" class="row g-3 align-items-end">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="ativa" value="on">
+
+                <div class="col-md-4 col-xl-3">
+                    <label class="form-label small fw-bold text-muted mb-1">Descricao</label>
+                    <input type="text" name="descricao" class="form-control" maxlength="140" placeholder="Ex: Salario" required>
+                </div>
+
+                <div class="col-md-4 col-xl-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Categoria</label>
+                    <select name="categoria_renda_id" class="form-select">
+                        <option value="">Sem categoria</option>
+                        {% for categoria in categorias_renda %}
+                            <option value="{{ categoria.CategoriaRendaId }}">{{ categoria.Nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-4 col-xl-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Carteira destino</label>
+                    <select name="carteira_id" class="form-select">
+                        <option value="">Definir ao receber</option>
+                        {% for carteira in carteiras %}
+                            <option value="{{ carteira.CarteiraId }}">{{ carteira.Nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-4 col-xl-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Valor previsto</label>
+                    <div class="input-group">
+                        <span class="input-group-text">R$</span>
+                        <input type="text" name="valor_previsto" class="form-control text-end" placeholder="0,00" required>
+                    </div>
+                </div>
+
+                <div class="col-md-4 col-xl-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Inicio</label>
+                    <input type="date" name="data_inicio" class="form-control" required>
+                </div>
+
+                <div class="col-md-2 col-xl-1">
+                    <label class="form-label small fw-bold text-muted mb-1">Dia</label>
+                    <input type="number" name="dia_recebimento" class="form-control" min="1" max="31" placeholder="10">
+                </div>
+
+                <div class="col-md-4 col-xl-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Periodicidade</label>
+                    <select name="periodicidade" id="periodicidadeNova" class="form-select" onchange="alternarIntervaloRecorrencia('Nova')">
+                        {% for valor, item in periodicidades.items() %}
+                            <option value="{{ valor }}">{{ item.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-3 col-xl-2 d-none" id="intervaloGrupoNova">
+                    <label class="form-label small fw-bold text-muted mb-1">A cada meses</label>
+                    <input type="number" name="intervalo_meses" class="form-control" min="1" value="1">
+                </div>
+
+                <div class="col-md-4 col-xl-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Fim opcional</label>
+                    <input type="date" name="data_fim" class="form-control">
+                </div>
+
+                <div class="col-md-3 col-xl-1 d-grid">
+                    <button type="submit" class="btn btn-success fw-bold" title="Adicionar">
+                        <i class="bi bi-plus-circle"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="finance-card bg-white">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 p-3 border-bottom">
+                <h6 class="fw-bold mb-0">Minhas rendas fixas</h6>
+                <span class="badge text-bg-light">{{ recorrentes|length }} cadastradas</span>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 table-finance">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Renda</th>
+                            <th>Categoria</th>
+                            <th>Carteira</th>
+                            <th class="text-end">Valor</th>
+                            <th>Ciclo</th>
+                            <th>Proxima</th>
+                            <th>Status</th>
+                            <th class="text-end pe-3">Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in recorrentes %}
+                            <tr>
+                                <td class="ps-3" style="min-width: 220px;">
+                                    <form id="form-recorrente-{{ item.RendaRecorrenteId }}" method="POST" action="{{ url_for('financas.editar_renda_recorrente', id=item.RendaRecorrenteId) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="text" name="descricao" class="form-control form-control-sm fw-bold" value="{{ item.Descricao }}" required>
+                                    </form>
+                                </td>
+                                <td style="min-width: 160px;">
+                                    <select name="categoria_renda_id" form="form-recorrente-{{ item.RendaRecorrenteId }}" class="form-select form-select-sm">
+                                        <option value="">Sem categoria</option>
+                                        {% for categoria in categorias_renda %}
+                                            <option value="{{ categoria.CategoriaRendaId }}" {% if item.CategoriaRendaId == categoria.CategoriaRendaId %}selected{% endif %}>{{ categoria.Nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td style="min-width: 170px;">
+                                    <select name="carteira_id" form="form-recorrente-{{ item.RendaRecorrenteId }}" class="form-select form-select-sm">
+                                        <option value="">Definir ao receber</option>
+                                        {% for carteira in carteiras %}
+                                            <option value="{{ carteira.CarteiraId }}" {% if item.CarteiraId == carteira.CarteiraId %}selected{% endif %}>{{ carteira.Nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td class="text-end" style="min-width: 150px;">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text">R$</span>
+                                        <input type="text" name="valor_previsto" form="form-recorrente-{{ item.RendaRecorrenteId }}" class="form-control text-end" value="{{ item.ValorPrevisto | formato_real }}">
+                                    </div>
+                                </td>
+                                <td style="min-width: 210px;">
+                                    <div class="d-flex gap-2">
+                                        <input type="number" name="dia_recebimento" form="form-recorrente-{{ item.RendaRecorrenteId }}" class="form-control form-control-sm" min="1" max="31" value="{{ item.DiaRecebimento }}" title="Dia">
+                                        <select name="periodicidade" id="periodicidade{{ item.RendaRecorrenteId }}" form="form-recorrente-{{ item.RendaRecorrenteId }}" class="form-select form-select-sm" onchange="alternarIntervaloRecorrencia('{{ item.RendaRecorrenteId }}')">
+                                            {% for valor, periodicidade in periodicidades.items() %}
+                                                <option value="{{ valor }}" {% if item.Periodicidade == valor %}selected{% endif %}>{{ periodicidade.label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <input type="number" name="intervalo_meses" id="intervaloGrupo{{ item.RendaRecorrenteId }}" form="form-recorrente-{{ item.RendaRecorrenteId }}" class="form-control form-control-sm mt-2 {% if item.Periodicidade != 'personalizado' %}d-none{% endif %}" min="1" value="{{ item.IntervaloMeses }}" placeholder="A cada meses">
+                                </td>
+                                <td style="min-width: 160px;">
+                                    <input type="date" name="data_inicio" form="form-recorrente-{{ item.RendaRecorrenteId }}" class="form-control form-control-sm mb-2" value="{{ item.DataInicio.strftime('%Y-%m-%d') if item.DataInicio else '' }}">
+                                    <input type="date" name="data_fim" form="form-recorrente-{{ item.RendaRecorrenteId }}" class="form-control form-control-sm" value="{{ item.DataFim.strftime('%Y-%m-%d') if item.DataFim else '' }}" title="Fim opcional">
+                                    <div class="small text-muted mt-1">
+                                        {% if item.ProximaData %}
+                                            Prox. {{ item.ProximaData.strftime('%d/%m/%Y') }}
+                                        {% else %}
+                                            Sem proxima
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td style="min-width: 120px;">
+                                    <select name="ativa" form="form-recorrente-{{ item.RendaRecorrenteId }}" class="form-select form-select-sm">
+                                        <option value="on" {% if item.Ativa %}selected{% endif %}>Ativa</option>
+                                        <option value="off" {% if not item.Ativa %}selected{% endif %}>Inativa</option>
+                                    </select>
+                                    <div class="small text-muted mt-1">{{ item.Recebidas }} recebida(s)</div>
+                                </td>
+                                <td class="text-end pe-3">
+                                    <button type="submit" form="form-recorrente-{{ item.RendaRecorrenteId }}" class="btn btn-sm btn-success fw-bold" title="Salvar">
+                                        <i class="bi bi-check-lg"></i>
+                                    </button>
+                                    <form method="POST" action="{{ url_for('financas.excluir_renda_recorrente', id=item.RendaRecorrenteId) }}" class="d-inline" onsubmit="return confirm('Excluir ou desativar esta renda recorrente?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger fw-bold" title="Excluir">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-5">
+                                    Nenhuma renda recorrente cadastrada.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function alternarIntervaloRecorrencia(sufixo) {
+    const periodicidade = document.getElementById(`periodicidade${sufixo}`);
+    const intervalo = document.getElementById(`intervaloGrupo${sufixo}`);
+    if (!periodicidade || !intervalo) return;
+
+    intervalo.classList.toggle('d-none', periodicidade.value !== 'personalizado');
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    alternarIntervaloRecorrencia('Nova');
+    {% for item in recorrentes %}
+        alternarIntervaloRecorrencia('{{ item.RendaRecorrenteId }}');
+    {% endfor %}
+});
+</script>
+{% endblock %}

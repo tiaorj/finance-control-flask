@@ -96,6 +96,26 @@
                             <label class="form-label">Data do Recebimento</label>
                             <input type="date" name="data_recebimento" class="form-control" required>
                         </div>
+                        <div class="border rounded p-3 mb-4 bg-light">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="rendaRecorrente" name="recorrente">
+                                <label class="form-check-label fw-bold" for="rendaRecorrente">Repetir automaticamente</label>
+                            </div>
+                            <div id="opcoesRecorrencia" class="row g-2 mt-2 d-none">
+                                <div class="col-7">
+                                    <label class="form-label small text-muted mb-1">Periodicidade</label>
+                                    <select name="periodicidade_recorrente" id="periodicidadeRecorrente" class="form-select form-select-sm">
+                                        {% for valor, item in periodicidades_renda.items() %}
+                                            <option value="{{ valor }}">{{ item.label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-5 d-none" id="intervaloRecorrenteGrupo">
+                                    <label class="form-label small text-muted mb-1">Meses</label>
+                                    <input type="number" min="1" name="intervalo_recorrente" class="form-control form-control-sm" value="1">
+                                </div>
+                            </div>
+                        </div>
                         <button type="submit" class="btn btn-success w-100 fw-bold">Salvar Renda</button>
                     </form>
                 </div>
@@ -111,6 +131,9 @@
                             <div class="text-muted small">{{ mes }}/{{ ano }}</div>
                         </div>
                         <div class="d-flex flex-wrap gap-2">
+                            <a href="{{ url_for('financas.rendas_recorrentes') }}" class="btn btn-sm btn-outline-primary fw-bold">
+                                <i class="bi bi-arrow-repeat me-1"></i>Recorrentes
+                            </a>
                             <a href="{{ url_for('financas.categorias_rendas') }}" class="btn btn-sm btn-outline-success fw-bold">
                                 <i class="bi bi-tags me-1"></i>Categorias
                             </a>
@@ -144,6 +167,11 @@
                                     <tr id="linha-renda-{{ r.RendaId }}">
                                         <td>
                                             <span id="desc-text-{{ r.RendaId }}">{{ r.Descricao }}</span>
+                                            {% if r.Recorrente %}
+                                                <span class="badge rounded-pill text-bg-light ms-1" title="{{ r.RecorrenciaLabel }}">
+                                                    <i class="bi bi-arrow-repeat"></i>
+                                                </span>
+                                            {% endif %}
                                             <input type="text" id="desc-edit-{{ r.RendaId }}" class="form-control form-control-sm d-none" value="{{ r.Descricao }}">
                                         </td>
                                         <td>
@@ -209,7 +237,7 @@
                                                         <select name="carteira_id" class="form-select form-select-sm" style="max-width: 150px;" required>
                                                             <option value="">Carteira...</option>
                                                             {% for carteira in carteiras %}
-                                                                <option value="{{ carteira.CarteiraId }}">{{ carteira.Nome }}</option>
+                                                                <option value="{{ carteira.CarteiraId }}" {% if r.CarteiraId == carteira.CarteiraId %}selected{% endif %}>{{ carteira.Nome }}</option>
                                                             {% endfor %}
                                                         </select>
                                                     {% endif %}
@@ -247,6 +275,21 @@ const rendaRoutes = {
     editar: "{{ url_for('financas.editar_renda', id=0) }}",
     deletar: "{{ url_for('financas.deletar_renda', id=0) }}"
 };
+
+function atualizarOpcoesRecorrencia() {
+    const repetir = document.getElementById('rendaRecorrente');
+    const opcoes = document.getElementById('opcoesRecorrencia');
+    const periodicidade = document.getElementById('periodicidadeRecorrente');
+    const intervalo = document.getElementById('intervaloRecorrenteGrupo');
+
+    if (!repetir || !opcoes || !periodicidade || !intervalo) return;
+    opcoes.classList.toggle('d-none', !repetir.checked);
+    intervalo.classList.toggle('d-none', periodicidade.value !== 'personalizado');
+}
+
+document.getElementById('rendaRecorrente')?.addEventListener('change', atualizarOpcoesRecorrencia);
+document.getElementById('periodicidadeRecorrente')?.addEventListener('change', atualizarOpcoesRecorrencia);
+window.addEventListener('DOMContentLoaded', atualizarOpcoesRecorrencia);
 
 function rendaRouteWithId(template, id) {
     return template.replace('/0', `/${id}`);

@@ -10,6 +10,7 @@ from routes.financas import (
     listar_carteiras_ativas,
     obter_resumo_carteiras,
     sincronizar_caixa_com_carteiras,
+    sincronizar_rendas_recorrentes_periodo,
 )
 from routes.tarefas import montar_resumo_tarefas
 from routes.veiculos import montar_resumo_veiculos
@@ -48,6 +49,7 @@ def index():
 
     with get_db_cursor() as cursor:
         sincronizar_assinaturas_periodo(cursor, usuario_id, hoje.month, hoje.year)
+        sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, hoje.month, hoje.year)
         garantir_estrutura_carteiras(cursor)
 
         cursor.execute("""
