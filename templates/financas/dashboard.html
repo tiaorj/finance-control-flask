@@ -22,7 +22,7 @@
         color: #64748b;
         font-size: .72rem;
         font-weight: 800;
-        letter-spacing: .04em;
+        letter-spacing: 0;
         text-transform: uppercase;
     }
 
@@ -55,7 +55,7 @@
     .table-finance th {
         color: #64748b;
         font-size: .76rem;
-        letter-spacing: .03em;
+        letter-spacing: 0;
         text-transform: uppercase;
         white-space: nowrap;
     }
@@ -76,6 +76,136 @@
         gap: .5rem;
     }
 
+    .wallet-grid {
+        align-items: stretch;
+        display: flex;
+        flex-wrap: wrap;
+        gap: .75rem;
+    }
+
+    .wallet-mini-card,
+    .wallet-manage-card {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        min-height: 82px;
+    }
+
+    .wallet-mini-card {
+        background: #ffffff;
+        flex: 1 1 155px;
+        padding: .85rem;
+    }
+
+    .wallet-total-card {
+        background: #f1f8f4;
+        border-color: rgba(25, 135, 84, .24);
+    }
+
+    .wallet-name {
+        color: #475569;
+        font-size: .78rem;
+        font-weight: 800;
+    }
+
+    .wallet-value {
+        color: #0f172a;
+        font-size: 1.05rem;
+        font-weight: 800;
+        line-height: 1.15;
+        margin-top: .45rem;
+        word-break: break-word;
+    }
+
+    .wallet-color {
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        border-radius: 999px;
+        display: inline-block;
+        flex: 0 0 auto;
+        height: 11px;
+        width: 11px;
+    }
+
+    .wallet-manage-card {
+        align-items: center;
+        background: #f8fafc;
+        color: #0d6efd;
+        display: inline-flex;
+        flex: 0 0 auto;
+        font-weight: 800;
+        justify-content: center;
+        padding: .85rem 1rem;
+        text-decoration: none;
+    }
+
+    .wallet-manage-card:hover {
+        background: #eef5ff;
+        color: #0a58ca;
+    }
+
+    .lancamentos-table-wrap {
+        display: block;
+    }
+
+    .lancamentos-mobile {
+        display: none;
+    }
+
+    .lancamento-mobile-card {
+        background: #ffffff;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    .lancamento-card-title {
+        color: #0f172a;
+        font-size: 1rem;
+        font-weight: 800;
+        line-height: 1.25;
+        min-width: 0;
+        word-break: break-word;
+    }
+
+    .lancamento-card-grid {
+        display: grid;
+        gap: .7rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin-top: .9rem;
+    }
+
+    .lancamento-field-label {
+        color: #64748b;
+        font-size: .72rem;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+
+    .lancamento-field-value {
+        color: #0f172a;
+        font-weight: 700;
+        margin-top: .15rem;
+        min-width: 0;
+        word-break: break-word;
+    }
+
+    .lancamento-actions {
+        display: grid;
+        gap: .5rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin-top: 1rem;
+    }
+
+    .touch-btn {
+        min-height: 44px;
+    }
+
+    .baixa-modal-summary {
+        background: #f8fafc;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        padding: .9rem;
+    }
+
     @media (max-width: 767.98px) {
         .metric-card {
             min-height: auto;
@@ -93,6 +223,41 @@
 
         .action-bar form .btn {
             width: 100%;
+        }
+
+        .wallet-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .wallet-mini-card,
+        .wallet-manage-card {
+            min-height: 78px;
+            width: 100%;
+        }
+
+        .quick-lancamento-form > [class*="col-"] {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+
+        .quick-lancamento-form .btn[type="submit"] {
+            min-height: 44px;
+            width: 100%;
+        }
+
+        .lancamentos-table-wrap {
+            display: none;
+        }
+
+        .lancamentos-mobile {
+            display: grid;
+            gap: .75rem;
+            padding: 1rem;
+        }
+
+        .lancamento-actions {
+            grid-template-columns: 1fr;
         }
     }
 </style>
@@ -257,20 +422,32 @@
 
         {% if resumo_carteiras.ativas %}
         <div class="finance-card bg-white p-3 mb-4">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                 <div>
                     <h6 class="fw-bold mb-1"><i class="bi bi-wallet2 me-2"></i>Carteiras</h6>
                     <div class="text-muted small">Saldo real distribuido em {{ resumo_carteiras.ativas }} carteira(s).</div>
                 </div>
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                    <strong class="text-success">{{ dinheiro(resumo_carteiras.saldo_total) }}</strong>
-                    {% for carteira in carteiras[:3] %}
-                        <span class="badge rounded-pill" style="background-color: {{ carteira.CorHex or '#6c757d' }};">
-                            {{ carteira.Nome }}: {{ dinheiro(carteira.SaldoAtual) }}
-                        </span>
-                    {% endfor %}
-                    <a href="{{ url_for('financas.carteiras') }}" class="btn btn-sm btn-outline-primary fw-bold">Gerenciar</a>
+            </div>
+
+            <div class="wallet-grid">
+                <div class="wallet-mini-card wallet-total-card">
+                    <div class="metric-label">Saldo Total</div>
+                    <div class="wallet-value text-success">{{ dinheiro(resumo_carteiras.saldo_total) }}</div>
                 </div>
+
+                {% for carteira in carteiras %}
+                    <div class="wallet-mini-card">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="wallet-color" style="background-color: {{ carteira.CorHex or '#6c757d' }};"></span>
+                            <div class="wallet-name text-truncate">{{ carteira.Nome }}</div>
+                        </div>
+                        <div class="wallet-value">{{ dinheiro(carteira.SaldoAtual) }}</div>
+                    </div>
+                {% endfor %}
+
+                <a href="{{ url_for('financas.carteiras') }}" class="wallet-manage-card">
+                    <i class="bi bi-gear me-2"></i>Gerenciar
+                </a>
             </div>
         </div>
         {% endif %}
@@ -286,7 +463,7 @@
                 </a>
             </div>
 
-            <form method="POST" action="{{ url_for('financas.adicionar_gasto', mes=mes_sel, ano=ano_sel) }}" class="row g-2 align-items-end">
+            <form method="POST" action="{{ url_for('financas.adicionar_gasto', mes=mes_sel, ano=ano_sel) }}" class="row g-2 align-items-end quick-lancamento-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="mes" value="{{ mes_sel }}">
                 <input type="hidden" name="ano" value="{{ ano_sel }}">
@@ -345,7 +522,7 @@
                 </div>
             </div>
 
-            <div class="table-responsive">
+            <div class="table-responsive lancamentos-table-wrap">
                 <table class="table table-hover align-middle mb-0 table-finance">
                     <thead class="table-light">
                         <tr>
@@ -427,20 +604,19 @@
                                         {% endif %}
                                     {% else %}
                                         <div class="d-flex flex-column gap-1 align-items-center">
-                                            {% if carteiras %}
-                                                <select id="carteira-baixa-{{ l.LancamentoId }}" class="form-select form-select-sm" style="min-width: 150px;">
-                                                    <option value="">Carteira...</option>
-                                                    {% for carteira in carteiras %}
-                                                        <option value="{{ carteira.CarteiraId }}">{{ carteira.Nome }}</option>
-                                                    {% endfor %}
-                                                </select>
-                                            {% endif %}
-                                            <button onclick="darBaixa({{ l.LancamentoId }})" class="btn btn-sm btn-outline-danger fw-bold">
-                                                <i class="bi bi-arrow-down-circle me-1"></i>Baixar
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-primary fw-bold"
+                                                onclick="abrirModalBaixa(
+                                                    {{ l.LancamentoId }},
+                                                    {{ l.Descricao|tojson }},
+                                                    '{{ (l.ValorEstimado or 0) | formato_real }}'
+                                                )">
+                                                <i class="bi bi-check-circle me-1"></i>Baixar
                                             </button>
                                         </div>
                                     {% endif %}
-                                    <button class="btn btn-sm text-danger p-1" onclick="deletarGasto({{ l.LancamentoId }})" title="Excluir">
+                                    <button type="button" class="btn btn-sm text-danger p-1" onclick="deletarGasto({{ l.LancamentoId }})" title="Excluir">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </td>
@@ -452,6 +628,121 @@
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+
+            <div class="lancamentos-mobile">
+                {% if lancamentos %}
+                    {% for l in lancamentos %}
+                        <div class="lancamento-mobile-card">
+                            <div class="d-flex align-items-start justify-content-between gap-2">
+                                <div class="lancamento-card-title">{{ l.Descricao }}</div>
+                                <span class="badge rounded-pill flex-shrink-0" style="background-color: {{ l.CorHex or '#6c757d' }};">
+                                    {{ l.CategoriaNome }}
+                                </span>
+                            </div>
+
+                            <div class="lancamento-card-grid">
+                                <div>
+                                    <div class="lancamento-field-label">Vencimento</div>
+                                    <div class="lancamento-field-value">
+                                        {{ l.DataVencimento.strftime('%d/%m/%Y') if l.DataVencimento else '-' }}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="lancamento-field-label">Status</div>
+                                    <div class="lancamento-field-value">
+                                        {% if l.Pago %}
+                                            <span class="text-success fw-bold"><i class="bi bi-check-circle-fill me-1"></i>Pago</span>
+                                            {% if l.CarteiraNome %}
+                                                <div class="small mt-1">
+                                                    <span class="badge rounded-pill" style="background-color: {{ l.CarteiraCorHex or '#6c757d' }};">
+                                                        {{ l.CarteiraNome }}
+                                                    </span>
+                                                </div>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-danger fw-bold"><i class="bi bi-clock-history me-1"></i>Em aberto</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="lancamento-field-label">Valor estimado</div>
+                                    <div class="lancamento-field-value">
+                                        {% if not l.Pago %}
+                                            <button id="display-estimado-mobile-{{ l.LancamentoId }}"
+                                                    type="button"
+                                                    onclick="habilitarEdicaoEstimado({{ l.LancamentoId }}, 'mobile')"
+                                                    class="btn btn-sm btn-link fw-bold text-primary text-decoration-none p-0 text-start"
+                                                    title="Editar valor estimado">
+                                                {{ dinheiro(l.ValorEstimado) }}
+                                            </button>
+                                            <div id="edit-estimado-container-mobile-{{ l.LancamentoId }}" class="d-none mt-1">
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">R$</span>
+                                                    <input type="text"
+                                                           id="input-estimado-mobile-{{ l.LancamentoId }}"
+                                                           class="form-control form-control-sm text-end"
+                                                           value="{{ (l.ValorEstimado or 0) | formato_real }}"
+                                                           onkeyup="if(event.key === 'Enter') salvarEstimado({{ l.LancamentoId }}, 'mobile')">
+                                                    <button type="button" class="btn btn-success btn-sm" onclick="salvarEstimado({{ l.LancamentoId }}, 'mobile')" title="Salvar">
+                                                        <i class="bi bi-check"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            {{ dinheiro(l.ValorEstimado) }}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="lancamento-field-label">Valor real</div>
+                                    <div class="lancamento-field-value">
+                                        <button id="display-valor-mobile-{{ l.LancamentoId }}"
+                                                type="button"
+                                                onclick="habilitarEdicao({{ l.LancamentoId }}, 'mobile')"
+                                                class="btn btn-sm btn-link fw-bold text-primary text-decoration-none p-0 text-start"
+                                                title="Editar valor real">
+                                            {{ dinheiro(l.ValorReal) }}
+                                        </button>
+                                        <div id="edit-container-mobile-{{ l.LancamentoId }}" class="d-none mt-1">
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="text"
+                                                       id="input-valor-mobile-{{ l.LancamentoId }}"
+                                                       class="form-control form-control-sm text-end"
+                                                       value="{{ (l.ValorReal or 0) | formato_real }}"
+                                                       onkeyup="if(event.key === 'Enter') salvarValor({{ l.LancamentoId }}, 'mobile')">
+                                                <button type="button" class="btn btn-success btn-sm" onclick="salvarValor({{ l.LancamentoId }}, 'mobile')" title="Salvar">
+                                                    <i class="bi bi-check"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="lancamento-actions">
+                                {% if not l.Pago %}
+                                    <button
+                                        type="button"
+                                        onclick="abrirModalBaixa(
+                                            {{ l.LancamentoId }},
+                                            {{ l.Descricao|tojson }},
+                                            '{{ (l.ValorEstimado or 0) | formato_real }}'
+                                        )"
+                                        class="btn btn-primary fw-bold touch-btn">
+                                        <i class="bi bi-check-circle me-1"></i>Baixar
+                                    </button>
+                                {% endif %}
+                                <button type="button" class="btn btn-outline-secondary fw-bold touch-btn" onclick="deletarGasto({{ l.LancamentoId }})">
+                                    <i class="bi bi-trash me-1"></i>Excluir
+                                </button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state py-5">Nenhum lan&ccedil;amento encontrado para este per&iacute;odo.</div>
+                {% endif %}
             </div>
         </div>
 
@@ -591,6 +882,72 @@
     </div>
 </div>
 
+<div class="modal fade" id="modalBaixa" tabindex="-1" aria-labelledby="modalBaixaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="formBaixa" onsubmit="event.preventDefault(); confirmarBaixa();">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title fw-bold" id="modalBaixaLabel">Confirmar pagamento</h5>
+                        <div class="text-muted small">Informe os dados da baixa deste lan&ccedil;amento.</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="baixa-modal-summary mb-3">
+                        <div class="metric-label">Descri&ccedil;&atilde;o</div>
+                        <div id="baixaDescricao" class="fw-bold text-dark mt-1">-</div>
+                        <div class="metric-label mt-3">Valor estimado</div>
+                        <div id="baixaValorEstimado" class="fw-bold text-danger mt-1">R$ 0,00</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="baixaCarteiraId" class="form-label fw-bold">Carteira de pagamento</label>
+                        <select id="baixaCarteiraId"
+                                class="form-select"
+                                data-has-carteiras="{% if carteiras %}1{% else %}0{% endif %}"
+                                {% if not carteiras %}disabled{% endif %}>
+                            {% if carteiras %}
+                                <option value="">Selecione a carteira...</option>
+                                {% for carteira in carteiras %}
+                                    <option value="{{ carteira.CarteiraId }}">{{ carteira.Nome }}</option>
+                                {% endfor %}
+                            {% else %}
+                                <option value="">Nenhuma carteira cadastrada</option>
+                            {% endif %}
+                        </select>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="baixaValorReal" class="form-label fw-bold">Valor pago</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="text"
+                                       id="baixaValorReal"
+                                       class="form-control"
+                                       inputmode="decimal"
+                                       placeholder="0,00"
+                                       required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="baixaDataPagamento" class="form-label fw-bold">Data do pagamento</label>
+                            <input type="date" id="baixaDataPagamento" class="form-control" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" id="btnConfirmarBaixa" class="btn btn-danger fw-bold">
+                        <i class="bi bi-check-circle me-1"></i>Confirmar pagamento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 const financeRoutes = {
     adicionarGasto: "{{ url_for('financas.adicionar_gasto') }}",
@@ -630,16 +987,83 @@ function deletarGasto(id) {
     .catch(error => console.error('Erro ao deletar:', error));
 }
 
-function darBaixa(id) {
-    if (!confirm("Confirmar pagamento deste item?")) return;
-    const carteiraSelect = document.getElementById(`carteira-baixa-${id}`);
-    const carteiraId = carteiraSelect?.value || null;
+function dataHojeParaInput() {
+    const hoje = new Date();
+    hoje.setMinutes(hoje.getMinutes() - hoje.getTimezoneOffset());
+    return hoje.toISOString().slice(0, 10);
+}
 
-    if (carteiraSelect && !carteiraId) {
+function parseMoneyBR(valor) {
+    const normalizado = String(valor || '')
+        .replace(/\s/g, '')
+        .replace(/\./g, '')
+        .replace(',', '.')
+        .replace(/[^\d.-]/g, '');
+    return Number(normalizado);
+}
+
+function abrirModalBaixa(lancamentoId, descricao, valorEstimado) {
+    const modalEl = document.getElementById('modalBaixa');
+    if (!modalEl || typeof bootstrap === 'undefined') return;
+
+    modalEl.dataset.lancamentoId = lancamentoId;
+
+    document.getElementById('baixaDescricao').textContent = descricao || '-';
+    document.getElementById('baixaValorEstimado').textContent = `R$ ${valorEstimado || '0,00'}`;
+    document.getElementById('baixaValorReal').value = valorEstimado || '0,00';
+    document.getElementById('baixaDataPagamento').value = dataHojeParaInput();
+
+    const carteiraSelect = document.getElementById('baixaCarteiraId');
+    if (carteiraSelect) {
+        carteiraSelect.value = '';
+    }
+
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+function confirmarBaixa() {
+    const modalEl = document.getElementById('modalBaixa');
+    const id = modalEl?.dataset.lancamentoId;
+    const carteiraSelect = document.getElementById('baixaCarteiraId');
+    const valorRealInput = document.getElementById('baixaValorReal');
+    const dataPagamentoInput = document.getElementById('baixaDataPagamento');
+    const botaoConfirmar = document.getElementById('btnConfirmarBaixa');
+
+    if (!id) {
+        alert("Lancamento nao identificado.");
+        return;
+    }
+
+    const carteiraId = carteiraSelect?.value || null;
+    const valorReal = valorRealInput?.value.trim();
+    const dataPagamento = dataPagamentoInput?.value;
+
+    if (carteiraSelect?.dataset.hasCarteiras === '1' && !carteiraId) {
         alert("Selecione a carteira usada no pagamento.");
         carteiraSelect.focus();
         return;
     }
+
+    if (!valorReal) {
+        alert("Informe o valor pago.");
+        valorRealInput.focus();
+        return;
+    }
+
+    if (!Number.isFinite(parseMoneyBR(valorReal)) || parseMoneyBR(valorReal) <= 0) {
+        alert("Informe um valor pago maior que zero.");
+        valorRealInput.focus();
+        return;
+    }
+
+    if (!dataPagamento) {
+        alert("Informe a data do pagamento.");
+        dataPagamentoInput.focus();
+        return;
+    }
+
+    botaoConfirmar.disabled = true;
+    botaoConfirmar.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Confirmando...';
 
     fetch(routeWithId(financeRoutes.baixarGasto, id), {
         method: 'POST',
@@ -647,35 +1071,89 @@ function darBaixa(id) {
             'Content-Type': 'application/json',
             'X-CSRFToken': window.csrfToken
         },
-        body: JSON.stringify({ carteira_id: carteiraId })
+        body: JSON.stringify({
+            carteira_id: carteiraId,
+            valor_real: valorReal,
+            data_pagamento: dataPagamento
+        })
     })
-    .then(response => {
-        if (response.ok) window.location.reload();
-        else alert("Erro ao processar a baixa no servidor.");
+    .then(async response => {
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (error) {
+            data = {};
+        }
+
+        if (response.ok && data.success !== false) {
+            return data;
+        }
+
+        alert(data.message || "Erro ao processar a baixa no servidor.");
+        throw new Error('baixa-failed');
     })
-    .catch(error => console.error('Erro:', error));
+    .then(() => fetch(routeWithId(financeRoutes.atualizarReal, id), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': window.csrfToken
+        },
+        body: JSON.stringify({
+            valor: valorReal,
+            carteira_id: carteiraId
+        })
+    }))
+    .then(async response => {
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (error) {
+            data = {};
+        }
+
+        if (response.ok && data.success !== false) {
+            window.location.reload();
+            return;
+        }
+
+        alert(data.message || "Pagamento confirmado, mas nao foi possivel atualizar o valor pago.");
+    })
+    .catch(error => {
+        if (error.message === 'baixa-failed') return;
+        console.error('Erro:', error);
+        alert("Erro ao processar a baixa no servidor.");
+    })
+    .finally(() => {
+        botaoConfirmar.disabled = false;
+        botaoConfirmar.innerHTML = '<i class="bi bi-check-circle me-1"></i>Confirmar pagamento';
+    });
 }
 
-function habilitarEdicao(id) {
-    document.getElementById(`display-valor-${id}`).classList.add('d-none');
-    document.getElementById(`edit-container-${id}`).classList.remove('d-none');
+function elementLancamento(prefixo, id, contexto) {
+    const chave = contexto ? `${contexto}-${id}` : id;
+    return document.getElementById(`${prefixo}-${chave}`);
+}
 
-    const input = document.getElementById(`input-valor-${id}`);
+function habilitarEdicao(id, contexto = '') {
+    elementLancamento('display-valor', id, contexto)?.classList.add('d-none');
+    elementLancamento('edit-container', id, contexto)?.classList.remove('d-none');
+
+    const input = elementLancamento('input-valor', id, contexto);
     input.focus();
     input.select();
 }
 
-function habilitarEdicaoEstimado(id) {
-    document.getElementById(`display-estimado-${id}`).classList.add('d-none');
-    document.getElementById(`edit-estimado-container-${id}`).classList.remove('d-none');
+function habilitarEdicaoEstimado(id, contexto = '') {
+    elementLancamento('display-estimado', id, contexto)?.classList.add('d-none');
+    elementLancamento('edit-estimado-container', id, contexto)?.classList.remove('d-none');
 
-    const input = document.getElementById(`input-estimado-${id}`);
+    const input = elementLancamento('input-estimado', id, contexto);
     input.focus();
     input.select();
 }
 
-function salvarEstimado(id) {
-    const novoValor = document.getElementById(`input-estimado-${id}`).value;
+function salvarEstimado(id, contexto = '') {
+    const novoValor = elementLancamento('input-estimado', id, contexto).value;
 
     fetch(routeWithId(financeRoutes.atualizarEstimado, id), {
         method: 'POST',
@@ -693,8 +1171,8 @@ function salvarEstimado(id) {
     .catch(error => console.error('Erro:', error));
 }
 
-function salvarValor(id) {
-    const novoValor = document.getElementById(`input-valor-${id}`).value;
+function salvarValor(id, contexto = '') {
+    const novoValor = elementLancamento('input-valor', id, contexto).value;
 
     fetch(routeWithId(financeRoutes.atualizarReal, id), {
         method: 'POST',
