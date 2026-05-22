@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .agenda-page {
+        background: #f6f8fb;
+        min-height: calc(100vh - 120px);
+        padding: 1.5rem;
+    }
+
+    .agenda-header {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+    }
+
+    .agenda-eyebrow {
+        color: #64748b;
+        font-size: .76rem;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+    }
+
+    .agenda-title {
+        color: #0f172a;
+        font-size: 1.7rem;
+        font-weight: 800;
+        line-height: 1.1;
+        margin: .2rem 0 0;
+    }
+
+    .agenda-card {
+        background: #ffffff;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+        padding: 1rem;
+    }
+
+    #agendaCalendar {
+        min-height: 680px;
+    }
+
+    .fc {
+        color: #0f172a;
+    }
+
+    .fc .fc-toolbar-title {
+        font-size: 1.25rem;
+        font-weight: 800;
+        text-transform: capitalize;
+    }
+
+    .fc .fc-button-primary {
+        background: #0d6efd;
+        border-color: #0d6efd;
+        border-radius: 6px;
+        font-weight: 700;
+    }
+
+    .fc .fc-daygrid-event {
+        border-radius: 6px;
+        font-weight: 700;
+        padding: .12rem .22rem;
+    }
+
+    .agenda-filters {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: .55rem;
+    }
+
+    .agenda-filter {
+        align-items: center;
+        background: #ffffff;
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        border-radius: 8px;
+        color: #334155;
+        cursor: pointer;
+        display: inline-flex;
+        font-size: .9rem;
+        font-weight: 800;
+        gap: .45rem;
+        min-height: 40px;
+        padding: .5rem .7rem;
+        user-select: none;
+    }
+
+    .agenda-filter input {
+        margin: 0;
+    }
+
+    .agenda-filter-dot {
+        border-radius: 999px;
+        display: inline-block;
+        height: 10px;
+        width: 10px;
+    }
+
+    .agenda-filter-financeiro .agenda-filter-dot,
+    .fc .agenda-event-financeiro {
+        background: #d97706;
+        border-color: #d97706;
+    }
+
+    .agenda-filter-tarefa .agenda-filter-dot,
+    .fc .agenda-event-tarefa {
+        background: #198754;
+        border-color: #198754;
+    }
+
+    .agenda-filter-veiculo .agenda-filter-dot,
+    .fc .agenda-event-veiculo {
+        background: #0d6efd;
+        border-color: #0d6efd;
+    }
+
+    @media (max-width: 767.98px) {
+        .agenda-page {
+            padding: 1rem;
+        }
+
+        #agendaCalendar {
+            min-height: 620px;
+        }
+
+        .fc .fc-toolbar {
+            align-items: stretch;
+            display: grid;
+            gap: .65rem;
+        }
+
+        .fc .fc-toolbar-chunk {
+            display: flex;
+            justify-content: center;
+        }
+    }
+</style>
+
+<div class="agenda-page">
+    <div class="agenda-header">
+        <div>
+            <div class="agenda-eyebrow">Rotina</div>
+            <h1 class="agenda-title">Agenda</h1>
+        </div>
+        <a class="btn btn-outline-primary fw-bold" href="{{ url_for('dashboard.index') }}">
+            <i class="bi bi-arrow-left me-1"></i>Painel geral
+        </a>
+    </div>
+
+    <div class="agenda-filters mb-3" aria-label="Filtros da agenda">
+        <label class="agenda-filter agenda-filter-financeiro">
+            <input class="form-check-input" type="checkbox" value="financeiro" data-agenda-filter checked>
+            <span class="agenda-filter-dot"></span>
+            <span>Financeiro</span>
+        </label>
+        <label class="agenda-filter agenda-filter-tarefa">
+            <input class="form-check-input" type="checkbox" value="tarefa" data-agenda-filter checked>
+            <span class="agenda-filter-dot"></span>
+            <span>Tarefa</span>
+        </label>
+        <label class="agenda-filter agenda-filter-veiculo">
+            <input class="form-check-input" type="checkbox" value="veiculo" data-agenda-filter checked>
+            <span class="agenda-filter-dot"></span>
+            <span>Ve&iacute;culo</span>
+        </label>
+    </div>
+
+    <div class="agenda-card">
+        <div id="agendaCalendar"></div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/locales-all.global.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const calendarEl = document.getElementById('agendaCalendar');
+        const filterInputs = Array.from(document.querySelectorAll('[data-agenda-filter]'));
+
+        function tiposVisiveis() {
+            return new Set(filterInputs.filter((input) => input.checked).map((input) => input.value));
+        }
+
+        function aplicarFiltros(calendar) {
+            const visiveis = tiposVisiveis();
+            calendar.batchRendering(function () {
+                calendar.getEvents().forEach(function (evento) {
+                    const tipo = evento.extendedProps.tipo;
+                    const display = visiveis.has(tipo) ? 'auto' : 'none';
+                    if (evento.display !== display) {
+                        evento.setProp('display', display);
+                    }
+                });
+            });
+        }
+
+        let calendar;
+        calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'pt-br',
+            height: 'auto',
+            firstDay: 0,
+            displayEventTime: false,
+            nowIndicator: true,
+            navLinks: true,
+            dayMaxEvents: 3,
+            events: "{{ url_for('agenda.eventos') }}",
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,listWeek'
+            },
+            eventClassNames: function (info) {
+                const tipo = info.event.extendedProps.tipo || 'outro';
+                return ['agenda-event-' + tipo];
+            },
+            eventsSet: function () {
+                aplicarFiltros(calendar);
+            },
+            buttonText: {
+                today: 'Hoje',
+                month: 'Mês',
+                list: 'Lista'
+            },
+            eventClick: function (info) {
+                if (info.event.url) {
+                    info.jsEvent.preventDefault();
+                    window.location.href = info.event.url;
+                }
+            }
+        });
+
+        calendar.render();
+        filterInputs.forEach(function (input) {
+            input.addEventListener('change', function () {
+                aplicarFiltros(calendar);
+            });
+        });
+    });
+</script>
+{% endblock %}

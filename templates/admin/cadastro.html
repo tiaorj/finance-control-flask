@@ -35,9 +35,24 @@
                 <input type="password" name="senha" class="form-control" minlength="6" required>
             </div>
 
-            <div class="mb-4">
+            <div class="mb-3">
                 <label class="form-label small fw-bold text-uppercase">Confirmar senha</label>
                 <input type="password" name="confirmar_senha" class="form-control" minlength="6" required>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label small fw-bold text-uppercase">M&oacute;dulos iniciais</label>
+                <div class="d-grid gap-2">
+                    {% for modulo in modulos_cadastro %}
+                        <label class="border rounded-3 p-3 d-flex gap-3 align-items-start">
+                            <input class="form-check-input mt-1" type="checkbox" name="modulos" value="{{ modulo.codigo }}" {% if modulo.checked %}checked{% endif %}>
+                            <span>
+                                <strong class="d-block">{{ modulo.nome }}</strong>
+                                <small class="text-muted">{{ modulo.descricao }}</small>
+                            </span>
+                        </label>
+                    {% endfor %}
+                </div>
             </div>
 
             <button type="submit" class="btn btn-primary w-100 fw-bold py-2">

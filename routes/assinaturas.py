@@ -5,6 +5,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 
 from database import get_db_cursor
+from helpers.sql import placeholders_sql
 from routes.financeiro_integracoes import (
     remover_lancamentos_assinatura_pendentes,
     sincronizar_assinatura_primeiro_periodo,
@@ -47,15 +48,17 @@ def valor_mensalizado(valor, ciclo):
     return valor / 12 if ciclo == 'anual' else valor
 
 
-def montar_resumo_assinaturas(cursor, usuario_id, hoje=None):
+def montar_resumo_assinaturas(cursor, usuario_id, hoje=None, usuarios_ids=None):
     hoje = hoje or datetime.now(ZoneInfo('America/Sao_Paulo')).date()
+    usuarios_ids = usuarios_ids or [usuario_id]
+    usuarios_placeholders = placeholders_sql(usuarios_ids)
 
-    cursor.execute("""
+    cursor.execute(f"""
         SELECT AssinaturaId, Nome, Categoria, Valor, Ciclo, DataRenovacao, Ativa
         FROM FIN_Assinaturas
-        WHERE UsuarioId = ? AND Ativa = 1
+        WHERE UsuarioId IN ({usuarios_placeholders}) AND Ativa = 1
         ORDER BY DataRenovacao ASC, Nome ASC
-    """, (usuario_id,))
+    """, tuple(usuarios_ids))
     assinaturas = cursor.fetchall()
 
     total_mensal = 0.0

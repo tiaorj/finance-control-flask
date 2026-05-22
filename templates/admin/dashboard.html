@@ -1,6 +1,5 @@
 {% extends 'base.html' %}
 {% macro dinheiro(valor) -%}{{ (valor or 0) | formato_real }}{%- endmacro %}
-{% set usa_curriculo = session.get('usa_curriculo', True) %}
 
 {% block content %}
 <main class="client-portal">
@@ -9,82 +8,88 @@
             <div>
                 <span class="admin-kicker">Portal do Cliente</span>
                 <h1>Bem-vindo, {{ session.usuario_nome }}</h1>
-                <p>Seu ponto de entrada para acompanhar finan&ccedil;as{% if usa_curriculo %}, evoluir perfil profissional{% endif %} e solicitar servi&ccedil;os digitais.</p>
+                <p>Seu ponto de entrada para {% if modulo_financeiro %}acompanhar finan&ccedil;as{% if modulo_carreiras %}, evoluir perfil profissional{% endif %} e {% elif modulo_carreiras %}evoluir perfil profissional e {% endif %}solicitar servi&ccedil;os digitais.</p>
             </div>
             <div class="client-portal-actions">
-                <a href="{{ url_for('financas.dashboard') }}" class="btn btn-warning fw-bold">
-                    <i class="bi bi-wallet2 me-2"></i>Abrir financeiro
-                </a>
+                {% if modulo_financeiro %}
+                    <a href="{{ url_for('financas.dashboard') }}" class="btn btn-warning fw-bold">
+                        <i class="bi bi-wallet2 me-2"></i>Abrir financeiro
+                    </a>
+                {% endif %}
                 <a href="{{ url_for('empresa.contato', servico='suporte') }}" class="btn btn-outline-light fw-bold">
                     <i class="bi bi-headset me-2"></i>Solicitar suporte
                 </a>
             </div>
         </section>
 
-        <section class="client-widget-grid" {% if not usa_curriculo %}style="grid-template-columns: minmax(0, 1fr);"{% endif %}>
-            <article class="client-widget client-widget-finance">
-                <div class="client-widget-header">
-                    <div>
-                        <span class="admin-kicker">Financeiro</span>
-                        <h2>Resumo de {{ mes_atual }}</h2>
-                    </div>
-                    <i class="bi bi-cash-stack"></i>
-                </div>
-
-                <div class="client-finance-balance">
-                    <span>Saldo previsto</span>
-                    <strong class="{{ 'text-danger' if saldo_previsto < 0 else 'text-success' }}">{{ dinheiro(saldo_previsto) }}</strong>
-                </div>
-
-                <div class="client-mini-metrics">
-                    <div>
-                        <span>Saldo atual</span>
-                        <strong>{{ dinheiro(saldo_atual) }}</strong>
-                    </div>
-                    <div>
-                        <span>A receber</span>
-                        <strong>{{ dinheiro(rendas_a_receber) }}</strong>
-                    </div>
-                    <div>
-                        <span>Pendentes</span>
-                        <strong>{{ dinheiro(contas_pendentes) }}</strong>
-                    </div>
-                </div>
-
-                <a href="{{ url_for('financas.dashboard') }}" class="client-widget-link">Ver dashboard financeiro <i class="bi bi-arrow-right"></i></a>
-            </article>
-
-            {% if usa_curriculo %}
-                <article class="client-widget">
-                    <div class="client-widget-header">
-                        <div>
-                            <span class="admin-kicker">Curr&iacute;culo</span>
-                            <h2>Status do perfil</h2>
+        {% if modulo_financeiro or modulo_carreiras %}
+            <section class="client-widget-grid" {% if not (modulo_financeiro and modulo_carreiras) %}style="grid-template-columns: minmax(0, 1fr);"{% endif %}>
+                {% if modulo_financeiro %}
+                    <article class="client-widget client-widget-finance">
+                        <div class="client-widget-header">
+                            <div>
+                                <span class="admin-kicker">Financeiro</span>
+                                <h2>Resumo de {{ mes_atual }}</h2>
+                            </div>
+                            <i class="bi bi-cash-stack"></i>
                         </div>
-                        <i class="bi bi-person-vcard"></i>
-                    </div>
 
-                    <div class="client-profile-progress">
-                        <strong>{{ perfil_percentual }}%</strong>
-                        <div class="progress">
-                            <div class="progress-bar" role="progressbar" style="width: {{ perfil_percentual }}%;" aria-valuenow="{{ perfil_percentual }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        <div class="client-finance-balance">
+                            <span>Saldo previsto</span>
+                            <strong class="{{ 'text-danger' if saldo_previsto < 0 else 'text-success' }}">{{ dinheiro(saldo_previsto) }}</strong>
                         </div>
-                    </div>
 
-                    <div class="client-checklist">
-                        {% for item in perfil_itens %}
-                            <span class="{{ 'done' if item.ativo else '' }}">
-                                <i class="bi {{ 'bi-check-circle-fill' if item.ativo else 'bi-circle' }}"></i>{{ item.label|safe }}
-                            </span>
-                        {% endfor %}
-                    </div>
+                        <div class="client-mini-metrics">
+                            <div>
+                                <span>Saldo atual</span>
+                                <strong>{{ dinheiro(saldo_atual) }}</strong>
+                            </div>
+                            <div>
+                                <span>A receber</span>
+                                <strong>{{ dinheiro(rendas_a_receber) }}</strong>
+                            </div>
+                            <div>
+                                <span>Pendentes</span>
+                                <strong>{{ dinheiro(contas_pendentes) }}</strong>
+                            </div>
+                        </div>
 
-                    <a href="{{ url_for('curriculo.especialista') }}" class="client-widget-link">Ver perfil profissional <i class="bi bi-arrow-right"></i></a>
-                </article>
-            {% endif %}
-        </section>
+                        <a href="{{ url_for('financas.dashboard') }}" class="client-widget-link">Ver dashboard financeiro <i class="bi bi-arrow-right"></i></a>
+                    </article>
+                {% endif %}
 
-        <section class="client-portal-layout">
+                {% if modulo_carreiras %}
+                    <article class="client-widget">
+                        <div class="client-widget-header">
+                            <div>
+                                <span class="admin-kicker">Curr&iacute;culo</span>
+                                <h2>Status do perfil</h2>
+                            </div>
+                            <i class="bi bi-person-vcard"></i>
+                        </div>
+
+                        <div class="client-profile-progress">
+                            <strong>{{ perfil_percentual }}%</strong>
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: {{ perfil_percentual }}%;" aria-valuenow="{{ perfil_percentual }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                        </div>
+
+                        <div class="client-checklist">
+                            {% for item in perfil_itens %}
+                                <span class="{{ 'done' if item.ativo else '' }}">
+                                    <i class="bi {{ 'bi-check-circle-fill' if item.ativo else 'bi-circle' }}"></i>{{ item.label|safe }}
+                                </span>
+                            {% endfor %}
+                        </div>
+
+                        <a href="{{ url_for('curriculo.especialista') }}" class="client-widget-link">Ver perfil profissional <i class="bi bi-arrow-right"></i></a>
+                    </article>
+                {% endif %}
+            </section>
+        {% endif %}
+
+        <section class="client-portal-layout" {% if not (modulo_financeiro or modulo_life) %}style="grid-template-columns: minmax(0, 1fr);"{% endif %}>
             <div>
                 <div class="client-section-title">
                     <span class="admin-kicker">Servi&ccedil;os</span>
@@ -93,7 +98,7 @@
 
                 <div class="client-service-grid">
                     {% for servico in servicos %}
-                        {% if usa_curriculo or servico.anchor != '?servico=curriculo' %}
+                        {% if (modulo_carreiras or servico.anchor != '?servico=curriculo') and (modulo_life or servico.url not in ['garantias.lista', 'veiculos.lista', 'tarefas.lista']) and (modulo_financeiro or servico.anchor != '#planos') %}
                             <article class="client-service-card">
                                 <i class="bi {{ servico.icone }}"></i>
                                 <h3>{{ servico.titulo|safe }}</h3>
@@ -111,7 +116,7 @@
 
                 <div class="client-article-list">
                     {% for artigo in artigos %}
-                        {% if usa_curriculo or artigo.categoria != 'Carreira' %}
+                        {% if (modulo_carreiras or artigo.categoria != 'Carreira') and (modulo_financeiro or artigo.categoria != 'Finan&ccedil;as') %}
                             <article>
                                 <span>{{ artigo.categoria }}</span>
                                 <h3>{{ artigo.titulo|safe }}</h3>
@@ -122,154 +127,160 @@
                 </div>
             </div>
 
-            <aside class="client-side-panel">
-                <div class="client-section-title">
-                    <span class="admin-kicker">Agenda</span>
-                    <h2>Contas pendentes</h2>
-                </div>
-
-                <div class="client-pending-list">
-                    {% for conta in proximas_contas %}
-                        <article>
-                            <div>
-                                <strong>{{ conta.Descricao }}</strong>
-                                <span>{{ conta.CategoriaNome or 'Sem categoria' }}</span>
-                            </div>
-                            <div class="text-end">
-                                <strong>{{ dinheiro(conta.ValorEstimado) }}</strong>
-                                <span>{{ conta.DataVencimento.strftime('%d/%m') if conta.DataVencimento else '-' }}</span>
-                                <form action="{{ url_for('financas.baixar_gasto', id=conta.LancamentoId) }}" method="POST" class="mt-2">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <input type="hidden" name="next" value="{{ url_for('dashboard.index') }}">
-                                    {% if carteiras %}
-                                        <select name="carteira_id" class="form-select form-select-sm mb-1" required>
-                                            <option value="">Carteira...</option>
-                                            {% for carteira in carteiras %}
-                                                <option value="{{ carteira.CarteiraId }}">{{ carteira.Nome }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    {% endif %}
-                                    <button type="submit" class="btn btn-sm btn-success fw-bold"
-                                            onclick="return confirm('Confirmar pagamento deste item?');">
-                                        <i class="bi bi-check2-circle me-1"></i>Dar baixa
-                                    </button>
-                                </form>
-                            </div>
-                        </article>
-                    {% else %}
-                        <div class="client-empty-state">
-                            <i class="bi bi-check2-circle"></i>
-                            <p>Nenhuma conta pendente cadastrada.</p>
+            {% if modulo_financeiro or modulo_life %}
+                <aside class="client-side-panel">
+                    {% if modulo_financeiro %}
+                        <div class="client-section-title">
+                            <span class="admin-kicker">Agenda</span>
+                            <h2>Contas pendentes</h2>
                         </div>
-                    {% endfor %}
-                </div>
 
-                <a href="{{ url_for('financas.adicionar_gasto') }}" class="btn btn-primary w-100 fw-bold mt-3">
-                    Novo lan&ccedil;amento
-                </a>
-
-                <div class="client-section-title mt-4">
-                    <span class="admin-kicker">Checklist</span>
-                    <h2>Tarefas do m&ecirc;s</h2>
-                </div>
-
-                <div class="client-pending-list">
-                    {% for tarefa in resumo_tarefas.proximas %}
-                        <article>
-                            <div>
-                                <strong>{{ tarefa.titulo }}</strong>
-                                <span>{{ tarefa.categoria }} &bull; {{ tarefa.periodicidade_label }}</span>
-                            </div>
-                            <div class="text-end">
-                                <strong>{{ tarefa.status_texto }}</strong>
-                                <span>{{ tarefa.proxima_data.strftime('%d/%m') if tarefa.proxima_data else '-' }}</span>
-                                <form action="{{ url_for('tarefas.concluir', id=tarefa.id) }}" method="POST" class="mt-2">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <input type="hidden" name="next" value="{{ url_for('dashboard.index') }}">
-                                    <button type="submit" class="btn btn-sm btn-success fw-bold">
-                                        <i class="bi bi-check2-circle me-1"></i>Concluir
-                                    </button>
-                                </form>
-                            </div>
-                        </article>
-                    {% else %}
-                        <div class="client-empty-state">
-                            <i class="bi bi-check2-circle"></i>
-                            <p>Nenhuma tarefa pendente para este m&ecirc;s.</p>
+                        <div class="client-pending-list">
+                            {% for conta in proximas_contas %}
+                                <article>
+                                    <div>
+                                        <strong>{{ conta.Descricao }}</strong>
+                                        <span>{{ conta.CategoriaNome or 'Sem categoria' }}</span>
+                                    </div>
+                                    <div class="text-end">
+                                        <strong>{{ dinheiro(conta.ValorEstimado) }}</strong>
+                                        <span>{{ conta.DataVencimento.strftime('%d/%m') if conta.DataVencimento else '-' }}</span>
+                                        <form action="{{ url_for('financas.baixar_gasto', id=conta.LancamentoId) }}" method="POST" class="mt-2">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="next" value="{{ url_for('dashboard.index') }}">
+                                            {% if carteiras %}
+                                                <select name="carteira_id" class="form-select form-select-sm mb-1" required>
+                                                    <option value="">Carteira...</option>
+                                                    {% for carteira in carteiras %}
+                                                        <option value="{{ carteira.CarteiraId }}">{{ carteira.Nome }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            {% endif %}
+                                            <button type="submit" class="btn btn-sm btn-success fw-bold"
+                                                    onclick="return confirm('Confirmar pagamento deste item?');">
+                                                <i class="bi bi-check2-circle me-1"></i>Dar baixa
+                                            </button>
+                                        </form>
+                                    </div>
+                                </article>
+                            {% else %}
+                                <div class="client-empty-state">
+                                    <i class="bi bi-check2-circle"></i>
+                                    <p>Nenhuma conta pendente cadastrada.</p>
+                                </div>
+                            {% endfor %}
                         </div>
-                    {% endfor %}
-                </div>
 
-                <a href="{{ url_for('tarefas.lista') }}" class="btn btn-outline-primary w-100 fw-bold mt-3">
-                    Abrir checklist
-                </a>
+                        <a href="{{ url_for('financas.adicionar_gasto') }}" class="btn btn-primary w-100 fw-bold mt-3">
+                            Novo lan&ccedil;amento
+                        </a>
+                    {% endif %}
 
-                <div class="client-section-title mt-4">
-                    <span class="admin-kicker">Ve&iacute;culos</span>
-                    <h2>Manuten&ccedil;&otilde;es</h2>
-                </div>
-
-                <div class="client-pending-list">
-                    {% for item in resumo_veiculos.proximos %}
-                        <article>
-                            <div>
-                                <strong>{{ item.titulo }}</strong>
-                                <span>{{ item.veiculo }} &bull; {{ item.tipo_label }}</span>
-                            </div>
-                            <div class="text-end">
-                                <strong>{{ item.status_texto }}</strong>
-                                <span>
-                                    {% if item.data_vencimento %}
-                                        {{ item.data_vencimento.strftime('%d/%m') }}
-                                    {% elif item.km_vencimento %}
-                                        {{ item.km_vencimento }} km
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </span>
-                            </div>
-                        </article>
-                    {% else %}
-                        <div class="client-empty-state">
-                            <i class="bi bi-check2-circle"></i>
-                            <p>Nenhum alerta de ve&iacute;culo cadastrado.</p>
+                    {% if modulo_life %}
+                        <div class="client-section-title {% if modulo_financeiro %}mt-4{% endif %}">
+                            <span class="admin-kicker">Checklist</span>
+                            <h2>Tarefas do m&ecirc;s</h2>
                         </div>
-                    {% endfor %}
-                </div>
 
-                <a href="{{ url_for('veiculos.lista') }}" class="btn btn-outline-primary w-100 fw-bold mt-3">
-                    Abrir ve&iacute;culos
-                </a>
-
-                <div class="client-section-title mt-4">
-                    <span class="admin-kicker">Garantias</span>
-                    <h2>Notas fiscais</h2>
-                </div>
-
-                <div class="client-pending-list">
-                    {% for item in resumo_garantias.proximas %}
-                        <article>
-                            <div>
-                                <strong>{{ item.nome }}</strong>
-                                <span>{{ item.categoria }} &bull; {{ item.status_texto }}</span>
-                            </div>
-                            <div class="text-end">
-                                <strong>{{ item.data_fim.strftime('%d/%m') if item.data_fim else '-' }}</strong>
-                                <span>{{ item.meses_garantia }} meses</span>
-                            </div>
-                        </article>
-                    {% else %}
-                        <div class="client-empty-state">
-                            <i class="bi bi-check2-circle"></i>
-                            <p>Nenhuma garantia cadastrada.</p>
+                        <div class="client-pending-list">
+                            {% for tarefa in resumo_tarefas.proximas %}
+                                <article>
+                                    <div>
+                                        <strong>{{ tarefa.titulo }}</strong>
+                                        <span>{{ tarefa.categoria }} &bull; {{ tarefa.periodicidade_label }}</span>
+                                    </div>
+                                    <div class="text-end">
+                                        <strong>{{ tarefa.status_texto }}</strong>
+                                        <span>{{ tarefa.proxima_data.strftime('%d/%m') if tarefa.proxima_data else '-' }}</span>
+                                        <form action="{{ url_for('tarefas.concluir', id=tarefa.id) }}" method="POST" class="mt-2">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="next" value="{{ url_for('dashboard.index') }}">
+                                            <button type="submit" class="btn btn-sm btn-success fw-bold">
+                                                <i class="bi bi-check2-circle me-1"></i>Concluir
+                                            </button>
+                                        </form>
+                                    </div>
+                                </article>
+                            {% else %}
+                                <div class="client-empty-state">
+                                    <i class="bi bi-check2-circle"></i>
+                                    <p>Nenhuma tarefa pendente para este m&ecirc;s.</p>
+                                </div>
+                            {% endfor %}
                         </div>
-                    {% endfor %}
-                </div>
 
-                <a href="{{ url_for('garantias.lista') }}" class="btn btn-outline-primary w-100 fw-bold mt-3">
-                    Abrir garantias
-                </a>
-            </aside>
+                        <a href="{{ url_for('tarefas.lista') }}" class="btn btn-outline-primary w-100 fw-bold mt-3">
+                            Abrir checklist
+                        </a>
+
+                        <div class="client-section-title mt-4">
+                            <span class="admin-kicker">Ve&iacute;culos</span>
+                            <h2>Manuten&ccedil;&otilde;es</h2>
+                        </div>
+
+                        <div class="client-pending-list">
+                            {% for item in resumo_veiculos.proximos %}
+                                <article>
+                                    <div>
+                                        <strong>{{ item.titulo }}</strong>
+                                        <span>{{ item.veiculo }} &bull; {{ item.tipo_label }}</span>
+                                    </div>
+                                    <div class="text-end">
+                                        <strong>{{ item.status_texto }}</strong>
+                                        <span>
+                                            {% if item.data_vencimento %}
+                                                {{ item.data_vencimento.strftime('%d/%m') }}
+                                            {% elif item.km_vencimento %}
+                                                {{ item.km_vencimento }} km
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                </article>
+                            {% else %}
+                                <div class="client-empty-state">
+                                    <i class="bi bi-check2-circle"></i>
+                                    <p>Nenhum alerta de ve&iacute;culo cadastrado.</p>
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <a href="{{ url_for('veiculos.lista') }}" class="btn btn-outline-primary w-100 fw-bold mt-3">
+                            Abrir ve&iacute;culos
+                        </a>
+
+                        <div class="client-section-title mt-4">
+                            <span class="admin-kicker">Garantias</span>
+                            <h2>Notas fiscais</h2>
+                        </div>
+
+                        <div class="client-pending-list">
+                            {% for item in resumo_garantias.proximas %}
+                                <article>
+                                    <div>
+                                        <strong>{{ item.nome }}</strong>
+                                        <span>{{ item.categoria }} &bull; {{ item.status_texto }}</span>
+                                    </div>
+                                    <div class="text-end">
+                                        <strong>{{ item.data_fim.strftime('%d/%m') if item.data_fim else '-' }}</strong>
+                                        <span>{{ item.meses_garantia }} meses</span>
+                                    </div>
+                                </article>
+                            {% else %}
+                                <div class="client-empty-state">
+                                    <i class="bi bi-check2-circle"></i>
+                                    <p>Nenhuma garantia cadastrada.</p>
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <a href="{{ url_for('garantias.lista') }}" class="btn btn-outline-primary w-100 fw-bold mt-3">
+                            Abrir garantias
+                        </a>
+                    {% endif %}
+                </aside>
+            {% endif %}
         </section>
     </div>
 </main>

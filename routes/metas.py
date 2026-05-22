@@ -5,6 +5,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 
 from database import get_db_cursor
+from helpers.sql import placeholders_sql
 from routes.financeiro_integracoes import ajustar_caixa, periodo_atual
 
 
@@ -62,16 +63,19 @@ def montar_meta(row):
     }
 
 
-def montar_resumo_metas(cursor, usuario_id):
-    cursor.execute("""
+def montar_resumo_metas(cursor, usuario_id, usuarios_ids=None):
+    usuarios_ids = usuarios_ids or [usuario_id]
+    usuarios_placeholders = placeholders_sql(usuarios_ids)
+
+    cursor.execute(f"""
         SELECT MetaId, Nome, ValorAlvo, ValorAtual, DataAlvo, CorHex, Ativa, Observacoes
         FROM FIN_Metas
-        WHERE UsuarioId = ? AND Ativa = 1
+        WHERE UsuarioId IN ({usuarios_placeholders}) AND Ativa = 1
         ORDER BY
             CASE WHEN ValorAlvo > 0 AND ValorAtual >= ValorAlvo THEN 1 ELSE 0 END,
             DataAlvo ASC,
             Nome ASC
-    """, (usuario_id,))
+    """, tuple(usuarios_ids))
     metas = [montar_meta(row) for row in cursor.fetchall()]
 
     total_alvo = sum(meta['valor_alvo'] for meta in metas)

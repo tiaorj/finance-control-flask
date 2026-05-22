@@ -1,9 +1,11 @@
-﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+﻿from flask import Blueprint, render_template, request, redirect, url_for, flash
 from database import get_db_cursor
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 import calendar
 from flask_login import current_user
+from helpers.sql import placeholders_sql
+from helpers.workspaces import usuarios_visiveis_financeiro
 from routes.assinaturas import montar_resumo_assinaturas
 from routes.financeiro_integracoes import sincronizar_assinaturas_periodo
 from routes.metas import montar_resumo_metas
@@ -763,17 +765,18 @@ def periodo_por_chave(chave):
     return mes, ano
 
 
-def saldo_transportado_periodo(cursor, usuario_id, mes, ano, profundidade=12):
+def saldo_transportado_periodo(cursor, usuario_id, mes, ano, profundidade=12, usuarios_ids=None):
     if profundidade <= 0:
         return 0.0
 
+    usuarios_ids = usuarios_ids or [usuario_id]
+    usuarios_placeholders = placeholders_sql(usuarios_ids)
     chave_atual = chave_periodo(mes, ano)
     chave_inicio = chave_atual - profundidade
     chave_fim = chave_atual - 1
     mes_inicio, ano_inicio = periodo_por_chave(chave_inicio)
     mes_fim, ano_fim = periodo_por_chave(chave_fim)
-    params_periodo = (
-        usuario_id,
+    params_periodo = tuple(usuarios_ids) + (
         ano_inicio, ano_inicio, mes_inicio,
         ano_fim, ano_fim, mes_fim,
     )
@@ -789,7 +792,7 @@ def saldo_transportado_periodo(cursor, usuario_id, mes, ano, profundidade=12):
             'contas_pendentes': 0.0,
         }
 
-    cursor.execute("""
+    cursor.execute(f"""
         SELECT
             MesReferencia,
             AnoReferencia,
@@ -804,7 +807,7 @@ def saldo_transportado_periodo(cursor, usuario_id, mes, ano, profundidade=12):
                 0 AS RendasAReceber,
                 0 AS ContasPendentes
             FROM FIN_Caixa
-            WHERE UsuarioId = ?
+            WHERE UsuarioId IN ({usuarios_placeholders})
             AND (AnoReferencia > ? OR (AnoReferencia = ? AND MesReferencia >= ?))
             AND (AnoReferencia < ? OR (AnoReferencia = ? AND MesReferencia <= ?))
             GROUP BY MesReferencia, AnoReferencia
@@ -823,7 +826,7 @@ def saldo_transportado_periodo(cursor, usuario_id, mes, ano, profundidade=12):
                 ) AS RendasAReceber,
                 0 AS ContasPendentes
             FROM FIN_Rendas
-            WHERE UsuarioId = ?
+            WHERE UsuarioId IN ({usuarios_placeholders})
             AND (AnoReferencia > ? OR (AnoReferencia = ? AND MesReferencia >= ?))
             AND (AnoReferencia < ? OR (AnoReferencia = ? AND MesReferencia <= ?))
             GROUP BY MesReferencia, AnoReferencia
@@ -837,7 +840,7 @@ def saldo_transportado_periodo(cursor, usuario_id, mes, ano, profundidade=12):
                 0 AS RendasAReceber,
                 SUM(ISNULL(ValorEstimado, 0)) AS ContasPendentes
             FROM FIN_Lancamentos
-            WHERE UsuarioId = ? AND Pago = 0
+            WHERE UsuarioId IN ({usuarios_placeholders}) AND Pago = 0
             AND (AnoReferencia > ? OR (AnoReferencia = ? AND MesReferencia >= ?))
             AND (AnoReferencia < ? OR (AnoReferencia = ? AND MesReferencia <= ?))
             GROUP BY MesReferencia, AnoReferencia
@@ -865,19 +868,21 @@ def saldo_transportado_periodo(cursor, usuario_id, mes, ano, profundidade=12):
     return saldo_transportado
 
 
-def montar_fluxo_caixa_diario(cursor, usuario_id, mes, ano, saldo_disponivel):
+def montar_fluxo_caixa_diario(cursor, usuario_id, mes, ano, saldo_disponivel, usuarios_ids=None):
+    usuarios_ids = usuarios_ids or [usuario_id]
+    usuarios_placeholders = placeholders_sql(usuarios_ids)
     ultimo_dia = calendar.monthrange(ano, mes)[1]
     entradas_por_dia = {dia: 0.0 for dia in range(1, ultimo_dia + 1)}
     saidas_por_dia = {dia: 0.0 for dia in range(1, ultimo_dia + 1)}
     entradas_recebidas = 0.0
     saidas_pagas = 0.0
 
-    cursor.execute("""
+    cursor.execute(f"""
         SELECT Descricao, ValorPrevisto, ISNULL(ValorReal, 0) AS ValorReal, DataRecebimento
         FROM FIN_Rendas
-        WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
+        WHERE UsuarioId IN ({usuarios_placeholders}) AND MesReferencia = ? AND AnoReferencia = ?
         ORDER BY DataRecebimento, RendaId
-    """, (usuario_id, mes, ano))
+    """, tuple(usuarios_ids) + (mes, ano))
     rendas_periodo = cursor.fetchall()
 
     for renda in rendas_periodo:
@@ -892,12 +897,12 @@ def montar_fluxo_caixa_diario(cursor, usuario_id, mes, ano, saldo_disponivel):
         if valor_real > 0:
             entradas_recebidas += valor_real
 
-    cursor.execute("""
+    cursor.execute(f"""
         SELECT Descricao, ValorEstimado, ISNULL(ValorReal, 0) AS ValorReal, Pago, DataVencimento
         FROM FIN_Lancamentos
-        WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
+        WHERE UsuarioId IN ({usuarios_placeholders}) AND MesReferencia = ? AND AnoReferencia = ?
         ORDER BY DataVencimento, LancamentoId
-    """, (usuario_id, mes, ano))
+    """, tuple(usuarios_ids) + (mes, ano))
     lancamentos_periodo = cursor.fetchall()
 
     for lancamento in lancamentos_periodo:
@@ -1837,52 +1842,61 @@ def dashboard():
         sincronizar_assinaturas_periodo(cursor, usuario_id, mes_sel, ano_sel)
         sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, mes_sel, ano_sel)
         sincronizar_lancamentos_recorrentes_periodo(cursor, usuario_id, mes_sel, ano_sel)
+        usuarios_financeiro = usuarios_visiveis_financeiro(cursor, usuario_id) or [usuario_id]
+        usuarios_placeholders = placeholders_sql(usuarios_financeiro)
 
-        cursor.execute("""
+        resumo_params = []
+        resumo_params.extend(usuarios_financeiro)
+        resumo_params.extend([mes_sel, ano_sel])
+        resumo_params.extend(usuarios_financeiro)
+        resumo_params.extend([mes_sel, ano_sel])
+        resumo_params.extend(usuarios_financeiro)
+        resumo_params.extend([mes_sel, ano_sel])
+        resumo_params.extend(usuarios_financeiro)
+        resumo_params.extend([mes_sel, ano_sel])
+        resumo_params.extend(usuarios_financeiro)
+        resumo_params.extend([ano_sel, ano_sel, mes_sel])
+        resumo_params.extend(usuarios_financeiro)
+        resumo_params.extend([mes_sel, ano_sel])
+
+        cursor.execute(f"""
             SELECT
                 ISNULL((
                     SELECT SUM(ISNULL(ValorReal, 0))
                     FROM FIN_Rendas
-                    WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
+                    WHERE UsuarioId IN ({usuarios_placeholders}) AND MesReferencia = ? AND AnoReferencia = ?
                     AND ISNULL(ValorReal, 0) > 0
                 ), 0) AS RendasRecebidas,
                 ISNULL((
                     SELECT SUM(ISNULL(ValorPrevisto, 0))
                     FROM FIN_Rendas
-                    WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
+                    WHERE UsuarioId IN ({usuarios_placeholders}) AND MesReferencia = ? AND AnoReferencia = ?
                     AND ISNULL(ValorReal, 0) <= 0
                 ), 0) AS RendasAReceber,
                 ISNULL((
                     SELECT SUM(ISNULL(ValorReal, 0))
                     FROM FIN_Lancamentos
-                    WHERE UsuarioId = ? AND Pago = 1
+                    WHERE UsuarioId IN ({usuarios_placeholders}) AND Pago = 1
                     AND MesReferencia = ? AND AnoReferencia = ?
                 ), 0) AS PagasMes,
                 ISNULL((
                     SELECT SUM(ISNULL(ValorEstimado, 0))
                     FROM FIN_Lancamentos
-                    WHERE UsuarioId = ? AND Pago = 0
+                    WHERE UsuarioId IN ({usuarios_placeholders}) AND Pago = 0
                     AND MesReferencia = ? AND AnoReferencia = ?
                 ), 0) AS ContasPendentesMes,
                 ISNULL((
                     SELECT SUM(ISNULL(ValorReal, 0))
                     FROM FIN_Lancamentos
-                    WHERE UsuarioId = ? AND Pago = 1
+                    WHERE UsuarioId IN ({usuarios_placeholders}) AND Pago = 1
                     AND (AnoReferencia < ? OR (AnoReferencia = ? AND MesReferencia <= ?))
                 ), 0) AS PagasAcumuladas,
                 ISNULL((
-                    SELECT TOP 1 SaldoAtual
+                    SELECT SUM(ISNULL(SaldoAtual, 0))
                     FROM FIN_Caixa
-                    WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
+                    WHERE UsuarioId IN ({usuarios_placeholders}) AND MesReferencia = ? AND AnoReferencia = ?
                 ), 0) AS SaldoBancario
-        """, (
-            usuario_id, mes_sel, ano_sel,
-            usuario_id, mes_sel, ano_sel,
-            usuario_id, mes_sel, ano_sel,
-            usuario_id, mes_sel, ano_sel,
-            usuario_id, ano_sel, ano_sel, mes_sel,
-            usuario_id, mes_sel, ano_sel,
-        ))
+        """, tuple(resumo_params))
         resumo_mes = cursor.fetchone()
         rendas_recebidas = float(resumo_mes.RendasRecebidas or 0)
         rendas_a_receber = float(resumo_mes.RendasAReceber or 0)
@@ -1894,11 +1908,11 @@ def dashboard():
         carteiras = listar_carteiras_ativas(cursor, usuario_id)
         resumo_carteiras = obter_resumo_carteiras(cursor, usuario_id)
 
-        if resumo_carteiras['ativas'] > 0 and mes_sel == mes_atual and ano_sel == ano_atual:
+        if len(usuarios_financeiro) == 1 and resumo_carteiras['ativas'] > 0 and mes_sel == mes_atual and ano_sel == ano_atual:
             saldo_bancario = resumo_carteiras['saldo_total']
             sincronizar_caixa_com_carteiras(cursor, usuario_id, mes_sel, ano_sel)
 
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT L.*, C.Nome as CategoriaNome, C.CorHex,
                    W.Nome AS CarteiraNome, W.CorHex AS CarteiraCorHex
             FROM FIN_Lancamentos L
@@ -1906,30 +1920,37 @@ def dashboard():
             LEFT JOIN FIN_Carteiras W
                 ON W.CarteiraId = L.CarteiraId
                 AND W.UsuarioId = L.UsuarioId
-            WHERE L.UsuarioId = ? AND L.MesReferencia = ? AND L.AnoReferencia = ?
+            WHERE L.UsuarioId IN ({usuarios_placeholders}) AND L.MesReferencia = ? AND L.AnoReferencia = ?
             ORDER BY L.DataVencimento ASC
-        """, (usuario_id, mes_sel, ano_sel))
+        """, tuple(usuarios_financeiro) + (mes_sel, ano_sel))
         lancamentos = cursor.fetchall()
 
-        saldo_transportado = saldo_transportado_periodo(cursor, usuario_id, mes_sel, ano_sel)
+        saldo_transportado = saldo_transportado_periodo(
+            cursor,
+            usuario_id,
+            mes_sel,
+            ano_sel,
+            usuarios_ids=usuarios_financeiro,
+        )
         fluxo_caixa = montar_fluxo_caixa_diario(
             cursor,
             usuario_id,
             mes_sel,
             ano_sel,
             saldo_bancario + saldo_transportado,
+            usuarios_ids=usuarios_financeiro,
         )
 
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT TOP 6 
                 AnoReferencia, 
                 MesReferencia,
                 SUM(ISNULL(ValorReal, 0)) as TotalGasto
             FROM FIN_Lancamentos
-            WHERE UsuarioId = ? AND Pago = 1
+            WHERE UsuarioId IN ({usuarios_placeholders}) AND Pago = 1
             GROUP BY AnoReferencia, MesReferencia
             ORDER BY AnoReferencia DESC, MesReferencia DESC
-        """, (usuario_id,))
+        """, tuple(usuarios_financeiro))
         historico_gastos = cursor.fetchall()
 
         historico_gastos.reverse()
@@ -1937,17 +1958,17 @@ def dashboard():
         labels_evolucao = [f"{NOMES_MESES.get(d.MesReferencia, d.MesReferencia)[:3]}/{d.AnoReferencia}" for d in historico_gastos]
         valores_evolucao = [float(d.TotalGasto or 0) for d in historico_gastos]
 
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT 
                 C.Nome, 
                 SUM(ISNULL(L.ValorReal, 0)) as Total,
                 C.CorHex
             FROM FIN_Lancamentos L
             JOIN FIN_Categorias C ON L.CategoriaId = C.CategoriaId
-            WHERE L.UsuarioId = ? AND L.MesReferencia = ? AND L.AnoReferencia = ? AND L.Pago = 1
+            WHERE L.UsuarioId IN ({usuarios_placeholders}) AND L.MesReferencia = ? AND L.AnoReferencia = ? AND L.Pago = 1
             GROUP BY C.Nome, C.CorHex
             ORDER BY Total DESC
-        """, (usuario_id, mes_sel, ano_sel))
+        """, tuple(usuarios_financeiro) + (mes_sel, ano_sel))
         ranking_categorias = cursor.fetchall()
 
         cursor.execute("""
@@ -1958,8 +1979,16 @@ def dashboard():
         """, (usuario_id,))
         categorias = cursor.fetchall()
 
-        resumo_assinaturas = montar_resumo_assinaturas(cursor, usuario_id)
-        resumo_metas = montar_resumo_metas(cursor, usuario_id)
+        resumo_assinaturas = montar_resumo_assinaturas(
+            cursor,
+            usuario_id,
+            usuarios_ids=usuarios_financeiro,
+        )
+        resumo_metas = montar_resumo_metas(
+            cursor,
+            usuario_id,
+            usuarios_ids=usuarios_financeiro,
+        )
 
     ranking_categorias = [
         {

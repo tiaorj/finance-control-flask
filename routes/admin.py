@@ -7,6 +7,28 @@ from zoneinfo import ZoneInfo
 
 admin_bp = Blueprint('admin', __name__)
 
+MODULOS_CADASTRO = [
+    {
+        'codigo': 'finance',
+        'nome': 'DirectTI Finance',
+        'descricao': 'Controle financeiro, contas, entradas e recorrencias.',
+        'checked': True,
+    },
+    {
+        'codigo': 'life',
+        'nome': 'DirectTI Life',
+        'descricao': 'Rotina, tarefas, veiculos e garantias.',
+        'checked': False,
+    },
+    {
+        'codigo': 'careers',
+        'nome': 'DirectTI Careers',
+        'descricao': 'Curriculo e perfil profissional.',
+        'checked': False,
+    },
+]
+
+
 class User(UserMixin):
     def __init__(self, usuario_id, nome, username=None):
         self.id = int(usuario_id)
@@ -33,6 +55,39 @@ def safe_next_url(target):
     if target and target.startswith('/') and not target.startswith('//'):
         return target
     return None
+
+
+def ativar_modulos_usuario(cursor, usuario_id, codigos):
+    codigos_validos = {modulo['codigo'] for modulo in MODULOS_CADASTRO}
+    codigos_selecionados = [codigo for codigo in codigos if codigo in codigos_validos]
+    if not codigos_selecionados:
+        codigos_selecionados = ['finance']
+
+    try:
+        cursor.execute("""
+            SELECT
+                OBJECT_ID('dbo.APP_Modulos', 'U') AS ModulosId,
+                OBJECT_ID('dbo.APP_UsuarioModulos', 'U') AS UsuarioModulosId
+        """)
+        row = cursor.fetchone()
+        if not row or not row[0] or not row[1]:
+            return
+
+        for codigo in codigos_selecionados:
+            cursor.execute("""
+                INSERT INTO APP_UsuarioModulos (UsuarioId, ModuloId)
+                SELECT ?, M.ModuloId
+                FROM APP_Modulos M
+                WHERE M.Codigo = ?
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM APP_UsuarioModulos UM
+                      WHERE UM.UsuarioId = ?
+                        AND UM.ModuloId = M.ModuloId
+                  )
+            """, (usuario_id, codigo, usuario_id))
+    except Exception:
+        return
 
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -71,6 +126,7 @@ def cadastro():
         username = (request.form.get('usuario') or '').strip()
         senha = request.form.get('senha') or ''
         confirmar_senha = request.form.get('confirmar_senha') or ''
+        modulos = request.form.getlist('modulos')
 
         if not nome or not username or not senha:
             flash('Preencha todos os campos obrigatórios.', 'danger')
@@ -93,6 +149,7 @@ def cadastro():
 
             cursor.execute("SELECT UsuarioId, Nome FROM Usuarios WHERE Username = ?", (username,))
             usuario = cursor.fetchone()
+            ativar_modulos_usuario(cursor, usuario.UsuarioId, modulos)
 
         user = User(usuario.UsuarioId, usuario.Nome, username)
         login_user(user)
@@ -103,7 +160,7 @@ def cadastro():
         flash('Conta criada com sucesso. Bem-vindo à plataforma!', 'success')
         return redirect(url_for('financas.dashboard'))
 
-    return render_template('admin/cadastro.html')
+    return render_template('admin/cadastro.html', modulos_cadastro=MODULOS_CADASTRO)
 
 @admin_bp.route('/logout')
 def logout():

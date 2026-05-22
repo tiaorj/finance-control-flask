@@ -6,7 +6,6 @@ from routes.empresa import empresa_bp
 from routes.curriculo import curriculo_bp
 from routes.admin import admin_bp, load_user
 from routes.main import main_bp
-from datetime import datetime
 from routes.dashboard import dashboard_bp
 from routes.projetos import projetos_bp
 from routes.habilidades import habilidades_bp
@@ -22,6 +21,10 @@ from routes.metas import metas_bp
 from routes.tarefas import tarefas_bp
 from routes.veiculos import veiculos_bp
 from routes.garantias import garantias_bp
+from routes.agenda import agenda_bp
+from commands.notificacoes import registrar_comandos
+from helpers.modulos import usuario_tem_modulo
+from scheduler import configurar_scheduler
 
 load_dotenv()
 
@@ -47,10 +50,8 @@ login_manager.user_loader(load_user)
 def formata_data(value):
     if not value: return "Atual"
     try:
-        # Se for string do SQL Server, tentamos converter
         return value.strftime('%m/%Y')
     except:
-        # Se já for string ou falhar, retorna o que for possível
         return str(value)[:10]
 
 app.register_blueprint(admin_bp)
@@ -67,15 +68,15 @@ app.register_blueprint(metas_bp)
 app.register_blueprint(tarefas_bp)
 app.register_blueprint(veiculos_bp)
 app.register_blueprint(garantias_bp)
+app.register_blueprint(agenda_bp)
 app.register_blueprint(main_bp)
 
-# CONFIGURAÇÃO DE E-MAIL (Exemplo Gmail)
-mail = Mail(app) # Inicializa o motor de e-mail
+mail = Mail(app)
 
-# Injetar o objeto mail nas rotas se necessário, ou importar direto
 app.extensions['mail'] = mail
+registrar_comandos(app)
+configurar_scheduler(app)
 
-# Informações base da DIRECTI / Sebastião
 INFO_BASE = {
     'nome': 'DIRECT TI SOLUÇÕES EM TECNOLOGIA LTDA',
     'especialista': 'SEBASTIÃO OLIVEIRA',
@@ -89,14 +90,12 @@ INFO_BASE = {
     }
 }
 
-# Injetar INFO_BASE automaticamente em todos os templates
 @app.context_processor
 def inject_info():
-    return dict(INFO_BASE=INFO_BASE)
+    return dict(INFO_BASE=INFO_BASE, usuario_tem_modulo=usuario_tem_modulo)
 
-# Registro dos módulos (Blueprints)
 app.register_blueprint(empresa_bp)
-app.register_blueprint(curriculo_bp)  # Cuida do Sobre (/sobre)
+app.register_blueprint(curriculo_bp)
 
 @app.errorhandler(404)
 def page_not_found(e):
@@ -104,21 +103,13 @@ def page_not_found(e):
 
 @app.errorhandler(500)
 def internal_server_error(e):
-    # Aqui você pode enviar um log ou e-mail para si mesmo avisando do erro
     return render_template('errors/500.html'), 500
-
-@app.template_filter('split_techs')
-def split_techs(value):
-    if not value: return []
-    return [t.strip() for t in value.split(',')]
 
 @app.template_filter('formato_real')
 def formato_real(valor):
     if valor is None:
         return "R$ 0,00"
-    # Formata com separador de milhar americano primeiro: 5,236.78
     v = "{:,.2f}".format(valor)
-    # Inverte os sinais: vira 5.236,78
     return v.replace(',', 'v').replace('.', ',').replace('v', '.')
     
 if __name__ == "__main__":

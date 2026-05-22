@@ -279,7 +279,7 @@
     {% set usa_curriculo = session.get('usa_curriculo', True) %}
     {% set financeiro_config_ativo = endpoint in ['financas.adicionar_gasto', 'financas.categorias', 'financas.categorias_rendas'] %}
     {% set curriculo_admin_ativo = usa_curriculo and (endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.')) %}
-    {% set admin_menu_ativo = endpoint.startswith('dashboard.') or endpoint.startswith('financas.') or endpoint.startswith('assinaturas.') or endpoint.startswith('metas.') or endpoint.startswith('tarefas.') or endpoint.startswith('veiculos.') or endpoint.startswith('garantias.') or (usa_curriculo and (endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.') or endpoint.startswith('curriculo.'))) %}
+    {% set admin_menu_ativo = endpoint.startswith('dashboard.') or endpoint.startswith('financas.') or endpoint.startswith('assinaturas.') or endpoint.startswith('metas.') or endpoint.startswith('agenda.') or endpoint.startswith('tarefas.') or endpoint.startswith('veiculos.') or endpoint.startswith('garantias.') or (usa_curriculo and (endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.') or endpoint.startswith('curriculo.'))) %}
     {% set app_shell_ativo = current_user.is_authenticated and admin_menu_ativo %}
 
     {% if app_shell_ativo %}
@@ -318,102 +318,113 @@
                     </div>
                 </div>
 
-                <div class="app-nav-section">
-                    <span class="app-nav-title">Financeiro</span>
-                    <div class="app-nav-list">
-                        <a class="app-nav-link {{ 'active' if endpoint == 'financas.dashboard' else '' }}" href="{{ url_for('financas.dashboard') }}">
-                            <i class="bi bi-activity"></i>
-                            <span class="app-nav-copy">
-                                <strong>Fluxo financeiro</strong>
-                                <small>Saldo, contas e proje&ccedil;&otilde;es</small>
-                            </span>
-                        </a>
-                        <a class="app-nav-link {{ 'active' if endpoint == 'financas.gerenciar_rendas' else '' }}" href="{{ url_for('financas.gerenciar_rendas') }}">
-                            <i class="bi bi-graph-up-arrow"></i>
-                            <span class="app-nav-copy">
-                                <strong>Entradas</strong>
-                                <small>Rendas e recebimentos</small>
-                            </span>
-                        </a>
-                        <a class="app-nav-link {{ 'active' if endpoint == 'financas.rendas_recorrentes' else '' }}" href="{{ url_for('financas.rendas_recorrentes') }}">
-                            <i class="bi bi-arrow-repeat"></i>
-                            <span class="app-nav-copy">
-                                <strong>Entradas fixas</strong>
-                                <small>Sal&aacute;rio, pro-labore e alugu&eacute;is</small>
-                            </span>
-                        </a>
-                        <a class="app-nav-link {{ 'active' if endpoint == 'financas.lancamentos_recorrentes' else '' }}" href="{{ url_for('financas.lancamentos_recorrentes') }}">
-                            <i class="bi bi-calendar2-week"></i>
-                            <span class="app-nav-copy">
-                                <strong>Despesas fixas</strong>
-                                <small>Contas que voltam todo m&ecirc;s</small>
-                            </span>
-                        </a>
-                        <a class="app-nav-link {{ 'active' if endpoint == 'financas.carteiras' else '' }}" href="{{ url_for('financas.carteiras') }}">
-                            <i class="bi bi-wallet2"></i>
-                            <span class="app-nav-copy">
-                                <strong>Contas e carteiras</strong>
-                                <small>Bancos, dinheiro e saldos</small>
-                            </span>
-                        </a>
-                        <a class="app-nav-link {{ 'active' if endpoint.startswith('assinaturas.') else '' }}" href="{{ url_for('assinaturas.lista') }}">
-                            <i class="bi bi-repeat"></i>
-                            <span class="app-nav-copy">
-                                <strong>Assinaturas</strong>
-                                <small>Servi&ccedil;os recorrentes</small>
-                            </span>
-                        </a>
-                        <a class="app-nav-link {{ 'active' if endpoint.startswith('metas.') else '' }}" href="{{ url_for('metas.lista') }}">
-                            <i class="bi bi-piggy-bank"></i>
-                            <span class="app-nav-copy">
-                                <strong>Metas</strong>
-                                <small>Reservas e objetivos</small>
-                            </span>
-                        </a>
+                {% if usuario_tem_modulo('finance') %}
+                    <div class="app-nav-section">
+                        <span class="app-nav-title">Financeiro</span>
+                        <div class="app-nav-list">
+                            <a class="app-nav-link {{ 'active' if endpoint == 'financas.dashboard' else '' }}" href="{{ url_for('financas.dashboard') }}">
+                                <i class="bi bi-activity"></i>
+                                <span class="app-nav-copy">
+                                    <strong>Fluxo financeiro</strong>
+                                    <small>Saldo, contas e proje&ccedil;&otilde;es</small>
+                                </span>
+                            </a>
+                            <a class="app-nav-link {{ 'active' if endpoint == 'financas.gerenciar_rendas' else '' }}" href="{{ url_for('financas.gerenciar_rendas') }}">
+                                <i class="bi bi-graph-up-arrow"></i>
+                                <span class="app-nav-copy">
+                                    <strong>Entradas</strong>
+                                    <small>Rendas e recebimentos</small>
+                                </span>
+                            </a>
+                            <a class="app-nav-link {{ 'active' if endpoint == 'financas.rendas_recorrentes' else '' }}" href="{{ url_for('financas.rendas_recorrentes') }}">
+                                <i class="bi bi-arrow-repeat"></i>
+                                <span class="app-nav-copy">
+                                    <strong>Entradas fixas</strong>
+                                    <small>Sal&aacute;rio, pro-labore e alugu&eacute;is</small>
+                                </span>
+                            </a>
+                            <a class="app-nav-link {{ 'active' if endpoint == 'financas.lancamentos_recorrentes' else '' }}" href="{{ url_for('financas.lancamentos_recorrentes') }}">
+                                <i class="bi bi-calendar2-week"></i>
+                                <span class="app-nav-copy">
+                                    <strong>Despesas fixas</strong>
+                                    <small>Contas que voltam todo m&ecirc;s</small>
+                                </span>
+                            </a>
+                            <a class="app-nav-link {{ 'active' if endpoint == 'financas.carteiras' else '' }}" href="{{ url_for('financas.carteiras') }}">
+                                <i class="bi bi-wallet2"></i>
+                                <span class="app-nav-copy">
+                                    <strong>Contas e carteiras</strong>
+                                    <small>Bancos, dinheiro e saldos</small>
+                                </span>
+                            </a>
+                            <a class="app-nav-link {{ 'active' if endpoint.startswith('assinaturas.') else '' }}" href="{{ url_for('assinaturas.lista') }}">
+                                <i class="bi bi-repeat"></i>
+                                <span class="app-nav-copy">
+                                    <strong>Assinaturas</strong>
+                                    <small>Servi&ccedil;os recorrentes</small>
+                                </span>
+                            </a>
+                            <a class="app-nav-link {{ 'active' if endpoint.startswith('metas.') else '' }}" href="{{ url_for('metas.lista') }}">
+                                <i class="bi bi-piggy-bank"></i>
+                                <span class="app-nav-copy">
+                                    <strong>Metas</strong>
+                                    <small>Reservas e objetivos</small>
+                                </span>
+                            </a>
 
-                        <div class="app-nav-sublist">
-                            <span class="app-nav-subtitle">Atalhos e configura&ccedil;&otilde;es</span>
-                            <a class="app-nav-sublink {{ 'active' if endpoint == 'financas.adicionar_gasto' else '' }}" href="{{ url_for('financas.adicionar_gasto') }}">
-                                <i class="bi bi-plus-circle"></i>Novo lan&ccedil;amento
+                            <div class="app-nav-sublist">
+                                <span class="app-nav-subtitle">Atalhos e configura&ccedil;&otilde;es</span>
+                                <a class="app-nav-sublink {{ 'active' if endpoint == 'financas.adicionar_gasto' else '' }}" href="{{ url_for('financas.adicionar_gasto') }}">
+                                    <i class="bi bi-plus-circle"></i>Novo lan&ccedil;amento
+                                </a>
+                                <a class="app-nav-sublink {{ 'active' if endpoint == 'financas.categorias' else '' }}" href="{{ url_for('financas.categorias') }}">
+                                    <i class="bi bi-tags"></i>Categorias de gastos
+                                </a>
+                                <a class="app-nav-sublink {{ 'active' if endpoint == 'financas.categorias_rendas' else '' }}" href="{{ url_for('financas.categorias_rendas') }}">
+                                    <i class="bi bi-tags"></i>Categorias de entradas
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if usuario_tem_modulo('life') %}
+                    <div class="app-nav-section">
+                        <span class="app-nav-title">Rotina</span>
+                        <div class="app-nav-list">
+                            <a class="app-nav-link {{ 'active' if endpoint.startswith('agenda.') else '' }}" href="{{ url_for('agenda.calendario') }}">
+                                <i class="bi bi-calendar3"></i>
+                                <span class="app-nav-copy">
+                                    <strong>Agenda</strong>
+                                    <small>Contas, tarefas e lembretes</small>
+                                </span>
                             </a>
-                            <a class="app-nav-sublink {{ 'active' if endpoint == 'financas.categorias' else '' }}" href="{{ url_for('financas.categorias') }}">
-                                <i class="bi bi-tags"></i>Categorias de gastos
+                            <a class="app-nav-link {{ 'active' if endpoint.startswith('tarefas.') else '' }}" href="{{ url_for('tarefas.lista') }}">
+                                <i class="bi bi-calendar2-check"></i>
+                                <span class="app-nav-copy">
+                                    <strong>Checklist</strong>
+                                    <small>Tarefas recorrentes</small>
+                                </span>
                             </a>
-                            <a class="app-nav-sublink {{ 'active' if endpoint == 'financas.categorias_rendas' else '' }}" href="{{ url_for('financas.categorias_rendas') }}">
-                                <i class="bi bi-tags"></i>Categorias de entradas
+                            <a class="app-nav-link {{ 'active' if endpoint.startswith('veiculos.') else '' }}" href="{{ url_for('veiculos.lista') }}">
+                                <i class="bi bi-car-front"></i>
+                                <span class="app-nav-copy">
+                                    <strong>Ve&iacute;culos</strong>
+                                    <small>Manuten&ccedil;&atilde;o e documentos</small>
+                                </span>
+                            </a>
+                            <a class="app-nav-link {{ 'active' if endpoint.startswith('garantias.') else '' }}" href="{{ url_for('garantias.lista') }}">
+                                <i class="bi bi-shield-check"></i>
+                                <span class="app-nav-copy">
+                                    <strong>Garantias</strong>
+                                    <small>Notas fiscais e prazos</small>
+                                </span>
                             </a>
                         </div>
                     </div>
-                </div>
+                {% endif %}
 
-                <div class="app-nav-section">
-                    <span class="app-nav-title">Rotina</span>
-                    <div class="app-nav-list">
-                        <a class="app-nav-link {{ 'active' if endpoint.startswith('tarefas.') else '' }}" href="{{ url_for('tarefas.lista') }}">
-                            <i class="bi bi-calendar2-check"></i>
-                            <span class="app-nav-copy">
-                                <strong>Checklist</strong>
-                                <small>Tarefas recorrentes</small>
-                            </span>
-                        </a>
-                        <a class="app-nav-link {{ 'active' if endpoint.startswith('veiculos.') else '' }}" href="{{ url_for('veiculos.lista') }}">
-                            <i class="bi bi-car-front"></i>
-                            <span class="app-nav-copy">
-                                <strong>Ve&iacute;culos</strong>
-                                <small>Manuten&ccedil;&atilde;o e documentos</small>
-                            </span>
-                        </a>
-                        <a class="app-nav-link {{ 'active' if endpoint.startswith('garantias.') else '' }}" href="{{ url_for('garantias.lista') }}">
-                            <i class="bi bi-shield-check"></i>
-                            <span class="app-nav-copy">
-                                <strong>Garantias</strong>
-                                <small>Notas fiscais e prazos</small>
-                            </span>
-                        </a>
-                    </div>
-                </div>
-
-                {% if usa_curriculo %}
+                {% if usuario_tem_modulo('careers') %}
                     <div class="app-nav-section">
                         <span class="app-nav-title">Perfil profissional</span>
                         <div class="app-nav-list">
@@ -459,11 +470,7 @@
                 <a class="app-nav-link" href="{{ url_for('main.index') }}">
                     <i class="bi bi-globe2"></i>Site p&uacute;blico
                 </a>
-                {% if usa_curriculo %}
-                    <a class="app-nav-link" href="{{ url_for('curriculo.gerar_pdf') }}" target="_blank" rel="noopener">
-                        <i class="bi bi-file-pdf"></i>Baixar PDF
-                    </a>
-                {% endif %}
+
                 <a class="app-nav-link" href="{{ url_for('admin.logout') }}">
                     <i class="bi bi-box-arrow-right"></i>Sair
                 </a>

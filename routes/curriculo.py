@@ -65,12 +65,10 @@ def salvar_foto_perfil(usuario_id):
     foto.save(pasta_destino / nome_arquivo)
     return f'uploads/curriculos/{nome_arquivo}'
 
-# FUNÇÃO AUXILIAR: Centraliza a inteligência de busca
 def get_dados_completos_curriculo(usuario_id):
     with get_db_cursor() as cursor:
         perfil = get_perfil_curriculo(cursor, usuario_id)
 
-        # 1. BUSCAR EXPERIÊNCIAS
         cursor.execute("""
             SELECT E.ExperienciaId, Em.NomeEmpresa, E.Cargo, E.ResumoCurto,
                 FORMAT(E.DataInicio, 'MM/yyyy') + ' - ' + ISNULL(FORMAT(E.DataFim, 'MM/yyyy'), 'Atual') as Periodo,
@@ -82,7 +80,6 @@ def get_dados_completos_curriculo(usuario_id):
         """, (usuario_id,))
         exps_rows = cursor.fetchall()
 
-        # 2. BUSCAR DETALHES
         cursor.execute("""
             SELECT D.ExperienciaId, D.DescricaoConquista
             FROM ExperienciaDetalhe D
@@ -108,7 +105,6 @@ def get_dados_completos_curriculo(usuario_id):
                 'conquistas': detalhes_map.get(row.ExperienciaId, [])
             })
 
-        # 3. HABILIDADES
         cursor.execute("""
             SELECT C.NomeCategoria, STRING_AGG(H.Descricao, ', ') as Itens
             FROM Habilidade H
@@ -118,7 +114,6 @@ def get_dados_completos_curriculo(usuario_id):
         """, (usuario_id,))
         habilidades = cursor.fetchall()
 
-        # 4. FORMAÇÃO
         cursor.execute("""
             SELECT NomeCurso, NomeInstituicao, Descricao, NomeCursoAbreviado, 
             CAST(AnoInicio AS VARCHAR) + ' - ' + ISNULL(CAST(AnoConclusao AS VARCHAR), 'Cursando') as PeriodoFormacao
@@ -136,7 +131,6 @@ def get_dados_completos_curriculo(usuario_id):
             'NomeCursoAbreviado': f.NomeCursoAbreviado
         } for f in formacao_rows]
 
-        # 5. CERTIFICAÇÕES
         cursor.execute("""
             SELECT Nome, Instituicao, IconeClass, LinkVerificacao
             FROM Certificacoes
@@ -217,14 +211,10 @@ def especialista():
 @curriculo_bp.route('/gerar-pdf')
 @login_required
 def gerar_pdf():
-#@curriculo_bp.route('/debug-html')
-#def debug_html():
     dados = get_dados_completos_curriculo(int(current_user.get_id()))
-        
-    # 2. Renderizar o HTML específico para o PDF
+
     html = render_template('pdf_template.html', **dados)
 
-    # 3. Converter HTML para PDF
     result = BytesIO()
     pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result, encoding="UTF-8")
 
@@ -233,6 +223,5 @@ def gerar_pdf():
         response.headers['Content-Type'] = 'application/pdf'
         response.headers['Content-Disposition'] = 'attachment; filename=curriculo.pdf'
         return response
-    
+
     return "Erro ao gerar PDF", 500
-    #return render_template('pdf_template.html', **dados)

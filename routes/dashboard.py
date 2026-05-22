@@ -5,6 +5,9 @@ from flask import Blueprint, render_template
 from flask_login import current_user, login_required
 
 from database import get_db_cursor
+from helpers.modulos import usuario_tem_modulo
+from helpers.sql import placeholders_sql
+from helpers.workspaces import usuarios_visiveis_financeiro
 from routes.financeiro_integracoes import sincronizar_assinaturas_periodo
 from routes.financas import (
     listar_carteiras_ativas,
@@ -46,77 +49,110 @@ def _perfil_status(cursor, usuario_id):
 def index():
     usuario_id = int(current_user.get_id())
     hoje = datetime.now(ZoneInfo('America/Sao_Paulo'))
+    modulo_financeiro = usuario_tem_modulo('finance')
+    modulo_life = usuario_tem_modulo('life')
+    modulo_carreiras = usuario_tem_modulo('careers')
 
-    with get_db_cursor() as cursor:
-        sincronizar_assinaturas_periodo(cursor, usuario_id, hoje.month, hoje.year)
-        sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, hoje.month, hoje.year)
+    saldo_atual = 0.0
+    saldo_previsto = 0.0
+    rendas_recebidas = 0.0
+    rendas_a_receber = 0.0
+    contas_pendentes = 0.0
+    proximas_contas = []
+    perfil_percentual = 0
+    perfil_itens = []
+    resumo_tarefas = {'proximas': []}
+    resumo_veiculos = {'proximos': []}
+    resumo_garantias = {'proximas': []}
+    carteiras = []
+    resumo_carteiras = {'ativas': 0, 'saldo_total': 0.0}
 
-        cursor.execute("""
-            SELECT
-                ISNULL((
-                    SELECT SUM(ISNULL(ValorReal, 0))
-                    FROM FIN_Rendas
-                    WHERE UsuarioId = ?
-                    AND MesReferencia = ?
-                    AND AnoReferencia = ?
-                    AND ISNULL(ValorReal, 0) > 0
-                ), 0) AS RendasRecebidas,
-                ISNULL((
-                    SELECT SUM(ISNULL(ValorPrevisto, 0))
-                    FROM FIN_Rendas
-                    WHERE UsuarioId = ?
-                    AND MesReferencia = ?
-                    AND AnoReferencia = ?
-                    AND ISNULL(ValorReal, 0) <= 0
-                ), 0) AS RendasAReceber,
-                ISNULL((
-                    SELECT SUM(ISNULL(ValorEstimado, 0))
-                    FROM FIN_Lancamentos
-                    WHERE UsuarioId = ?
-                    AND MesReferencia = ?
-                    AND AnoReferencia = ?
-                    AND Pago = 0
-                ), 0) AS ContasPendentes,
-                ISNULL((
-                    SELECT TOP 1 SaldoAtual
-                    FROM FIN_Caixa
-                    WHERE UsuarioId = ?
-                    AND MesReferencia = ?
-                    AND AnoReferencia = ?
-                ), 0) AS SaldoAtual
-        """, (
-            usuario_id, hoje.month, hoje.year,
-            usuario_id, hoje.month, hoje.year,
-            usuario_id, hoje.month, hoje.year,
-            usuario_id, hoje.month, hoje.year,
-        ))
-        financeiro = cursor.fetchone()
-        carteiras = listar_carteiras_ativas(cursor, usuario_id)
-        resumo_carteiras = obter_resumo_carteiras(cursor, usuario_id)
+    if modulo_financeiro or modulo_life or modulo_carreiras:
+        with get_db_cursor() as cursor:
+            if modulo_financeiro:
+                sincronizar_assinaturas_periodo(cursor, usuario_id, hoje.month, hoje.year)
+                sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, hoje.month, hoje.year)
+                usuarios_financeiro = usuarios_visiveis_financeiro(cursor, usuario_id) or [usuario_id]
+                usuarios_placeholders = placeholders_sql(usuarios_financeiro)
 
-        if resumo_carteiras['ativas'] > 0:
-            sincronizar_caixa_com_carteiras(cursor, usuario_id, hoje.month, hoje.year)
+                financeiro_params = []
+                financeiro_params.extend(usuarios_financeiro)
+                financeiro_params.extend([hoje.month, hoje.year])
+                financeiro_params.extend(usuarios_financeiro)
+                financeiro_params.extend([hoje.month, hoje.year])
+                financeiro_params.extend(usuarios_financeiro)
+                financeiro_params.extend([hoje.month, hoje.year])
+                financeiro_params.extend(usuarios_financeiro)
+                financeiro_params.extend([hoje.month, hoje.year])
 
-        cursor.execute("""
-            SELECT TOP 4 L.LancamentoId, L.Descricao, L.ValorEstimado, L.DataVencimento, C.Nome AS CategoriaNome
-            FROM FIN_Lancamentos L
-            LEFT JOIN FIN_Categorias C ON L.CategoriaId = C.CategoriaId
-            WHERE L.UsuarioId = ?
-            AND L.Pago = 0
-            ORDER BY L.DataVencimento ASC
-        """, (usuario_id,))
-        proximas_contas = cursor.fetchall()
+                cursor.execute(f"""
+                    SELECT
+                        ISNULL((
+                            SELECT SUM(ISNULL(ValorReal, 0))
+                            FROM FIN_Rendas
+                            WHERE UsuarioId IN ({usuarios_placeholders})
+                            AND MesReferencia = ?
+                            AND AnoReferencia = ?
+                            AND ISNULL(ValorReal, 0) > 0
+                        ), 0) AS RendasRecebidas,
+                        ISNULL((
+                            SELECT SUM(ISNULL(ValorPrevisto, 0))
+                            FROM FIN_Rendas
+                            WHERE UsuarioId IN ({usuarios_placeholders})
+                            AND MesReferencia = ?
+                            AND AnoReferencia = ?
+                            AND ISNULL(ValorReal, 0) <= 0
+                        ), 0) AS RendasAReceber,
+                        ISNULL((
+                            SELECT SUM(ISNULL(ValorEstimado, 0))
+                            FROM FIN_Lancamentos
+                            WHERE UsuarioId IN ({usuarios_placeholders})
+                            AND MesReferencia = ?
+                            AND AnoReferencia = ?
+                            AND Pago = 0
+                        ), 0) AS ContasPendentes,
+                        ISNULL((
+                            SELECT SUM(ISNULL(SaldoAtual, 0))
+                            FROM FIN_Caixa
+                            WHERE UsuarioId IN ({usuarios_placeholders})
+                            AND MesReferencia = ?
+                            AND AnoReferencia = ?
+                        ), 0) AS SaldoAtual
+                """, tuple(financeiro_params))
+                financeiro = cursor.fetchone()
+                carteiras = listar_carteiras_ativas(cursor, usuario_id)
+                resumo_carteiras = obter_resumo_carteiras(cursor, usuario_id)
 
-        perfil_percentual, perfil_itens = _perfil_status(cursor, usuario_id)
-        resumo_tarefas = montar_resumo_tarefas(cursor, usuario_id)
-        resumo_veiculos = montar_resumo_veiculos(cursor, usuario_id)
-        resumo_garantias = montar_resumo_garantias(cursor, usuario_id)
+                if len(usuarios_financeiro) == 1 and resumo_carteiras['ativas'] > 0:
+                    sincronizar_caixa_com_carteiras(cursor, usuario_id, hoje.month, hoje.year)
 
-    saldo_atual = resumo_carteiras['saldo_total'] if resumo_carteiras['ativas'] > 0 else float(financeiro.SaldoAtual or 0)
-    rendas_recebidas = float(financeiro.RendasRecebidas or 0)
-    rendas_a_receber = float(financeiro.RendasAReceber or 0)
-    contas_pendentes = float(financeiro.ContasPendentes or 0)
-    saldo_previsto = saldo_atual + rendas_a_receber - contas_pendentes
+                cursor.execute(f"""
+                    SELECT TOP 4 L.LancamentoId, L.Descricao, L.ValorEstimado, L.DataVencimento, C.Nome AS CategoriaNome
+                    FROM FIN_Lancamentos L
+                    LEFT JOIN FIN_Categorias C ON L.CategoriaId = C.CategoriaId
+                    WHERE L.UsuarioId IN ({usuarios_placeholders})
+                    AND L.Pago = 0
+                    ORDER BY L.DataVencimento ASC
+                """, tuple(usuarios_financeiro))
+                proximas_contas = cursor.fetchall()
+
+                saldo_atual = (
+                    resumo_carteiras['saldo_total']
+                    if len(usuarios_financeiro) == 1 and resumo_carteiras['ativas'] > 0
+                    else float(financeiro.SaldoAtual or 0)
+                )
+                rendas_recebidas = float(financeiro.RendasRecebidas or 0)
+                rendas_a_receber = float(financeiro.RendasAReceber or 0)
+                contas_pendentes = float(financeiro.ContasPendentes or 0)
+                saldo_previsto = saldo_atual + rendas_a_receber - contas_pendentes
+
+            if modulo_carreiras:
+                perfil_percentual, perfil_itens = _perfil_status(cursor, usuario_id)
+
+            if modulo_life:
+                resumo_tarefas = montar_resumo_tarefas(cursor, usuario_id)
+                resumo_veiculos = montar_resumo_veiculos(cursor, usuario_id)
+                resumo_garantias = montar_resumo_garantias(cursor, usuario_id)
 
     servicos = [
         {
@@ -183,6 +219,9 @@ def index():
 
     return render_template(
         'admin/dashboard.html',
+        modulo_financeiro=modulo_financeiro,
+        modulo_life=modulo_life,
+        modulo_carreiras=modulo_carreiras,
         mes_atual=hoje.strftime('%m/%Y'),
         saldo_atual=saldo_atual,
         saldo_previsto=saldo_previsto,
