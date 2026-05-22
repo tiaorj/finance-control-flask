@@ -33,50 +33,6 @@ def usuario_atual_id():
     return int(current_user.get_id())
 
 
-def garantir_tabelas_tarefas(cursor):
-    cursor.execute("""
-        IF OBJECT_ID('dbo.APP_TarefasRecorrentes', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.APP_TarefasRecorrentes (
-                TarefaId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                UsuarioId INT NOT NULL,
-                Titulo NVARCHAR(140) NOT NULL,
-                Categoria NVARCHAR(80) NULL,
-                Periodicidade NVARCHAR(20) NOT NULL,
-                IntervaloMeses INT NOT NULL DEFAULT 1,
-                ProximaData DATE NOT NULL,
-                UltimaConclusao DATETIME2 NULL,
-                Ativa BIT NOT NULL DEFAULT 1,
-                Observacoes NVARCHAR(500) NULL,
-                DataCriacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                DataAtualizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                CONSTRAINT FK_APP_TarefasRecorrentes_Usuarios
-                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
-                CONSTRAINT CK_APP_TarefasRecorrentes_Periodicidade
-                    CHECK (Periodicidade IN ('mensal', 'bimestral', 'trimestral', 'semestral', 'anual', 'personalizado')),
-                CONSTRAINT CK_APP_TarefasRecorrentes_Intervalo
-                    CHECK (IntervaloMeses > 0)
-            )
-        END
-
-        IF OBJECT_ID('dbo.APP_TarefaConclusoes', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.APP_TarefaConclusoes (
-                ConclusaoId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                TarefaId INT NOT NULL,
-                UsuarioId INT NOT NULL,
-                DataConclusao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                ProximaDataGerada DATE NULL,
-                Observacao NVARCHAR(300) NULL,
-                CONSTRAINT FK_APP_TarefaConclusoes_Tarefas
-                    FOREIGN KEY (TarefaId) REFERENCES dbo.APP_TarefasRecorrentes(TarefaId),
-                CONSTRAINT FK_APP_TarefaConclusoes_Usuarios
-                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId)
-            )
-        END
-    """)
-
-
 def normalizar_data(valor):
     if isinstance(valor, datetime):
         return valor.date()
@@ -153,7 +109,6 @@ def montar_tarefa(row, hoje=None):
 
 
 def montar_resumo_tarefas(cursor, usuario_id, hoje=None):
-    garantir_tabelas_tarefas(cursor)
     hoje = hoje or date.today()
     fim_mes = date(hoje.year, hoje.month, monthrange(hoje.year, hoje.month)[1])
 
@@ -246,7 +201,6 @@ def form(id):
             return redirect(url_for('tarefas.form', id=id) if id else url_for('tarefas.form'))
 
         with get_db_cursor() as cursor:
-            garantir_tabelas_tarefas(cursor)
             if id:
                 cursor.execute("""
                     UPDATE APP_TarefasRecorrentes
@@ -269,7 +223,6 @@ def form(id):
     tarefa = None
     if id:
         with get_db_cursor() as cursor:
-            garantir_tabelas_tarefas(cursor)
             cursor.execute("""
                 SELECT TarefaId, Titulo, Categoria, Periodicidade, IntervaloMeses,
                        ProximaData, UltimaConclusao, Ativa, Observacoes
@@ -294,7 +247,6 @@ def concluir(id):
     destino = next_url if next_url and next_url.startswith('/') and not next_url.startswith('//') else url_for('tarefas.lista')
 
     with get_db_cursor() as cursor:
-        garantir_tabelas_tarefas(cursor)
         cursor.execute("""
             SELECT TarefaId, ProximaData, IntervaloMeses
             FROM APP_TarefasRecorrentes
@@ -335,7 +287,6 @@ def pular(id):
     usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
-        garantir_tabelas_tarefas(cursor)
         cursor.execute("""
             SELECT TarefaId, ProximaData, IntervaloMeses
             FROM APP_TarefasRecorrentes
@@ -370,7 +321,6 @@ def excluir(id):
     usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
-        garantir_tabelas_tarefas(cursor)
         cursor.execute("DELETE FROM APP_TarefaConclusoes WHERE TarefaId = ? AND UsuarioId = ?", (id, usuario_id))
         cursor.execute("DELETE FROM APP_TarefasRecorrentes WHERE TarefaId = ? AND UsuarioId = ?", (id, usuario_id))
 

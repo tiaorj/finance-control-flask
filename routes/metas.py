@@ -28,48 +28,6 @@ def parse_money(valor, default=0.0):
         return default
 
 
-def garantir_tabelas_metas(cursor):
-    cursor.execute("""
-        IF OBJECT_ID('dbo.FIN_Metas', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.FIN_Metas (
-                MetaId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                UsuarioId INT NOT NULL,
-                Nome NVARCHAR(120) NOT NULL,
-                ValorAlvo DECIMAL(12,2) NOT NULL,
-                ValorAtual DECIMAL(12,2) NOT NULL DEFAULT 0,
-                DataAlvo DATE NULL,
-                CorHex NVARCHAR(20) NULL,
-                Ativa BIT NOT NULL DEFAULT 1,
-                Observacoes NVARCHAR(500) NULL,
-                DataCriacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                DataAtualizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                CONSTRAINT FK_FIN_Metas_Usuarios
-                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId)
-            )
-        END
-
-        IF OBJECT_ID('dbo.FIN_MetaMovimentacoes', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.FIN_MetaMovimentacoes (
-                MovimentacaoId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                MetaId INT NOT NULL,
-                UsuarioId INT NOT NULL,
-                Tipo NVARCHAR(20) NOT NULL,
-                Valor DECIMAL(12,2) NOT NULL,
-                Observacao NVARCHAR(300) NULL,
-                DataMovimentacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                CONSTRAINT FK_FIN_MetaMovimentacoes_Metas
-                    FOREIGN KEY (MetaId) REFERENCES dbo.FIN_Metas(MetaId),
-                CONSTRAINT FK_FIN_MetaMovimentacoes_Usuarios
-                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
-                CONSTRAINT CK_FIN_MetaMovimentacoes_Tipo
-                    CHECK (Tipo IN ('aporte', 'retirada'))
-            )
-        END
-    """)
-
-
 def normalizar_data(valor):
     if isinstance(valor, date):
         return valor
@@ -104,7 +62,6 @@ def montar_meta(row):
 
 
 def montar_resumo_metas(cursor, usuario_id):
-    garantir_tabelas_metas(cursor)
     cursor.execute("""
         SELECT MetaId, Nome, ValorAlvo, ValorAtual, DataAlvo, CorHex, Ativa, Observacoes
         FROM FIN_Metas
@@ -194,7 +151,6 @@ def form(id):
                 return redirect(url_for('metas.form', id=id) if id else url_for('metas.form'))
 
         with get_db_cursor() as cursor:
-            garantir_tabelas_metas(cursor)
             mes_ref, ano_ref = periodo_atual()
             if id:
                 cursor.execute("""
@@ -250,7 +206,6 @@ def form(id):
     meta = None
     if id:
         with get_db_cursor() as cursor:
-            garantir_tabelas_metas(cursor)
             cursor.execute("""
                 SELECT MetaId, Nome, ValorAlvo, ValorAtual, DataAlvo, CorHex, Ativa, Observacoes
                 FROM FIN_Metas
@@ -277,7 +232,6 @@ def movimentar(id):
         return redirect(url_for('metas.lista'))
 
     with get_db_cursor() as cursor:
-        garantir_tabelas_metas(cursor)
         cursor.execute("""
             SELECT ValorAtual
             FROM FIN_Metas
@@ -321,7 +275,6 @@ def excluir(id):
     usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
-        garantir_tabelas_metas(cursor)
         cursor.execute("DELETE FROM FIN_MetaMovimentacoes WHERE MetaId = ? AND UsuarioId = ?", (id, usuario_id))
         cursor.execute("DELETE FROM FIN_Metas WHERE MetaId = ? AND UsuarioId = ?", (id, usuario_id))
 

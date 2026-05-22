@@ -28,36 +28,6 @@ def usuario_atual_id():
     return int(current_user.get_id())
 
 
-def garantir_tabela_garantias(cursor):
-    cursor.execute("""
-        IF OBJECT_ID('dbo.APP_BensGarantia', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.APP_BensGarantia (
-                BemId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                UsuarioId INT NOT NULL,
-                Nome NVARCHAR(140) NOT NULL,
-                Categoria NVARCHAR(80) NULL,
-                Marca NVARCHAR(80) NULL,
-                Modelo NVARCHAR(100) NULL,
-                DataCompra DATE NOT NULL,
-                MesesGarantia INT NOT NULL,
-                ValorCompra DECIMAL(12,2) NULL,
-                LocalCompra NVARCHAR(140) NULL,
-                NotaFiscalUrl NVARCHAR(500) NULL,
-                NotaFiscalArquivo NVARCHAR(255) NULL,
-                Ativo BIT NOT NULL DEFAULT 1,
-                Observacoes NVARCHAR(500) NULL,
-                DataCriacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                DataAtualizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                CONSTRAINT FK_APP_BensGarantia_Usuarios
-                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
-                CONSTRAINT CK_APP_BensGarantia_Meses
-                    CHECK (MesesGarantia >= 0)
-            )
-        END
-    """)
-
-
 def parse_int(valor, default=None):
     if valor is None or str(valor).strip() == '':
         return default
@@ -163,7 +133,6 @@ def montar_bem(row, hoje=None):
 
 
 def montar_resumo_garantias(cursor, usuario_id, hoje=None):
-    garantir_tabela_garantias(cursor)
     hoje = hoje or date.today()
 
     cursor.execute("""
@@ -270,7 +239,6 @@ def form(id):
             nota_arquivo = arquivo_enviado
 
         with get_db_cursor() as cursor:
-            garantir_tabela_garantias(cursor)
             if id:
                 cursor.execute("""
                     UPDATE APP_BensGarantia
@@ -304,7 +272,6 @@ def form(id):
     bem = None
     if id:
         with get_db_cursor() as cursor:
-            garantir_tabela_garantias(cursor)
             cursor.execute("""
                 SELECT BemId, Nome, Categoria, Marca, Modelo, DataCompra, MesesGarantia,
                        ValorCompra, LocalCompra, NotaFiscalUrl, NotaFiscalArquivo,
@@ -322,7 +289,6 @@ def excluir(id):
     usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
-        garantir_tabela_garantias(cursor)
         cursor.execute("DELETE FROM APP_BensGarantia WHERE BemId = ? AND UsuarioId = ?", (id, usuario_id))
 
     flash('Bem removido.', 'warning')

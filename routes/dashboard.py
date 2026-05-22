@@ -6,7 +6,6 @@ from flask_login import current_user, login_required
 from database import get_db_cursor
 from routes.financeiro_integracoes import sincronizar_assinaturas_periodo
 from routes.financas import (
-    garantir_estrutura_carteiras,
     listar_carteiras_ativas,
     obter_resumo_carteiras,
     sincronizar_caixa_com_carteiras,
@@ -50,7 +49,6 @@ def index():
     with get_db_cursor() as cursor:
         sincronizar_assinaturas_periodo(cursor, usuario_id, hoje.month, hoje.year)
         sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, hoje.month, hoje.year)
-        garantir_estrutura_carteiras(cursor)
 
         cursor.execute("""
             SELECT

@@ -4,7 +4,7 @@ from datetime import datetime, date
 import calendar
 from flask_login import current_user
 from routes.assinaturas import montar_resumo_assinaturas
-from routes.financeiro_integracoes import garantir_tabela_assinatura_lancamentos, sincronizar_assinaturas_periodo
+from routes.financeiro_integracoes import sincronizar_assinaturas_periodo
 from routes.metas import montar_resumo_metas
 
 financas_bp = Blueprint('financas', __name__, url_prefix='/app/financeiro')
@@ -128,213 +128,6 @@ def normalizar_cor_categoria(cor):
     if len(cor) == 7 and cor.startswith('#') and all(c in digitos_hex for c in cor[1:]):
         return cor.lower()
     return COR_CATEGORIA_PADRAO
-
-
-def garantir_estrutura_renda_categorias(cursor):
-    cursor.execute("""
-        IF OBJECT_ID('dbo.FIN_RendaCategorias', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.FIN_RendaCategorias (
-                CategoriaRendaId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                UsuarioId INT NOT NULL,
-                Nome NVARCHAR(80) NOT NULL,
-                CorHex NVARCHAR(7) NOT NULL DEFAULT '#6c757d',
-                DataCriacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
-            )
-        END
-    """)
-
-    cursor.execute("""
-        IF COL_LENGTH('dbo.FIN_Rendas', 'CategoriaRendaId') IS NULL
-        BEGIN
-            ALTER TABLE dbo.FIN_Rendas ADD CategoriaRendaId INT NULL
-        END
-    """)
-
-
-def garantir_estrutura_carteiras(cursor):
-    cursor.execute("""
-        IF OBJECT_ID('dbo.FIN_Carteiras', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.FIN_Carteiras (
-                CarteiraId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                UsuarioId INT NOT NULL,
-                Nome NVARCHAR(100) NOT NULL,
-                Tipo NVARCHAR(40) NOT NULL DEFAULT 'conta_corrente',
-                SaldoAtual DECIMAL(18,2) NOT NULL DEFAULT 0,
-                CorHex NVARCHAR(7) NOT NULL DEFAULT '#0d6efd',
-                Ativa BIT NOT NULL DEFAULT 1,
-                DataCriacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                DataAtualizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
-            )
-        END
-    """)
-
-    cursor.execute("""
-        IF COL_LENGTH('dbo.FIN_Rendas', 'CarteiraId') IS NULL
-        BEGIN
-            ALTER TABLE dbo.FIN_Rendas ADD CarteiraId INT NULL
-        END
-    """)
-
-    cursor.execute("""
-        IF COL_LENGTH('dbo.FIN_Lancamentos', 'CarteiraId') IS NULL
-        BEGIN
-            ALTER TABLE dbo.FIN_Lancamentos ADD CarteiraId INT NULL
-        END
-    """)
-
-
-def garantir_estrutura_rendas_recorrentes(cursor):
-    garantir_estrutura_renda_categorias(cursor)
-    garantir_estrutura_carteiras(cursor)
-
-    cursor.execute("""
-        IF OBJECT_ID('dbo.FIN_RendasRecorrentes', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.FIN_RendasRecorrentes (
-                RendaRecorrenteId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                UsuarioId INT NOT NULL,
-                CategoriaRendaId INT NULL,
-                CarteiraId INT NULL,
-                Descricao NVARCHAR(140) NOT NULL,
-                ValorPrevisto DECIMAL(18,2) NOT NULL DEFAULT 0,
-                DiaRecebimento INT NOT NULL,
-                Periodicidade NVARCHAR(20) NOT NULL DEFAULT 'mensal',
-                IntervaloMeses INT NOT NULL DEFAULT 1,
-                DataInicio DATE NOT NULL,
-                DataFim DATE NULL,
-                Ativa BIT NOT NULL DEFAULT 1,
-                DataCriacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                DataAtualizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                CONSTRAINT FK_FIN_RendasRecorrentes_Usuarios
-                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
-                CONSTRAINT CK_FIN_RendasRecorrentes_Dia
-                    CHECK (DiaRecebimento BETWEEN 1 AND 31),
-                CONSTRAINT CK_FIN_RendasRecorrentes_Intervalo
-                    CHECK (IntervaloMeses > 0),
-                CONSTRAINT CK_FIN_RendasRecorrentes_Periodicidade
-                    CHECK (Periodicidade IN ('mensal', 'bimestral', 'trimestral', 'semestral', 'anual', 'personalizado'))
-            )
-        END
-    """)
-
-    cursor.execute("""
-        IF OBJECT_ID('dbo.FIN_RendaRecorrenteOcorrencias', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.FIN_RendaRecorrenteOcorrencias (
-                OcorrenciaId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                UsuarioId INT NOT NULL,
-                RendaRecorrenteId INT NOT NULL,
-                RendaId INT NOT NULL,
-                MesReferencia INT NOT NULL,
-                AnoReferencia INT NOT NULL,
-                DataSincronizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                CONSTRAINT FK_FIN_RendaRecorrenteOcorrencias_Usuarios
-                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
-                CONSTRAINT FK_FIN_RendaRecorrenteOcorrencias_Recorrentes
-                    FOREIGN KEY (RendaRecorrenteId) REFERENCES dbo.FIN_RendasRecorrentes(RendaRecorrenteId)
-            )
-        END
-
-        IF NOT EXISTS (
-            SELECT 1
-            FROM sys.indexes
-            WHERE name = 'UX_FIN_RendaRecorrenteOcorrencias_Periodo'
-              AND object_id = OBJECT_ID('dbo.FIN_RendaRecorrenteOcorrencias')
-        )
-        BEGIN
-            CREATE UNIQUE INDEX UX_FIN_RendaRecorrenteOcorrencias_Periodo
-            ON dbo.FIN_RendaRecorrenteOcorrencias (UsuarioId, RendaRecorrenteId, MesReferencia, AnoReferencia)
-        END
-    """)
-
-    cursor.execute("""
-        IF COL_LENGTH('dbo.FIN_Rendas', 'RendaRecorrenteId') IS NULL
-        BEGIN
-            ALTER TABLE dbo.FIN_Rendas ADD RendaRecorrenteId INT NULL
-        END
-    """)
-
-
-def garantir_estrutura_lancamentos_recorrentes(cursor):
-    garantir_estrutura_carteiras(cursor)
-
-    cursor.execute("""
-        IF OBJECT_ID('dbo.FIN_LancamentosRecorrentes', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.FIN_LancamentosRecorrentes (
-                LancamentoRecorrenteId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                UsuarioId INT NOT NULL,
-                CategoriaId INT NOT NULL,
-                Descricao NVARCHAR(140) NOT NULL,
-                ValorEstimado DECIMAL(18,2) NOT NULL DEFAULT 0,
-                DiaVencimento INT NOT NULL,
-                Periodicidade NVARCHAR(20) NOT NULL DEFAULT 'mensal',
-                IntervaloMeses INT NOT NULL DEFAULT 1,
-                DataInicio DATE NOT NULL,
-                DataFim DATE NULL,
-                Ativa BIT NOT NULL DEFAULT 1,
-                DataCriacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                DataAtualizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                CONSTRAINT FK_FIN_LancamentosRecorrentes_Usuarios
-                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
-                CONSTRAINT CK_FIN_LancamentosRecorrentes_Dia
-                    CHECK (DiaVencimento BETWEEN 1 AND 31),
-                CONSTRAINT CK_FIN_LancamentosRecorrentes_Intervalo
-                    CHECK (IntervaloMeses > 0),
-                CONSTRAINT CK_FIN_LancamentosRecorrentes_Periodicidade
-                    CHECK (Periodicidade IN ('mensal', 'bimestral', 'trimestral', 'semestral', 'anual', 'personalizado'))
-            )
-        END
-    """)
-
-    cursor.execute("""
-        IF OBJECT_ID('dbo.FIN_LancamentoRecorrenteOcorrencias', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.FIN_LancamentoRecorrenteOcorrencias (
-                OcorrenciaId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                UsuarioId INT NOT NULL,
-                LancamentoRecorrenteId INT NOT NULL,
-                LancamentoId INT NOT NULL,
-                MesReferencia INT NOT NULL,
-                AnoReferencia INT NOT NULL,
-                Ignorado BIT NOT NULL DEFAULT 0,
-                DataSincronizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                CONSTRAINT FK_FIN_LancamentoRecorrenteOcorrencias_Usuarios
-                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
-                CONSTRAINT FK_FIN_LancamentoRecorrenteOcorrencias_Recorrentes
-                    FOREIGN KEY (LancamentoRecorrenteId) REFERENCES dbo.FIN_LancamentosRecorrentes(LancamentoRecorrenteId)
-            )
-        END
-
-        IF NOT EXISTS (
-            SELECT 1
-            FROM sys.indexes
-            WHERE name = 'UX_FIN_LancamentoRecorrenteOcorrencias_Periodo'
-              AND object_id = OBJECT_ID('dbo.FIN_LancamentoRecorrenteOcorrencias')
-        )
-        BEGIN
-            CREATE UNIQUE INDEX UX_FIN_LancamentoRecorrenteOcorrencias_Periodo
-            ON dbo.FIN_LancamentoRecorrenteOcorrencias (UsuarioId, LancamentoRecorrenteId, MesReferencia, AnoReferencia)
-        END
-    """)
-
-    cursor.execute("""
-        IF COL_LENGTH('dbo.FIN_LancamentoRecorrenteOcorrencias', 'Ignorado') IS NULL
-        BEGIN
-            ALTER TABLE dbo.FIN_LancamentoRecorrenteOcorrencias
-            ADD Ignorado BIT NOT NULL
-                CONSTRAINT DF_FIN_LancamentoRecorrenteOcorrencias_Ignorado DEFAULT 0
-        END
-    """)
-
-    cursor.execute("""
-        IF COL_LENGTH('dbo.FIN_Lancamentos', 'LancamentoRecorrenteId') IS NULL
-        BEGIN
-            ALTER TABLE dbo.FIN_Lancamentos ADD LancamentoRecorrenteId INT NULL
-        END
-    """)
 
 
 def tipo_carteira_valido(tipo):
@@ -472,7 +265,6 @@ def ajustar_caixa(cursor, usuario_id, mes, ano, delta):
 
 
 def obter_resumo_carteiras(cursor, usuario_id):
-    garantir_estrutura_carteiras(cursor)
     cursor.execute("""
         SELECT
             COUNT(*) AS TotalCarteiras,
@@ -490,7 +282,6 @@ def obter_resumo_carteiras(cursor, usuario_id):
 
 
 def listar_carteiras_ativas(cursor, usuario_id):
-    garantir_estrutura_carteiras(cursor)
     cursor.execute("""
         SELECT CarteiraId, Nome, Tipo, SaldoAtual, CorHex
         FROM FIN_Carteiras
@@ -526,7 +317,6 @@ def movimentar_carteira(cursor, usuario_id, carteira_id, delta):
 
 
 def ignorar_sincronizacao_assinatura_lancamento(cursor, usuario_id, lancamento_id):
-    garantir_tabela_assinatura_lancamentos(cursor)
     cursor.execute("""
         UPDATE FIN_AssinaturaLancamentos
         SET Ignorado = 1,
@@ -536,7 +326,6 @@ def ignorar_sincronizacao_assinatura_lancamento(cursor, usuario_id, lancamento_i
 
 
 def ignorar_sincronizacao_lancamento_recorrente(cursor, usuario_id, lancamento_id):
-    garantir_estrutura_lancamentos_recorrentes(cursor)
     cursor.execute("""
         UPDATE FIN_LancamentoRecorrenteOcorrencias
         SET Ignorado = 1,
@@ -591,8 +380,6 @@ def criar_ocorrencia_renda_recorrente(cursor, usuario_id, renda_recorrente, data
 
 
 def sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, mes, ano, renda_recorrente_id=None):
-    garantir_estrutura_rendas_recorrentes(cursor)
-
     params = [usuario_id]
     filtro = ''
     if renda_recorrente_id:
@@ -664,8 +451,6 @@ def criar_ocorrencia_lancamento_recorrente(cursor, usuario_id, lancamento_recorr
 
 
 def sincronizar_lancamentos_recorrentes_periodo(cursor, usuario_id, mes, ano, lancamento_recorrente_id=None):
-    garantir_estrutura_lancamentos_recorrentes(cursor)
-
     params = [usuario_id]
     filtro = ''
     if lancamento_recorrente_id:
@@ -759,7 +544,6 @@ def sincronizar_renda_recorrente_primeiro_periodo(cursor, usuario_id, renda_reco
 
 
 def remover_ocorrencias_renda_recorrente_pendentes(cursor, usuario_id, renda_recorrente_id):
-    garantir_estrutura_rendas_recorrentes(cursor)
     cursor.execute("""
         SELECT O.OcorrenciaId, O.RendaId, ISNULL(R.ValorReal, 0) AS ValorReal
         FROM FIN_RendaRecorrenteOcorrencias O
@@ -783,7 +567,6 @@ def remover_ocorrencias_renda_recorrente_pendentes(cursor, usuario_id, renda_rec
 
 
 def remover_ocorrencias_lancamento_recorrente_pendentes(cursor, usuario_id, lancamento_recorrente_id):
-    garantir_estrutura_lancamentos_recorrentes(cursor)
     cursor.execute("""
         SELECT O.OcorrenciaId, O.LancamentoId, ISNULL(L.ValorReal, 0) AS ValorReal, L.Pago
         FROM FIN_LancamentoRecorrenteOcorrencias O
@@ -806,7 +589,6 @@ def remover_ocorrencias_lancamento_recorrente_pendentes(cursor, usuario_id, lanc
 
 
 def total_ocorrencias_renda_recorrente_recebidas(cursor, usuario_id, renda_recorrente_id):
-    garantir_estrutura_rendas_recorrentes(cursor)
     cursor.execute("""
         SELECT COUNT(*)
         FROM FIN_RendaRecorrenteOcorrencias O
@@ -819,7 +601,6 @@ def total_ocorrencias_renda_recorrente_recebidas(cursor, usuario_id, renda_recor
 
 
 def total_ocorrencias_lancamento_recorrente_pagas(cursor, usuario_id, lancamento_recorrente_id):
-    garantir_estrutura_lancamentos_recorrentes(cursor)
     cursor.execute("""
         SELECT COUNT(*)
         FROM FIN_LancamentoRecorrenteOcorrencias O
@@ -927,8 +708,6 @@ def ler_dados_lancamento_recorrente_form():
 
 
 def criar_regra_recorrente_a_partir_lancamento(cursor, usuario_id, lancamento_id, dados_lancamento):
-    garantir_estrutura_lancamentos_recorrentes(cursor)
-
     cursor.execute("""
         SELECT ISNULL(L.LancamentoRecorrenteId, O.LancamentoRecorrenteId) AS LancamentoRecorrenteId
         FROM FIN_Lancamentos L
@@ -1203,7 +982,6 @@ def carteiras():
             return redirect(url_for('financas.carteiras'))
 
         with get_db_cursor() as cursor:
-            garantir_estrutura_carteiras(cursor)
             cursor.execute("""
                 SELECT CarteiraId
                 FROM FIN_Carteiras
@@ -1223,7 +1001,6 @@ def carteiras():
         return redirect(url_for('financas.carteiras'))
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_carteiras(cursor)
         cursor.execute("""
             SELECT
                 C.CarteiraId,
@@ -1276,7 +1053,6 @@ def editar_carteira(id):
         return redirect(url_for('financas.carteiras'))
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_carteiras(cursor)
         cursor.execute("""
             UPDATE FIN_Carteiras
             SET Nome = ?, Tipo = ?, SaldoAtual = ?, CorHex = ?, Ativa = ?,
@@ -1300,7 +1076,6 @@ def excluir_carteira(id):
     mes_atual, ano_atual = periodo_atual()
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_carteiras(cursor)
         cursor.execute("""
             SELECT CarteiraId
             FROM FIN_Carteiras
@@ -1445,7 +1220,6 @@ def categorias_rendas():
         nome = nome[:80]
 
         with get_db_cursor() as cursor:
-            garantir_estrutura_renda_categorias(cursor)
             cursor.execute("""
                 SELECT CategoriaRendaId
                 FROM FIN_RendaCategorias
@@ -1464,7 +1238,6 @@ def categorias_rendas():
         return redirect(url_for('financas.categorias_rendas'))
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_renda_categorias(cursor)
         cursor.execute("""
             SELECT
                 C.CategoriaRendaId,
@@ -1496,7 +1269,6 @@ def excluir_categoria_renda(id):
     usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_renda_categorias(cursor)
         cursor.execute("""
             SELECT CategoriaRendaId
             FROM FIN_RendaCategorias
@@ -1538,8 +1310,6 @@ def rendas_recorrentes():
             return redirect(url_for('financas.rendas_recorrentes'))
 
         with get_db_cursor() as cursor:
-            garantir_estrutura_rendas_recorrentes(cursor)
-
             if dados['categoria_renda_id']:
                 cursor.execute("""
                     SELECT CategoriaRendaId
@@ -1582,7 +1352,6 @@ def rendas_recorrentes():
         return redirect(url_for('financas.rendas_recorrentes'))
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_rendas_recorrentes(cursor)
         sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, mes_atual, ano_atual)
 
         cursor.execute("""
@@ -1682,7 +1451,6 @@ def editar_renda_recorrente(id):
         return redirect(url_for('financas.rendas_recorrentes'))
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_rendas_recorrentes(cursor)
         cursor.execute("""
             SELECT RendaRecorrenteId
             FROM FIN_RendasRecorrentes
@@ -1740,7 +1508,6 @@ def excluir_renda_recorrente(id):
     usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_rendas_recorrentes(cursor)
         cursor.execute("""
             SELECT RendaRecorrenteId
             FROM FIN_RendasRecorrentes
@@ -1786,8 +1553,6 @@ def lancamentos_recorrentes():
             return redirect(url_for('financas.lancamentos_recorrentes'))
 
         with get_db_cursor() as cursor:
-            garantir_estrutura_lancamentos_recorrentes(cursor)
-
             cursor.execute("""
                 SELECT CategoriaId
                 FROM FIN_Categorias
@@ -1825,7 +1590,6 @@ def lancamentos_recorrentes():
         return redirect(url_for('financas.lancamentos_recorrentes'))
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_lancamentos_recorrentes(cursor)
         sincronizar_lancamentos_recorrentes_periodo(cursor, usuario_id, mes_atual, ano_atual)
 
         cursor.execute("""
@@ -1915,7 +1679,6 @@ def editar_lancamento_recorrente(id):
         return redirect(url_for('financas.lancamentos_recorrentes'))
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_lancamentos_recorrentes(cursor)
         cursor.execute("""
             SELECT LancamentoRecorrenteId
             FROM FIN_LancamentosRecorrentes
@@ -1968,7 +1731,6 @@ def excluir_lancamento_recorrente(id):
     usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_lancamentos_recorrentes(cursor)
         cursor.execute("""
             SELECT LancamentoRecorrenteId
             FROM FIN_LancamentosRecorrentes
@@ -2074,7 +1836,6 @@ def dashboard():
         sincronizar_assinaturas_periodo(cursor, usuario_id, mes_sel, ano_sel)
         sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, mes_sel, ano_sel)
         sincronizar_lancamentos_recorrentes_periodo(cursor, usuario_id, mes_sel, ano_sel)
-        garantir_estrutura_carteiras(cursor)
 
         cursor.execute("""
             SELECT
@@ -2265,7 +2026,6 @@ def baixar_gasto(id):
     carteira_id = request.form.get('carteira_id') or dados.get('carteira_id') or None
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_carteiras(cursor)
         cursor.execute("""
             SELECT ValorEstimado, ISNULL(ValorReal, 0) AS ValorReal, Pago, CarteiraId, MesReferencia, AnoReferencia
             FROM FIN_Lancamentos
@@ -2357,7 +2117,6 @@ def atualizar_valor_real(id):
             return {"success": False, "message": "Informe um valor real maior ou igual a zero."}, 400
 
         with get_db_cursor() as cursor:
-            garantir_estrutura_carteiras(cursor)
             cursor.execute("""
                 SELECT ISNULL(ValorReal, 0) AS ValorReal, Pago, CarteiraId, MesReferencia, AnoReferencia
                 FROM FIN_Lancamentos
@@ -2448,9 +2207,6 @@ def editar_gasto(id):
             return {"success": False, "message": "Carteira invalida."}, 400
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_carteiras(cursor)
-        garantir_tabela_assinatura_lancamentos(cursor)
-
         cursor.execute("""
             SELECT ISNULL(ValorReal, 0) AS ValorReal, Pago, CarteiraId, MesReferencia, AnoReferencia
             FROM FIN_Lancamentos
@@ -2568,9 +2324,6 @@ def gerenciar_rendas():
             return redirect(url_for('financas.gerenciar_rendas', mes=mes, ano=ano))
 
         with get_db_cursor() as cursor:
-            garantir_estrutura_renda_categorias(cursor)
-            garantir_estrutura_carteiras(cursor)
-            garantir_estrutura_rendas_recorrentes(cursor)
             if categoria_renda_id:
                 cursor.execute("""
                     SELECT CategoriaRendaId
@@ -2646,8 +2399,6 @@ def gerenciar_rendas():
         return redirect(url_for('financas.gerenciar_rendas', mes=dt.month, ano=dt.year))
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_renda_categorias(cursor)
-        garantir_estrutura_carteiras(cursor)
         sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, mes, ano)
         cursor.execute("""
             SELECT R.*, C.Nome AS CategoriaNome, C.CorHex AS CategoriaCorHex,
@@ -2731,8 +2482,6 @@ def gerenciar_rendas():
 def deletar_renda(id):
     usuario_id = usuario_atual_id()
     with get_db_cursor() as cursor:
-        garantir_estrutura_carteiras(cursor)
-        garantir_estrutura_rendas_recorrentes(cursor)
         cursor.execute("""
             SELECT ISNULL(ValorReal, 0) AS ValorReal, CarteiraId, MesReferencia, AnoReferencia
             FROM FIN_Rendas
@@ -2766,8 +2515,6 @@ def editar_renda(id):
         v_real = parse_money(dados.get('valor_real'))
 
         with get_db_cursor() as cursor:
-            garantir_estrutura_renda_categorias(cursor)
-            garantir_estrutura_carteiras(cursor)
             if categoria_renda_id:
                 cursor.execute("""
                     SELECT CategoriaRendaId
@@ -2819,8 +2566,6 @@ def deletar_gasto(id):
     usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_carteiras(cursor)
-        garantir_tabela_assinatura_lancamentos(cursor)
         cursor.execute("""
             SELECT ISNULL(ValorReal, 0) AS ValorReal, Pago, CarteiraId, MesReferencia, AnoReferencia
             FROM FIN_Lancamentos
@@ -2881,7 +2626,6 @@ def receber_renda(id):
     carteira_id = request.form.get('carteira_id') or None
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_carteiras(cursor)
         cursor.execute("""
             SELECT ValorPrevisto, ISNULL(ValorReal, 0) AS ValorReal, MesReferencia, AnoReferencia
             FROM FIN_Rendas
@@ -2934,7 +2678,6 @@ def reabrir_renda(id):
     ano_ref = hoje.year
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_carteiras(cursor)
         cursor.execute("""
             SELECT ValorPrevisto, ISNULL(ValorReal, 0) AS ValorReal, CarteiraId, MesReferencia, AnoReferencia
             FROM FIN_Rendas
@@ -2975,7 +2718,6 @@ def clonar_mes_anterior():
     mes_origem, ano_origem = periodo_anterior(mes_destino, ano_destino)
 
     with get_db_cursor() as cursor:
-        garantir_estrutura_lancamentos_recorrentes(cursor)
         sincronizar_lancamentos_recorrentes_periodo(cursor, usuario_id, mes_destino, ano_destino)
 
         cursor.execute("""

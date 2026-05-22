@@ -57,74 +57,6 @@ def garantir_categoria_financeira(cursor, usuario_id, nome, cor_hex):
     return int(cursor.fetchone()[0])
 
 
-def garantir_tabela_assinaturas(cursor):
-    cursor.execute("""
-        IF OBJECT_ID('dbo.FIN_Assinaturas', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.FIN_Assinaturas (
-                AssinaturaId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                UsuarioId INT NOT NULL,
-                Nome NVARCHAR(120) NOT NULL,
-                Categoria NVARCHAR(80) NULL,
-                Valor DECIMAL(12,2) NOT NULL,
-                Ciclo NVARCHAR(20) NOT NULL,
-                DataRenovacao DATE NOT NULL,
-                Ativa BIT NOT NULL DEFAULT 1,
-                Observacoes NVARCHAR(500) NULL,
-                DataCriacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                DataAtualizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                CONSTRAINT FK_FIN_Assinaturas_Usuarios
-                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
-                CONSTRAINT CK_FIN_Assinaturas_Ciclo
-                    CHECK (Ciclo IN ('mensal', 'anual'))
-            )
-        END
-    """)
-
-
-def garantir_tabela_assinatura_lancamentos(cursor):
-    garantir_tabela_assinaturas(cursor)
-    cursor.execute("""
-        IF OBJECT_ID('dbo.FIN_AssinaturaLancamentos', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.FIN_AssinaturaLancamentos (
-                AssinaturaLancamentoId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                UsuarioId INT NOT NULL,
-                AssinaturaId INT NOT NULL,
-                LancamentoId INT NOT NULL,
-                MesReferencia INT NOT NULL,
-                AnoReferencia INT NOT NULL,
-                Ignorado BIT NOT NULL DEFAULT 0,
-                DataSincronizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                CONSTRAINT FK_FIN_AssinaturaLancamentos_Usuarios
-                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
-                CONSTRAINT FK_FIN_AssinaturaLancamentos_Assinaturas
-                    FOREIGN KEY (AssinaturaId) REFERENCES dbo.FIN_Assinaturas(AssinaturaId)
-            )
-        END
-
-        IF NOT EXISTS (
-            SELECT 1
-            FROM sys.indexes
-            WHERE name = 'UX_FIN_AssinaturaLancamentos_Periodo'
-              AND object_id = OBJECT_ID('dbo.FIN_AssinaturaLancamentos')
-        )
-        BEGIN
-            CREATE UNIQUE INDEX UX_FIN_AssinaturaLancamentos_Periodo
-            ON dbo.FIN_AssinaturaLancamentos (UsuarioId, AssinaturaId, MesReferencia, AnoReferencia)
-        END
-    """)
-
-    cursor.execute("""
-        IF COL_LENGTH('dbo.FIN_AssinaturaLancamentos', 'Ignorado') IS NULL
-        BEGIN
-            ALTER TABLE dbo.FIN_AssinaturaLancamentos
-            ADD Ignorado BIT NOT NULL
-                CONSTRAINT DF_FIN_AssinaturaLancamentos_Ignorado DEFAULT 0
-        END
-    """)
-
-
 def data_vencimento_assinatura(data_renovacao, ciclo, mes, ano):
     data_base = normalizar_data(data_renovacao)
     if not data_base:
@@ -159,7 +91,6 @@ def criar_lancamento_assinatura(cursor, usuario_id, assinatura, categoria_id, da
 
 
 def sincronizar_assinaturas_periodo(cursor, usuario_id, mes, ano, assinatura_id=None):
-    garantir_tabela_assinatura_lancamentos(cursor)
     categoria_id = garantir_categoria_financeira(cursor, usuario_id, 'Assinaturas', '#7c3aed')
 
     params = [usuario_id]
@@ -246,7 +177,6 @@ def sincronizar_assinatura_primeiro_periodo(cursor, usuario_id, assinatura_id):
 
 
 def remover_lancamentos_assinatura_pendentes(cursor, usuario_id, assinatura_id, remover_mapeamentos_pagos=False):
-    garantir_tabela_assinatura_lancamentos(cursor)
     cursor.execute("""
         SELECT M.AssinaturaLancamentoId, M.LancamentoId, L.Pago
         FROM FIN_AssinaturaLancamentos M

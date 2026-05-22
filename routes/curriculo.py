@@ -13,67 +13,22 @@ curriculo_bp = Blueprint('curriculo', __name__)
 EXTENSOES_FOTO_PERMITIDAS = {'.jpg', '.jpeg', '.png', '.webp'}
 
 
-def tabela_curriculo_perfil_existe(cursor):
-    cursor.execute("SELECT OBJECT_ID('dbo.CurriculoPerfil', 'U')")
-    row = cursor.fetchone()
-    return bool(row and row[0])
-
-
-def garantir_tabela_curriculo_perfil(cursor):
-    cursor.execute("""
-        IF OBJECT_ID('dbo.CurriculoPerfil', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.CurriculoPerfil (
-                CurriculoPerfilId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                UsuarioId INT NOT NULL UNIQUE,
-                NomeExibicao NVARCHAR(150) NOT NULL,
-                Cargo NVARCHAR(200) NULL,
-                Resumo NVARCHAR(MAX) NULL,
-                Localizacao NVARCHAR(150) NULL,
-                Telefone NVARCHAR(50) NULL,
-                Email NVARCHAR(150) NULL,
-                Linkedin NVARCHAR(250) NULL,
-                FotoArquivo NVARCHAR(255) NULL,
-                DataAtualizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                CONSTRAINT FK_CurriculoPerfil_Usuarios
-                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId)
-            )
-        END
-
-        INSERT INTO dbo.CurriculoPerfil (UsuarioId, NomeExibicao)
-        SELECT U.UsuarioId, U.Nome
-        FROM dbo.Usuarios U
-        WHERE NOT EXISTS (
-            SELECT 1
-            FROM dbo.CurriculoPerfil P
-            WHERE P.UsuarioId = U.UsuarioId
-        )
-    """)
-
-
 def get_perfil_curriculo(cursor, usuario_id):
-    if tabela_curriculo_perfil_existe(cursor):
-        cursor.execute("""
-            SELECT
-                U.Nome AS UsuarioNome,
-                P.NomeExibicao,
-                P.Cargo,
-                P.Resumo,
-                P.Localizacao,
-                P.Telefone,
-                P.Email,
-                P.Linkedin,
-                P.FotoArquivo
-            FROM Usuarios U
-            LEFT JOIN CurriculoPerfil P ON P.UsuarioId = U.UsuarioId
-            WHERE U.UsuarioId = ?
-        """, (usuario_id,))
-    else:
-        cursor.execute("""
-            SELECT Nome AS UsuarioNome
-            FROM Usuarios
-            WHERE UsuarioId = ?
-        """, (usuario_id,))
+    cursor.execute("""
+        SELECT
+            U.Nome AS UsuarioNome,
+            P.NomeExibicao,
+            P.Cargo,
+            P.Resumo,
+            P.Localizacao,
+            P.Telefone,
+            P.Email,
+            P.Linkedin,
+            P.FotoArquivo
+        FROM Usuarios U
+        LEFT JOIN CurriculoPerfil P ON P.UsuarioId = U.UsuarioId
+        WHERE U.UsuarioId = ?
+    """, (usuario_id,))
 
     row = cursor.fetchone()
     usuario_nome = getattr(row, 'UsuarioNome', None) if row else ''
@@ -225,7 +180,6 @@ def editar_perfil():
             foto_arquivo = foto_enviada
 
         with get_db_cursor() as cursor:
-            garantir_tabela_curriculo_perfil(cursor)
             cursor.execute("SELECT CurriculoPerfilId FROM CurriculoPerfil WHERE UsuarioId = ?", (usuario_id,))
             perfil_existente = cursor.fetchone()
 
@@ -248,7 +202,6 @@ def editar_perfil():
         return redirect(url_for('curriculo.especialista'))
 
     with get_db_cursor() as cursor:
-        garantir_tabela_curriculo_perfil(cursor)
         perfil = get_perfil_curriculo(cursor, usuario_id)
 
     return render_template('admin/form_curriculo_perfil.html', perfil=perfil)

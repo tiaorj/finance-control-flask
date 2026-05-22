@@ -25,60 +25,6 @@ def usuario_atual_id():
     return int(current_user.get_id())
 
 
-def garantir_tabelas_veiculos(cursor):
-    cursor.execute("""
-        IF OBJECT_ID('dbo.APP_Veiculos', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.APP_Veiculos (
-                VeiculoId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                UsuarioId INT NOT NULL,
-                Apelido NVARCHAR(100) NOT NULL,
-                Tipo NVARCHAR(20) NOT NULL,
-                Marca NVARCHAR(80) NULL,
-                Modelo NVARCHAR(100) NULL,
-                Ano INT NULL,
-                Placa NVARCHAR(20) NULL,
-                QuilometragemAtual INT NULL,
-                Ativo BIT NOT NULL DEFAULT 1,
-                Observacoes NVARCHAR(500) NULL,
-                DataCriacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                DataAtualizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                CONSTRAINT FK_APP_Veiculos_Usuarios
-                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
-                CONSTRAINT CK_APP_Veiculos_Tipo
-                    CHECK (Tipo IN ('carro', 'moto', 'utilitario', 'outro'))
-            )
-        END
-
-        IF OBJECT_ID('dbo.APP_VeiculoLembretes', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.APP_VeiculoLembretes (
-                LembreteId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                VeiculoId INT NOT NULL,
-                UsuarioId INT NOT NULL,
-                Tipo NVARCHAR(30) NOT NULL,
-                Titulo NVARCHAR(140) NOT NULL,
-                DataVencimento DATE NULL,
-                KmVencimento INT NULL,
-                RecorrenciaMeses INT NULL,
-                IntervaloKm INT NULL,
-                ValorEstimado DECIMAL(12,2) NULL,
-                Concluido BIT NOT NULL DEFAULT 0,
-                UltimaConclusao DATETIME2 NULL,
-                Observacoes NVARCHAR(500) NULL,
-                DataCriacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                DataAtualizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                CONSTRAINT FK_APP_VeiculoLembretes_Veiculos
-                    FOREIGN KEY (VeiculoId) REFERENCES dbo.APP_Veiculos(VeiculoId),
-                CONSTRAINT FK_APP_VeiculoLembretes_Usuarios
-                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
-                CONSTRAINT CK_APP_VeiculoLembretes_Tipo
-                    CHECK (Tipo IN ('oleo', 'ipva', 'seguro', 'pneus', 'licenciamento', 'revisao', 'outro'))
-            )
-        END
-    """)
-
-
 def parse_int(valor, default=None):
     if valor is None or str(valor).strip() == '':
         return default
@@ -173,7 +119,6 @@ def montar_lembrete(row, hoje=None):
 
 
 def montar_resumo_veiculos(cursor, usuario_id, hoje=None):
-    garantir_tabelas_veiculos(cursor)
     hoje = hoje or date.today()
 
     cursor.execute("""
@@ -221,7 +166,6 @@ def lista():
     usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
-        garantir_tabelas_veiculos(cursor)
         resumo = montar_resumo_veiculos(cursor, usuario_id)
         cursor.execute("""
             SELECT VeiculoId, Apelido, Tipo, Marca, Modelo, Ano, Placa,
@@ -277,7 +221,6 @@ def form(id):
             return redirect(url_for('veiculos.form', id=id) if id else url_for('veiculos.form'))
 
         with get_db_cursor() as cursor:
-            garantir_tabelas_veiculos(cursor)
             if id:
                 cursor.execute("""
                     UPDATE APP_Veiculos
@@ -300,7 +243,6 @@ def form(id):
     veiculo = None
     if id:
         with get_db_cursor() as cursor:
-            garantir_tabelas_veiculos(cursor)
             cursor.execute("""
                 SELECT VeiculoId, Apelido, Tipo, Marca, Modelo, Ano, Placa,
                        QuilometragemAtual, Ativo, Observacoes
@@ -318,7 +260,6 @@ def form_lembrete(id):
     usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
-        garantir_tabelas_veiculos(cursor)
         cursor.execute("""
             SELECT VeiculoId, Apelido
             FROM APP_Veiculos
@@ -362,7 +303,6 @@ def form_lembrete(id):
                 return redirect(url_for('veiculos.form_lembrete', id=id) if id else url_for('veiculos.form_lembrete'))
 
         with get_db_cursor() as cursor:
-            garantir_tabelas_veiculos(cursor)
             cursor.execute("""
                 SELECT VeiculoId
                 FROM APP_Veiculos
@@ -404,7 +344,6 @@ def form_lembrete(id):
     lembrete = None
     if id:
         with get_db_cursor() as cursor:
-            garantir_tabelas_veiculos(cursor)
             cursor.execute("""
                 SELECT LembreteId, VeiculoId, Tipo, Titulo, DataVencimento, KmVencimento,
                        RecorrenciaMeses, IntervaloKm, ValorEstimado, Concluido, Observacoes
@@ -433,7 +372,6 @@ def atualizar_quilometragem(id):
         return redirect(url_for('veiculos.lista'))
 
     with get_db_cursor() as cursor:
-        garantir_tabelas_veiculos(cursor)
         cursor.execute("""
             UPDATE APP_Veiculos
             SET QuilometragemAtual = ?, DataAtualizacao = SYSUTCDATETIME()
@@ -449,7 +387,6 @@ def concluir_lembrete(id):
     usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
-        garantir_tabelas_veiculos(cursor)
         cursor.execute("""
             SELECT L.LembreteId, L.VeiculoId, L.DataVencimento, L.KmVencimento,
                    L.RecorrenciaMeses, L.IntervaloKm, V.QuilometragemAtual
@@ -503,7 +440,6 @@ def excluir_lembrete(id):
     usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
-        garantir_tabelas_veiculos(cursor)
         cursor.execute("DELETE FROM APP_VeiculoLembretes WHERE LembreteId = ? AND UsuarioId = ?", (id, usuario_id))
 
     flash('Lembrete removido.', 'warning')
@@ -515,7 +451,6 @@ def excluir(id):
     usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
-        garantir_tabelas_veiculos(cursor)
         cursor.execute("DELETE FROM APP_VeiculoLembretes WHERE VeiculoId = ? AND UsuarioId = ?", (id, usuario_id))
         cursor.execute("DELETE FROM APP_Veiculos WHERE VeiculoId = ? AND UsuarioId = ?", (id, usuario_id))
 

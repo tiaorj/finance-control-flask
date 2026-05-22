@@ -31,31 +31,6 @@ def parse_money(valor, default=0.0):
         return default
 
 
-def garantir_tabela_assinaturas(cursor):
-    cursor.execute("""
-        IF OBJECT_ID('dbo.FIN_Assinaturas', 'U') IS NULL
-        BEGIN
-            CREATE TABLE dbo.FIN_Assinaturas (
-                AssinaturaId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                UsuarioId INT NOT NULL,
-                Nome NVARCHAR(120) NOT NULL,
-                Categoria NVARCHAR(80) NULL,
-                Valor DECIMAL(12,2) NOT NULL,
-                Ciclo NVARCHAR(20) NOT NULL,
-                DataRenovacao DATE NOT NULL,
-                Ativa BIT NOT NULL DEFAULT 1,
-                Observacoes NVARCHAR(500) NULL,
-                DataCriacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                DataAtualizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                CONSTRAINT FK_FIN_Assinaturas_Usuarios
-                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
-                CONSTRAINT CK_FIN_Assinaturas_Ciclo
-                    CHECK (Ciclo IN ('mensal', 'anual'))
-            )
-        END
-    """)
-
-
 def normalizar_data(valor):
     if isinstance(valor, date):
         return valor
@@ -72,7 +47,6 @@ def valor_mensalizado(valor, ciclo):
 
 
 def montar_resumo_assinaturas(cursor, usuario_id, hoje=None):
-    garantir_tabela_assinaturas(cursor)
     hoje = hoje or date.today()
 
     cursor.execute("""
@@ -121,7 +95,6 @@ def lista():
     usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
-        garantir_tabela_assinaturas(cursor)
         resumo = montar_resumo_assinaturas(cursor, usuario_id)
         cursor.execute("""
             SELECT AssinaturaId, Nome, Categoria, Valor, Ciclo, DataRenovacao, Ativa, Observacoes
@@ -189,7 +162,6 @@ def form(id):
             return redirect(url_for('assinaturas.form', id=id) if id else url_for('assinaturas.form'))
 
         with get_db_cursor() as cursor:
-            garantir_tabela_assinaturas(cursor)
             if id:
                 remover_lancamentos_assinatura_pendentes(cursor, usuario_id, id)
                 cursor.execute("""
@@ -218,7 +190,6 @@ def form(id):
     assinatura = None
     if id:
         with get_db_cursor() as cursor:
-            garantir_tabela_assinaturas(cursor)
             cursor.execute("""
                 SELECT AssinaturaId, Nome, Categoria, Valor, Ciclo, DataRenovacao, Ativa, Observacoes
                 FROM FIN_Assinaturas
@@ -234,7 +205,6 @@ def excluir(id):
     usuario_id = usuario_atual_id()
 
     with get_db_cursor() as cursor:
-        garantir_tabela_assinaturas(cursor)
         remover_lancamentos_assinatura_pendentes(cursor, usuario_id, id, remover_mapeamentos_pagos=True)
         cursor.execute("DELETE FROM FIN_Assinaturas WHERE AssinaturaId = ? AND UsuarioId = ?", (id, usuario_id))
 
