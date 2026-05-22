@@ -1,5 +1,21 @@
 {% extends "base.html" %}
 {% macro dinheiro(valor) -%}R$ {{ (valor or 0) | formato_real }}{%- endmacro %}
+{% macro botao_editar_lancamento(l, classes='btn btn-sm btn-outline-primary border-0', label='') -%}
+<button type="button"
+        class="{{ classes }}"
+        onclick="abrirModalEdicaoLancamento(this)"
+        title="Editar lancamento"
+        data-id="{{ l.LancamentoId }}"
+        data-descricao="{{ l.Descricao|e }}"
+        data-categoria-id="{{ l.CategoriaId }}"
+        data-data-vencimento="{{ l.DataVencimento.strftime('%Y-%m-%d') if l.DataVencimento else '' }}"
+        data-valor-estimado="{{ (l.ValorEstimado or 0) | formato_real }}"
+        data-valor-real="{{ (l.ValorReal or 0) | formato_real }}"
+        data-pago="{{ 1 if l.Pago else 0 }}"
+        data-carteira-id="{{ l.CarteiraId or '' }}">
+    <i class="bi bi-pencil-square{% if label %} me-1{% endif %}"></i>{% if label %}{{ label }}{% endif %}
+</button>
+{%- endmacro %}
 
 {% block content %}
 <style>
@@ -60,8 +76,45 @@
         white-space: nowrap;
     }
 
+    .table-finance {
+        min-width: 940px;
+    }
+
     .table-finance td {
         vertical-align: middle;
+    }
+
+    .lancamento-descricao {
+        max-width: 300px;
+        min-width: 180px;
+        white-space: normal;
+        word-break: break-word;
+    }
+
+    .lancamento-valor-col {
+        min-width: 138px;
+    }
+
+    .lancamento-status-col {
+        min-width: 128px;
+    }
+
+    .lancamento-actions-col {
+        min-width: 112px;
+    }
+
+    .lancamento-row-actions {
+        align-items: center;
+        display: inline-flex;
+        gap: .25rem;
+        justify-content: center;
+    }
+
+    .lancamento-status-pill {
+        align-items: center;
+        display: inline-flex;
+        gap: .25rem;
+        white-space: nowrap;
     }
 
     .category-dot {
@@ -169,8 +222,15 @@
     .lancamento-card-grid {
         display: grid;
         gap: .7rem;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
         margin-top: .9rem;
+    }
+
+    .lancamento-card-metric {
+        background: #f8fafc;
+        border: 1px solid rgba(15, 23, 42, 0.06);
+        border-radius: 8px;
+        padding: .7rem;
     }
 
     .lancamento-field-label {
@@ -191,7 +251,7 @@
     .lancamento-actions {
         display: grid;
         gap: .5rem;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
         margin-top: 1rem;
     }
 
@@ -204,6 +264,13 @@
         border: 1px solid rgba(15, 23, 42, 0.08);
         border-radius: 8px;
         padding: .9rem;
+    }
+
+    .edit-lancamento-modal .form-label {
+        color: #334155;
+        font-size: .82rem;
+        font-weight: 800;
+        margin-bottom: .35rem;
     }
 
     @media (max-width: 767.98px) {
@@ -529,9 +596,10 @@
                             <th class="ps-3">Categoria</th>
                             <th>Descri&ccedil;&atilde;o</th>
                             <th>Vencimento</th>
-                            <th class="text-end">Estimado</th>
-                            <th class="text-end">Real</th>
-                            <th class="text-center">Status</th>
+                            <th class="text-end lancamento-valor-col">Estimado</th>
+                            <th class="text-end lancamento-valor-col">Real</th>
+                            <th class="text-center lancamento-status-col">Status</th>
+                            <th class="text-center lancamento-actions-col">A&ccedil;&otilde;es</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -542,9 +610,9 @@
                                         {{ l.CategoriaNome }}
                                     </span>
                                 </td>
-                                <td class="fw-bold">{{ l.Descricao }}</td>
+                                <td class="fw-bold lancamento-descricao">{{ l.Descricao }}</td>
                                 <td>{{ l.DataVencimento.strftime('%d/%m/%Y') if l.DataVencimento else '-' }}</td>
-                                <td class="text-end text-muted" style="min-width: 150px;">
+                                <td class="text-end text-muted lancamento-valor-col">
                                     {% if not l.Pago %}
                                         <button id="display-estimado-{{ l.LancamentoId }}"
                                                 type="button"
@@ -570,7 +638,7 @@
                                         {{ dinheiro(l.ValorEstimado) }}
                                     {% endif %}
                                 </td>
-                                <td class="text-end" style="min-width: 150px;">
+                                <td class="text-end lancamento-valor-col">
                                     <button id="display-valor-{{ l.LancamentoId }}"
                                             type="button"
                                             onclick="habilitarEdicao({{ l.LancamentoId }})"
@@ -594,7 +662,7 @@
                                 </td>
                                 <td class="text-center" id="status-container-{{ l.LancamentoId }}">
                                     {% if l.Pago %}
-                                        <span class="text-success fw-bold"><i class="bi bi-check-circle-fill me-1"></i>Pago</span>
+                                        <span class="text-success fw-bold lancamento-status-pill"><i class="bi bi-check-circle-fill"></i>Pago</span>
                                         {% if l.CarteiraNome %}
                                             <div class="small mt-1">
                                                 <span class="badge rounded-pill" style="background-color: {{ l.CarteiraCorHex or '#6c757d' }};">
@@ -616,14 +684,19 @@
                                             </button>
                                         </div>
                                     {% endif %}
-                                    <button type="button" class="btn btn-sm text-danger p-1" onclick="deletarGasto({{ l.LancamentoId }})" title="Excluir">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                </td>
+                                <td class="text-center">
+                                    <div class="lancamento-row-actions">
+                                        {{ botao_editar_lancamento(l) }}
+                                        <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="deletarGasto({{ l.LancamentoId }})" title="Excluir">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         {% else %}
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-5">Nenhum lan&ccedil;amento encontrado para este per&iacute;odo.</td>
+                                <td colspan="7" class="text-center text-muted py-5">Nenhum lan&ccedil;amento encontrado para este per&iacute;odo.</td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -642,13 +715,13 @@
                             </div>
 
                             <div class="lancamento-card-grid">
-                                <div>
+                                <div class="lancamento-card-metric">
                                     <div class="lancamento-field-label">Vencimento</div>
                                     <div class="lancamento-field-value">
                                         {{ l.DataVencimento.strftime('%d/%m/%Y') if l.DataVencimento else '-' }}
                                     </div>
                                 </div>
-                                <div>
+                                <div class="lancamento-card-metric">
                                     <div class="lancamento-field-label">Status</div>
                                     <div class="lancamento-field-value">
                                         {% if l.Pago %}
@@ -665,7 +738,7 @@
                                         {% endif %}
                                     </div>
                                 </div>
-                                <div>
+                                <div class="lancamento-card-metric">
                                     <div class="lancamento-field-label">Valor estimado</div>
                                     <div class="lancamento-field-value">
                                         {% if not l.Pago %}
@@ -694,7 +767,7 @@
                                         {% endif %}
                                     </div>
                                 </div>
-                                <div>
+                                <div class="lancamento-card-metric">
                                     <div class="lancamento-field-label">Valor real</div>
                                     <div class="lancamento-field-value">
                                         <button id="display-valor-mobile-{{ l.LancamentoId }}"
@@ -722,6 +795,7 @@
                             </div>
 
                             <div class="lancamento-actions">
+                                {{ botao_editar_lancamento(l, 'btn btn-outline-primary fw-bold touch-btn', 'Editar') }}
                                 {% if not l.Pago %}
                                     <button
                                         type="button"
@@ -734,7 +808,7 @@
                                         <i class="bi bi-check-circle me-1"></i>Baixar
                                     </button>
                                 {% endif %}
-                                <button type="button" class="btn btn-outline-secondary fw-bold touch-btn" onclick="deletarGasto({{ l.LancamentoId }})">
+                                <button type="button" class="btn btn-outline-danger fw-bold touch-btn" onclick="deletarGasto({{ l.LancamentoId }})">
                                     <i class="bi bi-trash me-1"></i>Excluir
                                 </button>
                             </div>
@@ -882,6 +956,88 @@
     </div>
 </div>
 
+<div class="modal fade edit-lancamento-modal" id="modalEditarLancamento" tabindex="-1" aria-labelledby="modalEditarLancamentoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form id="formEditarLancamento" onsubmit="event.preventDefault(); salvarEdicaoLancamento();">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title fw-bold" id="modalEditarLancamentoLabel">Editar lan&ccedil;amento</h5>
+                        <div class="text-muted small" id="editarLancamentoResumo">-</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editarLancamentoId">
+
+                    <div class="row g-3">
+                        <div class="col-md-7">
+                            <label for="editarDescricao" class="form-label">Descri&ccedil;&atilde;o</label>
+                            <input type="text" id="editarDescricao" class="form-control" maxlength="140" required>
+                        </div>
+                        <div class="col-md-5">
+                            <label for="editarCategoriaId" class="form-label">Categoria</label>
+                            <select id="editarCategoriaId" class="form-select" required>
+                                <option value="">Selecione...</option>
+                                {% for cat in categorias %}
+                                    <option value="{{ cat.CategoriaId }}">{{ cat.Nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-sm-6 col-lg-4">
+                            <label for="editarDataVencimento" class="form-label">Vencimento</label>
+                            <input type="date" id="editarDataVencimento" class="form-control" required>
+                        </div>
+                        <div class="col-sm-6 col-lg-4">
+                            <label for="editarValorEstimado" class="form-label">Valor estimado</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="text" id="editarValorEstimado" class="form-control text-end" inputmode="decimal" required>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-lg-4">
+                            <label for="editarPago" class="form-label">Status</label>
+                            <select id="editarPago" class="form-select" onchange="atualizarCamposEdicaoStatus()">
+                                <option value="0">Em aberto</option>
+                                <option value="1">Pago</option>
+                            </select>
+                        </div>
+                        <div class="col-sm-6 col-lg-4">
+                            <label for="editarValorReal" class="form-label">Valor real</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="text" id="editarValorReal" class="form-control text-end" inputmode="decimal" required>
+                            </div>
+                        </div>
+                        <div class="col-lg-8">
+                            <label for="editarCarteiraId" class="form-label">Carteira</label>
+                            <select id="editarCarteiraId"
+                                    class="form-select"
+                                    data-has-carteiras="{% if carteiras %}1{% else %}0{% endif %}"
+                                    {% if not carteiras %}disabled{% endif %}>
+                                {% if carteiras %}
+                                    <option value="">Selecione a carteira...</option>
+                                    {% for carteira in carteiras %}
+                                        <option value="{{ carteira.CarteiraId }}">{{ carteira.Nome }}</option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option value="">Nenhuma carteira cadastrada</option>
+                                {% endif %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" id="btnSalvarEdicaoLancamento" class="btn btn-primary fw-bold">
+                        <i class="bi bi-check-lg me-1"></i>Salvar altera&ccedil;&otilde;es
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="modalBaixa" tabindex="-1" aria-labelledby="modalBaixaLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -952,6 +1108,7 @@
 const financeRoutes = {
     adicionarGasto: "{{ url_for('financas.adicionar_gasto') }}",
     deletarGasto: "{{ url_for('financas.deletar_gasto', id=0) }}",
+    editarGasto: "{{ url_for('financas.editar_gasto', id=0) }}",
     baixarGasto: "{{ url_for('financas.baixar_gasto', id=0) }}",
     atualizarEstimado: "{{ url_for('financas.atualizar_valor_estimado', id=0) }}",
     atualizarReal: "{{ url_for('financas.atualizar_valor_real', id=0) }}"
@@ -972,19 +1129,140 @@ function atualizarLinkNovoGasto() {
 
 window.addEventListener('DOMContentLoaded', atualizarLinkNovoGasto);
 
+function atualizarCamposEdicaoStatus() {
+    const pago = document.getElementById('editarPago')?.value === '1';
+    const valorRealInput = document.getElementById('editarValorReal');
+    const carteiraSelect = document.getElementById('editarCarteiraId');
+    const hasCarteiras = carteiraSelect?.dataset.hasCarteiras === '1';
+
+    if (valorRealInput) {
+        valorRealInput.disabled = !pago;
+        valorRealInput.required = pago;
+    }
+
+    if (carteiraSelect) {
+        carteiraSelect.disabled = !pago || !hasCarteiras;
+        carteiraSelect.required = pago && hasCarteiras;
+        if (!pago) carteiraSelect.value = '';
+    }
+}
+
+function abrirModalEdicaoLancamento(botao) {
+    const modalEl = document.getElementById('modalEditarLancamento');
+    if (!modalEl || typeof bootstrap === 'undefined') return;
+
+    document.getElementById('editarLancamentoId').value = botao.dataset.id || '';
+    document.getElementById('editarDescricao').value = botao.dataset.descricao || '';
+    document.getElementById('editarCategoriaId').value = botao.dataset.categoriaId || '';
+    document.getElementById('editarDataVencimento').value = botao.dataset.dataVencimento || '';
+    document.getElementById('editarValorEstimado').value = botao.dataset.valorEstimado || '0,00';
+    document.getElementById('editarValorReal').value = botao.dataset.valorReal || '0,00';
+    document.getElementById('editarPago').value = botao.dataset.pago === '1' ? '1' : '0';
+    document.getElementById('editarCarteiraId').value = botao.dataset.carteiraId || '';
+    document.getElementById('editarLancamentoResumo').textContent = botao.dataset.descricao || '-';
+
+    atualizarCamposEdicaoStatus();
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+function salvarEdicaoLancamento() {
+    const id = document.getElementById('editarLancamentoId')?.value;
+    const botaoSalvar = document.getElementById('btnSalvarEdicaoLancamento');
+    const pago = document.getElementById('editarPago')?.value === '1';
+    const carteiraSelect = document.getElementById('editarCarteiraId');
+    const valorRealInput = document.getElementById('editarValorReal');
+
+    if (!id) {
+        alert("Lancamento nao identificado.");
+        return;
+    }
+
+    if (pago && carteiraSelect?.dataset.hasCarteiras === '1' && !carteiraSelect.value) {
+        alert("Selecione a carteira usada no pagamento.");
+        carteiraSelect.focus();
+        return;
+    }
+
+    if (pago && (!Number.isFinite(parseMoneyBR(valorRealInput.value)) || parseMoneyBR(valorRealInput.value) <= 0)) {
+        alert("Informe um valor real maior que zero para marcar como pago.");
+        valorRealInput.focus();
+        return;
+    }
+
+    botaoSalvar.disabled = true;
+    botaoSalvar.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Salvando...';
+
+    fetch(routeWithId(financeRoutes.editarGasto, id), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': window.csrfToken
+        },
+        body: JSON.stringify({
+            descricao: document.getElementById('editarDescricao').value,
+            categoria_id: document.getElementById('editarCategoriaId').value,
+            data_vencimento: document.getElementById('editarDataVencimento').value,
+            valor_estimado: document.getElementById('editarValorEstimado').value,
+            valor_real: valorRealInput.value,
+            pago: pago ? 1 : 0,
+            carteira_id: carteiraSelect?.value || null
+        })
+    })
+    .then(async response => {
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (error) {
+            data = {};
+        }
+
+        if (response.ok && data.success !== false) {
+            window.location.reload();
+            return;
+        }
+
+        alert(data.message || "Nao foi possivel salvar o lancamento.");
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert("Erro ao salvar o lancamento.");
+    })
+    .finally(() => {
+        botaoSalvar.disabled = false;
+        botaoSalvar.innerHTML = '<i class="bi bi-check-lg me-1"></i>Salvar altera&ccedil;&otilde;es';
+    });
+}
+
 function deletarGasto(id) {
-    if (!confirm("Excluir este lançamento permanentemente?")) return;
+    if (!confirm("Excluir este lancamento permanentemente?")) return;
 
     fetch(routeWithId(financeRoutes.deletarGasto, id), {
         method: 'POST',
         headers: { 'X-CSRFToken': window.csrfToken }
     })
-    .then(res => res.json())
+    .then(async response => {
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (error) {
+            data = {};
+        }
+
+        if (response.ok && data.success !== false) {
+            return data;
+        }
+
+        alert(data.message || "Erro ao excluir lancamento.");
+        throw new Error('delete-failed');
+    })
     .then(data => {
         if (data.success) window.location.reload();
-        else alert("Erro ao excluir lançamento.");
     })
-    .catch(error => console.error('Erro ao deletar:', error));
+    .catch(error => {
+        if (error.message === 'delete-failed') return;
+        console.error('Erro ao deletar:', error);
+        alert("Erro ao excluir lancamento.");
+    });
 }
 
 function dataHojeParaInput() {

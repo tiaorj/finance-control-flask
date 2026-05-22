@@ -94,6 +94,7 @@ def garantir_tabela_assinatura_lancamentos(cursor):
                 LancamentoId INT NOT NULL,
                 MesReferencia INT NOT NULL,
                 AnoReferencia INT NOT NULL,
+                Ignorado BIT NOT NULL DEFAULT 0,
                 DataSincronizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
                 CONSTRAINT FK_FIN_AssinaturaLancamentos_Usuarios
                     FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
@@ -111,6 +112,15 @@ def garantir_tabela_assinatura_lancamentos(cursor):
         BEGIN
             CREATE UNIQUE INDEX UX_FIN_AssinaturaLancamentos_Periodo
             ON dbo.FIN_AssinaturaLancamentos (UsuarioId, AssinaturaId, MesReferencia, AnoReferencia)
+        END
+    """)
+
+    cursor.execute("""
+        IF COL_LENGTH('dbo.FIN_AssinaturaLancamentos', 'Ignorado') IS NULL
+        BEGIN
+            ALTER TABLE dbo.FIN_AssinaturaLancamentos
+            ADD Ignorado BIT NOT NULL
+                CONSTRAINT DF_FIN_AssinaturaLancamentos_Ignorado DEFAULT 0
         END
     """)
 
@@ -172,7 +182,8 @@ def sincronizar_assinaturas_periodo(cursor, usuario_id, mes, ano, assinatura_id=
             continue
 
         cursor.execute("""
-            SELECT M.AssinaturaLancamentoId, M.LancamentoId, L.Pago
+            SELECT M.AssinaturaLancamentoId, M.LancamentoId, L.Pago,
+                   ISNULL(M.Ignorado, 0) AS Ignorado
             FROM FIN_AssinaturaLancamentos M
             LEFT JOIN FIN_Lancamentos L
                 ON L.LancamentoId = M.LancamentoId AND L.UsuarioId = M.UsuarioId
@@ -180,6 +191,9 @@ def sincronizar_assinaturas_periodo(cursor, usuario_id, mes, ano, assinatura_id=
               AND M.MesReferencia = ? AND M.AnoReferencia = ?
         """, (usuario_id, assinatura.AssinaturaId, mes, ano))
         vinculo = cursor.fetchone()
+
+        if vinculo and vinculo.Ignorado:
+            continue
 
         if vinculo and vinculo.Pago is not None:
             if not vinculo.Pago:
@@ -204,7 +218,7 @@ def sincronizar_assinaturas_periodo(cursor, usuario_id, mes, ano, assinatura_id=
         if vinculo:
             cursor.execute("""
                 UPDATE FIN_AssinaturaLancamentos
-                SET LancamentoId = ?, DataSincronizacao = SYSUTCDATETIME()
+                SET LancamentoId = ?, Ignorado = 0, DataSincronizacao = SYSUTCDATETIME()
                 WHERE AssinaturaLancamentoId = ? AND UsuarioId = ?
             """, (lancamento_id, vinculo.AssinaturaLancamentoId, usuario_id))
         else:

@@ -4,7 +4,7 @@ from datetime import datetime, date
 import calendar
 from flask_login import current_user
 from routes.assinaturas import montar_resumo_assinaturas
-from routes.financeiro_integracoes import sincronizar_assinaturas_periodo
+from routes.financeiro_integracoes import garantir_tabela_assinatura_lancamentos, sincronizar_assinaturas_periodo
 from routes.metas import montar_resumo_metas
 
 financas_bp = Blueprint('financas', __name__, url_prefix='/app/financeiro')
@@ -69,6 +69,17 @@ def parse_money(valor, default=0.0):
         return float(valor_limpo) if valor_limpo else default
     except ValueError:
         return default
+
+
+def parse_money_strict(valor):
+    if valor is None or str(valor).strip() == '':
+        raise ValueError
+
+    valor_limpo = str(valor).replace('R$', '').replace(' ', '')
+    if ',' in valor_limpo:
+        valor_limpo = valor_limpo.replace('.', '').replace(',', '.')
+    return float(valor_limpo)
+
 
 MESES_LISTA = [
     (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
@@ -404,6 +415,16 @@ def movimentar_carteira(cursor, usuario_id, carteira_id, delta):
         WHERE CarteiraId = ? AND UsuarioId = ? AND Ativa = 1
     """, (delta, carteira_id, usuario_id))
     return cursor.rowcount > 0
+
+
+def ignorar_sincronizacao_assinatura_lancamento(cursor, usuario_id, lancamento_id):
+    garantir_tabela_assinatura_lancamentos(cursor)
+    cursor.execute("""
+        UPDATE FIN_AssinaturaLancamentos
+        SET Ignorado = 1,
+            DataSincronizacao = SYSUTCDATETIME()
+        WHERE LancamentoId = ? AND UsuarioId = ?
+    """, (lancamento_id, usuario_id))
 
 
 def sincronizar_caixa_com_carteiras(cursor, usuario_id, mes, ano):
@@ -1801,6 +1822,128 @@ def atualizar_valor_real(id):
     except ValueError:
         return {"success": False, "message": "Valor inválido"}, 400
 
+
+@financas_bp.route('/editar-gasto/<int:id>', methods=['POST'])
+def editar_gasto(id):
+    usuario_id = usuario_atual_id()
+    dados = request.get_json(silent=True) or request.form
+
+    descricao = (dados.get('descricao') or '').strip()
+    categoria_id = dados.get('categoria_id')
+    data_vencimento_bruta = dados.get('data_vencimento')
+    pago = str(dados.get('pago', '')).lower() in {'1', 'true', 'on', 'sim', 'pago'}
+    carteira_id = dados.get('carteira_id') or None
+
+    if not descricao:
+        return {"success": False, "message": "Informe a descricao do lancamento."}, 400
+
+    try:
+        categoria_id = int(categoria_id)
+    except (TypeError, ValueError):
+        return {"success": False, "message": "Selecione uma categoria valida."}, 400
+
+    try:
+        data_vencimento = datetime.strptime(data_vencimento_bruta, '%Y-%m-%d').date()
+    except (TypeError, ValueError):
+        return {"success": False, "message": "Informe uma data de vencimento valida."}, 400
+
+    try:
+        valor_estimado = parse_money_strict(dados.get('valor_estimado'))
+        valor_real = parse_money_strict(dados.get('valor_real')) if pago else 0.0
+    except (TypeError, ValueError):
+        return {"success": False, "message": "Informe valores validos."}, 400
+
+    if valor_estimado < 0:
+        return {"success": False, "message": "O valor estimado nao pode ser negativo."}, 400
+
+    if pago and valor_real <= 0:
+        return {"success": False, "message": "Informe um valor real maior que zero para marcar como pago."}, 400
+
+    if valor_real < 0:
+        return {"success": False, "message": "O valor real nao pode ser negativo."}, 400
+
+    if carteira_id:
+        try:
+            carteira_id = int(carteira_id)
+        except (TypeError, ValueError):
+            return {"success": False, "message": "Carteira invalida."}, 400
+
+    with get_db_cursor() as cursor:
+        garantir_estrutura_carteiras(cursor)
+        garantir_tabela_assinatura_lancamentos(cursor)
+
+        cursor.execute("""
+            SELECT ISNULL(ValorReal, 0) AS ValorReal, Pago, CarteiraId, MesReferencia, AnoReferencia
+            FROM FIN_Lancamentos
+            WHERE LancamentoId = ? AND UsuarioId = ?
+        """, (id, usuario_id))
+        gasto = cursor.fetchone()
+
+        if not gasto:
+            return {"success": False, "message": "Lancamento nao encontrado."}, 404
+
+        cursor.execute("""
+            SELECT CategoriaId
+            FROM FIN_Categorias
+            WHERE CategoriaId = ? AND UsuarioId = ?
+        """, (categoria_id, usuario_id))
+        if not cursor.fetchone():
+            return {"success": False, "message": "Selecione uma categoria valida."}, 400
+
+        resumo_carteiras = obter_resumo_carteiras(cursor, usuario_id)
+        if pago and valor_real > 0 and resumo_carteiras['ativas'] > 0:
+            if not carteira_ativa_existe(cursor, usuario_id, carteira_id):
+                return {"success": False, "message": "Selecione uma carteira valida para o pagamento."}, 400
+        elif not carteira_ativa_existe(cursor, usuario_id, carteira_id):
+            carteira_id = None
+
+        mes_referencia = data_vencimento.month
+        ano_referencia = data_vencimento.year
+
+        valor_real_anterior = float(gasto.ValorReal or 0) if gasto.Pago else 0.0
+        carteira_anterior = gasto.CarteiraId if gasto.Pago else None
+        valor_real_novo = valor_real if pago else 0.0
+        carteira_nova = carteira_id if pago else None
+
+        cursor.execute("""
+            UPDATE FIN_Lancamentos
+            SET CategoriaId = ?,
+                Descricao = ?,
+                ValorEstimado = ?,
+                ValorReal = ?,
+                DataVencimento = ?,
+                MesReferencia = ?,
+                AnoReferencia = ?,
+                Pago = ?,
+                CarteiraId = ?
+            WHERE LancamentoId = ? AND UsuarioId = ?
+        """, (
+            categoria_id,
+            descricao,
+            valor_estimado,
+            valor_real_novo,
+            data_vencimento,
+            mes_referencia,
+            ano_referencia,
+            1 if pago else 0,
+            carteira_nova,
+            id,
+            usuario_id,
+        ))
+
+        if gasto.Pago and valor_real_anterior > 0:
+            movimentar_carteira(cursor, usuario_id, carteira_anterior, valor_real_anterior)
+            ajustar_caixa(cursor, usuario_id, gasto.MesReferencia, gasto.AnoReferencia, valor_real_anterior)
+
+        if pago and valor_real_novo > 0:
+            movimentar_carteira(cursor, usuario_id, carteira_nova, -valor_real_novo)
+            ajustar_caixa(cursor, usuario_id, mes_referencia, ano_referencia, -valor_real_novo)
+
+        ignorar_sincronizacao_assinatura_lancamento(cursor, usuario_id, id)
+
+    return {"success": True}, 200
+
+
 @financas_bp.route('/rendas', methods=['GET', 'POST'])
 def gerenciar_rendas():
     usuario_id = usuario_atual_id()
@@ -2090,6 +2233,7 @@ def deletar_gasto(id):
 
     with get_db_cursor() as cursor:
         garantir_estrutura_carteiras(cursor)
+        garantir_tabela_assinatura_lancamentos(cursor)
         cursor.execute("""
             SELECT ISNULL(ValorReal, 0) AS ValorReal, Pago, CarteiraId, MesReferencia, AnoReferencia
             FROM FIN_Lancamentos
@@ -2097,11 +2241,15 @@ def deletar_gasto(id):
         """, (id, usuario_id))
         gasto = cursor.fetchone()
 
+        if not gasto:
+            return {"success": False, "message": "Lancamento nao encontrado."}, 404
+
         if gasto and gasto.Pago and float(gasto.ValorReal or 0) > 0:
             valor_real = float(gasto.ValorReal or 0)
             movimentar_carteira(cursor, usuario_id, gasto.CarteiraId, valor_real)
             ajustar_caixa(cursor, usuario_id, gasto.MesReferencia, gasto.AnoReferencia, valor_real)
 
+        ignorar_sincronizacao_assinatura_lancamento(cursor, usuario_id, id)
         cursor.execute("DELETE FROM FIN_Lancamentos WHERE LancamentoId = ? AND UsuarioId = ?", (id, usuario_id))
 
     flash('Lançamento excluído com sucesso!', 'success')
