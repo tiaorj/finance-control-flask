@@ -12,7 +12,8 @@
         data-valor-estimado="{{ (l.ValorEstimado or 0) | formato_real }}"
         data-valor-real="{{ (l.ValorReal or 0) | formato_real }}"
         data-pago="{{ 1 if l.Pago else 0 }}"
-        data-carteira-id="{{ l.CarteiraId or '' }}">
+        data-carteira-id="{{ l.CarteiraId or '' }}"
+        data-recorrente-id="{{ l.LancamentoRecorrenteId or '' }}">
     <i class="bi bi-pencil-square{% if label %} me-1{% endif %}"></i>{% if label %}{{ label }}{% endif %}
 </button>
 {%- endmacro %}
@@ -355,14 +356,18 @@
                 </a>
 
                 <form action="{{ url_for('financas.clonar_mes_anterior') }}" method="POST"
-                      onsubmit="return confirm('Importar lançamentos do mês anterior para {{ mes_sel }}/{{ ano_sel }}?');">
+                      onsubmit="return confirm('Importar apenas lancamentos avulsos do mes anterior para {{ mes_sel }}/{{ ano_sel }}? As despesas fixas recorrentes ja sao geradas automaticamente.');">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="mes" value="{{ mes_sel }}">
                     <input type="hidden" name="ano" value="{{ ano_sel }}">
                     <button type="submit" class="btn btn-outline-secondary">
-                        <i class="bi bi-copy me-1"></i>Importar Mês Anterior
+                        <i class="bi bi-copy me-1"></i>Importar avulsos
                     </button>
                 </form>
+
+                <a href="{{ url_for('financas.lancamentos_recorrentes') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-arrow-repeat me-1"></i>Despesas fixas
+                </a>
             </div>
         </div>
 
@@ -610,7 +615,14 @@
                                         {{ l.CategoriaNome }}
                                     </span>
                                 </td>
-                                <td class="fw-bold lancamento-descricao">{{ l.Descricao }}</td>
+                                <td class="fw-bold lancamento-descricao">
+                                    {{ l.Descricao }}
+                                    {% if l.LancamentoRecorrenteId %}
+                                        <span class="badge rounded-pill text-bg-light ms-1" title="Despesa recorrente">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                        </span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ l.DataVencimento.strftime('%d/%m/%Y') if l.DataVencimento else '-' }}</td>
                                 <td class="text-end text-muted lancamento-valor-col">
                                     {% if not l.Pago %}
@@ -708,7 +720,14 @@
                     {% for l in lancamentos %}
                         <div class="lancamento-mobile-card">
                             <div class="d-flex align-items-start justify-content-between gap-2">
-                                <div class="lancamento-card-title">{{ l.Descricao }}</div>
+                                <div class="lancamento-card-title">
+                                    {{ l.Descricao }}
+                                    {% if l.LancamentoRecorrenteId %}
+                                        <span class="badge rounded-pill text-bg-light ms-1" title="Despesa recorrente">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                        </span>
+                                    {% endif %}
+                                </div>
                                 <span class="badge rounded-pill flex-shrink-0" style="background-color: {{ l.CorHex or '#6c757d' }};">
                                     {{ l.CategoriaNome }}
                                 </span>
@@ -1025,6 +1044,17 @@
                                 {% endif %}
                             </select>
                         </div>
+                        <div class="col-12">
+                            <div class="form-check border rounded p-3 ps-5 bg-light">
+                                <input class="form-check-input" type="checkbox" id="editarRecorrente">
+                                <label class="form-check-label fw-bold" for="editarRecorrente">
+                                    Replicar mensalmente nos proximos meses
+                                </label>
+                                <div class="small text-muted" id="editarRecorrenteAjuda">
+                                    Cria uma despesa fixa com os dados atuais deste lancamento.
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1161,6 +1191,15 @@ function abrirModalEdicaoLancamento(botao) {
     document.getElementById('editarCarteiraId').value = botao.dataset.carteiraId || '';
     document.getElementById('editarLancamentoResumo').textContent = botao.dataset.descricao || '-';
 
+    const recorrenteCheckbox = document.getElementById('editarRecorrente');
+    const recorrenteAjuda = document.getElementById('editarRecorrenteAjuda');
+    const jaRecorrente = Boolean(botao.dataset.recorrenteId);
+    recorrenteCheckbox.checked = jaRecorrente;
+    recorrenteCheckbox.disabled = jaRecorrente;
+    recorrenteAjuda.textContent = jaRecorrente
+        ? 'Este lancamento ja esta vinculado a uma despesa fixa. Ajustes da regra ficam na tela Despesas fixas.'
+        : 'Cria uma despesa fixa mensal com os dados atuais deste lancamento.';
+
     atualizarCamposEdicaoStatus();
     bootstrap.Modal.getOrCreateInstance(modalEl).show();
 }
@@ -1205,7 +1244,8 @@ function salvarEdicaoLancamento() {
             valor_estimado: document.getElementById('editarValorEstimado').value,
             valor_real: valorRealInput.value,
             pago: pago ? 1 : 0,
-            carteira_id: carteiraSelect?.value || null
+            carteira_id: carteiraSelect?.value || null,
+            recorrente: document.getElementById('editarRecorrente')?.checked ? 1 : 0
         })
     })
     .then(async response => {

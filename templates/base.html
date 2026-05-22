@@ -341,6 +341,13 @@
                                 <small>Sal&aacute;rio, pro-labore e alugu&eacute;is</small>
                             </span>
                         </a>
+                        <a class="app-nav-link {{ 'active' if endpoint == 'financas.lancamentos_recorrentes' else '' }}" href="{{ url_for('financas.lancamentos_recorrentes') }}">
+                            <i class="bi bi-calendar2-week"></i>
+                            <span class="app-nav-copy">
+                                <strong>Despesas fixas</strong>
+                                <small>Contas que voltam todo m&ecirc;s</small>
+                            </span>
+                        </a>
                         <a class="app-nav-link {{ 'active' if endpoint == 'financas.carteiras' else '' }}" href="{{ url_for('financas.carteiras') }}">
                             <i class="bi bi-wallet2"></i>
                             <span class="app-nav-copy">

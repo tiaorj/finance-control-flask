@@ -53,6 +53,11 @@ def legacy_rendas_recorrentes():
     return redirect(url_for('financas.rendas_recorrentes', **request.args))
 
 
+@financas_legacy_bp.route('/lancamentos/recorrentes')
+def legacy_lancamentos_recorrentes():
+    return redirect(url_for('financas.lancamentos_recorrentes', **request.args))
+
+
 @financas_legacy_bp.route('/categorias')
 def legacy_categorias():
     return redirect(url_for('financas.categorias', **request.args))
@@ -252,6 +257,86 @@ def garantir_estrutura_rendas_recorrentes(cursor):
     """)
 
 
+def garantir_estrutura_lancamentos_recorrentes(cursor):
+    garantir_estrutura_carteiras(cursor)
+
+    cursor.execute("""
+        IF OBJECT_ID('dbo.FIN_LancamentosRecorrentes', 'U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.FIN_LancamentosRecorrentes (
+                LancamentoRecorrenteId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                UsuarioId INT NOT NULL,
+                CategoriaId INT NOT NULL,
+                Descricao NVARCHAR(140) NOT NULL,
+                ValorEstimado DECIMAL(18,2) NOT NULL DEFAULT 0,
+                DiaVencimento INT NOT NULL,
+                Periodicidade NVARCHAR(20) NOT NULL DEFAULT 'mensal',
+                IntervaloMeses INT NOT NULL DEFAULT 1,
+                DataInicio DATE NOT NULL,
+                DataFim DATE NULL,
+                Ativa BIT NOT NULL DEFAULT 1,
+                DataCriacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                DataAtualizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                CONSTRAINT FK_FIN_LancamentosRecorrentes_Usuarios
+                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
+                CONSTRAINT CK_FIN_LancamentosRecorrentes_Dia
+                    CHECK (DiaVencimento BETWEEN 1 AND 31),
+                CONSTRAINT CK_FIN_LancamentosRecorrentes_Intervalo
+                    CHECK (IntervaloMeses > 0),
+                CONSTRAINT CK_FIN_LancamentosRecorrentes_Periodicidade
+                    CHECK (Periodicidade IN ('mensal', 'bimestral', 'trimestral', 'semestral', 'anual', 'personalizado'))
+            )
+        END
+    """)
+
+    cursor.execute("""
+        IF OBJECT_ID('dbo.FIN_LancamentoRecorrenteOcorrencias', 'U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.FIN_LancamentoRecorrenteOcorrencias (
+                OcorrenciaId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                UsuarioId INT NOT NULL,
+                LancamentoRecorrenteId INT NOT NULL,
+                LancamentoId INT NOT NULL,
+                MesReferencia INT NOT NULL,
+                AnoReferencia INT NOT NULL,
+                Ignorado BIT NOT NULL DEFAULT 0,
+                DataSincronizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                CONSTRAINT FK_FIN_LancamentoRecorrenteOcorrencias_Usuarios
+                    FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId),
+                CONSTRAINT FK_FIN_LancamentoRecorrenteOcorrencias_Recorrentes
+                    FOREIGN KEY (LancamentoRecorrenteId) REFERENCES dbo.FIN_LancamentosRecorrentes(LancamentoRecorrenteId)
+            )
+        END
+
+        IF NOT EXISTS (
+            SELECT 1
+            FROM sys.indexes
+            WHERE name = 'UX_FIN_LancamentoRecorrenteOcorrencias_Periodo'
+              AND object_id = OBJECT_ID('dbo.FIN_LancamentoRecorrenteOcorrencias')
+        )
+        BEGIN
+            CREATE UNIQUE INDEX UX_FIN_LancamentoRecorrenteOcorrencias_Periodo
+            ON dbo.FIN_LancamentoRecorrenteOcorrencias (UsuarioId, LancamentoRecorrenteId, MesReferencia, AnoReferencia)
+        END
+    """)
+
+    cursor.execute("""
+        IF COL_LENGTH('dbo.FIN_LancamentoRecorrenteOcorrencias', 'Ignorado') IS NULL
+        BEGIN
+            ALTER TABLE dbo.FIN_LancamentoRecorrenteOcorrencias
+            ADD Ignorado BIT NOT NULL
+                CONSTRAINT DF_FIN_LancamentoRecorrenteOcorrencias_Ignorado DEFAULT 0
+        END
+    """)
+
+    cursor.execute("""
+        IF COL_LENGTH('dbo.FIN_Lancamentos', 'LancamentoRecorrenteId') IS NULL
+        BEGIN
+            ALTER TABLE dbo.FIN_Lancamentos ADD LancamentoRecorrenteId INT NULL
+        END
+    """)
+
+
 def tipo_carteira_valido(tipo):
     tipos_validos = {item[0] for item in TIPOS_CARTEIRA}
     return tipo if tipo in tipos_validos else 'outro'
@@ -346,6 +431,29 @@ def data_recebimento_recorrente(renda_recorrente, mes, ano):
     return data_ocorrencia
 
 
+def data_vencimento_recorrente(lancamento_recorrente, mes, ano):
+    data_inicio = normalizar_data(lancamento_recorrente.DataInicio)
+    if not data_inicio:
+        return None
+
+    periodo_inicio = chave_periodo(data_inicio.month, data_inicio.year)
+    periodo_destino = chave_periodo(mes, ano)
+    if periodo_destino < periodo_inicio:
+        return None
+
+    intervalo = max(int(lancamento_recorrente.IntervaloMeses or 1), 1)
+    if (periodo_destino - periodo_inicio) % intervalo != 0:
+        return None
+
+    dia = min(int(lancamento_recorrente.DiaVencimento or data_inicio.day), calendar.monthrange(ano, mes)[1])
+    data_ocorrencia = date(ano, mes, dia)
+    data_fim = normalizar_data(lancamento_recorrente.DataFim)
+    if data_fim and data_ocorrencia > data_fim:
+        return None
+
+    return data_ocorrencia
+
+
 def ajustar_caixa(cursor, usuario_id, mes, ano, delta):
     if not delta:
         return
@@ -421,6 +529,16 @@ def ignorar_sincronizacao_assinatura_lancamento(cursor, usuario_id, lancamento_i
     garantir_tabela_assinatura_lancamentos(cursor)
     cursor.execute("""
         UPDATE FIN_AssinaturaLancamentos
+        SET Ignorado = 1,
+            DataSincronizacao = SYSUTCDATETIME()
+        WHERE LancamentoId = ? AND UsuarioId = ?
+    """, (lancamento_id, usuario_id))
+
+
+def ignorar_sincronizacao_lancamento_recorrente(cursor, usuario_id, lancamento_id):
+    garantir_estrutura_lancamentos_recorrentes(cursor)
+    cursor.execute("""
+        UPDATE FIN_LancamentoRecorrenteOcorrencias
         SET Ignorado = 1,
             DataSincronizacao = SYSUTCDATETIME()
         WHERE LancamentoId = ? AND UsuarioId = ?
@@ -525,6 +643,103 @@ def sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, mes, ano, renda_r
             """, (usuario_id, recorrente.RendaRecorrenteId, renda_id, mes, ano))
 
 
+def criar_ocorrencia_lancamento_recorrente(cursor, usuario_id, lancamento_recorrente, data_vencimento, mes, ano):
+    cursor.execute("""
+        INSERT INTO FIN_Lancamentos
+        (UsuarioId, CategoriaId, LancamentoRecorrenteId, Descricao, ValorEstimado, ValorReal,
+         DataVencimento, MesReferencia, AnoReferencia, Pago)
+        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 0)
+    """, (
+        usuario_id,
+        lancamento_recorrente.CategoriaId,
+        lancamento_recorrente.LancamentoRecorrenteId,
+        lancamento_recorrente.Descricao,
+        float(lancamento_recorrente.ValorEstimado or 0),
+        data_vencimento,
+        mes,
+        ano,
+    ))
+    cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
+    return int(cursor.fetchone()[0])
+
+
+def sincronizar_lancamentos_recorrentes_periodo(cursor, usuario_id, mes, ano, lancamento_recorrente_id=None):
+    garantir_estrutura_lancamentos_recorrentes(cursor)
+
+    params = [usuario_id]
+    filtro = ''
+    if lancamento_recorrente_id:
+        filtro = ' AND LancamentoRecorrenteId = ?'
+        params.append(lancamento_recorrente_id)
+
+    cursor.execute(f"""
+        SELECT LancamentoRecorrenteId, UsuarioId, CategoriaId, Descricao,
+               ValorEstimado, DiaVencimento, Periodicidade, IntervaloMeses,
+               DataInicio, DataFim, Ativa
+        FROM FIN_LancamentosRecorrentes
+        WHERE UsuarioId = ? AND Ativa = 1{filtro}
+        ORDER BY Descricao ASC
+    """, tuple(params))
+    recorrentes = cursor.fetchall()
+
+    for recorrente in recorrentes:
+        data_vencimento = data_vencimento_recorrente(recorrente, mes, ano)
+        if not data_vencimento:
+            continue
+
+        cursor.execute("""
+            SELECT O.OcorrenciaId, O.LancamentoId, L.LancamentoId AS LancamentoExistente,
+                   ISNULL(O.Ignorado, 0) AS Ignorado
+            FROM FIN_LancamentoRecorrenteOcorrencias O
+            LEFT JOIN FIN_Lancamentos L
+                ON L.LancamentoId = O.LancamentoId AND L.UsuarioId = O.UsuarioId
+            WHERE O.UsuarioId = ? AND O.LancamentoRecorrenteId = ?
+              AND O.MesReferencia = ? AND O.AnoReferencia = ?
+        """, (usuario_id, recorrente.LancamentoRecorrenteId, mes, ano))
+        ocorrencia = cursor.fetchone()
+
+        if ocorrencia and ocorrencia.Ignorado:
+            continue
+
+        if ocorrencia and ocorrencia.LancamentoExistente:
+            continue
+
+        lancamento_id = criar_ocorrencia_lancamento_recorrente(
+            cursor, usuario_id, recorrente, data_vencimento, mes, ano
+        )
+
+        if ocorrencia:
+            cursor.execute("""
+                UPDATE FIN_LancamentoRecorrenteOcorrencias
+                SET LancamentoId = ?, Ignorado = 0, DataSincronizacao = SYSUTCDATETIME()
+                WHERE OcorrenciaId = ? AND UsuarioId = ?
+            """, (lancamento_id, ocorrencia.OcorrenciaId, usuario_id))
+        else:
+            cursor.execute("""
+                INSERT INTO FIN_LancamentoRecorrenteOcorrencias
+                (UsuarioId, LancamentoRecorrenteId, LancamentoId, MesReferencia, AnoReferencia)
+                VALUES (?, ?, ?, ?, ?)
+            """, (usuario_id, recorrente.LancamentoRecorrenteId, lancamento_id, mes, ano))
+
+
+def sincronizar_lancamento_recorrente_primeiro_periodo(cursor, usuario_id, lancamento_recorrente_id):
+    cursor.execute("""
+        SELECT DataInicio
+        FROM FIN_LancamentosRecorrentes
+        WHERE UsuarioId = ? AND LancamentoRecorrenteId = ? AND Ativa = 1
+    """, (usuario_id, lancamento_recorrente_id))
+    recorrente = cursor.fetchone()
+
+    if not recorrente:
+        return
+
+    data_inicio = normalizar_data(recorrente.DataInicio)
+    if data_inicio:
+        sincronizar_lancamentos_recorrentes_periodo(
+            cursor, usuario_id, data_inicio.month, data_inicio.year, lancamento_recorrente_id
+        )
+
+
 def sincronizar_renda_recorrente_primeiro_periodo(cursor, usuario_id, renda_recorrente_id):
     cursor.execute("""
         SELECT DataInicio
@@ -567,6 +782,29 @@ def remover_ocorrencias_renda_recorrente_pendentes(cursor, usuario_id, renda_rec
             """, (ocorrencia.OcorrenciaId, usuario_id))
 
 
+def remover_ocorrencias_lancamento_recorrente_pendentes(cursor, usuario_id, lancamento_recorrente_id):
+    garantir_estrutura_lancamentos_recorrentes(cursor)
+    cursor.execute("""
+        SELECT O.OcorrenciaId, O.LancamentoId, ISNULL(L.ValorReal, 0) AS ValorReal, L.Pago
+        FROM FIN_LancamentoRecorrenteOcorrencias O
+        LEFT JOIN FIN_Lancamentos L
+            ON L.LancamentoId = O.LancamentoId AND L.UsuarioId = O.UsuarioId
+        WHERE O.UsuarioId = ? AND O.LancamentoRecorrenteId = ?
+    """, (usuario_id, lancamento_recorrente_id))
+    ocorrencias = cursor.fetchall()
+
+    for ocorrencia in ocorrencias:
+        if ocorrencia.Pago is None or not ocorrencia.Pago:
+            cursor.execute("""
+                DELETE FROM FIN_Lancamentos
+                WHERE LancamentoId = ? AND UsuarioId = ? AND Pago = 0
+            """, (ocorrencia.LancamentoId, usuario_id))
+            cursor.execute("""
+                DELETE FROM FIN_LancamentoRecorrenteOcorrencias
+                WHERE OcorrenciaId = ? AND UsuarioId = ?
+            """, (ocorrencia.OcorrenciaId, usuario_id))
+
+
 def total_ocorrencias_renda_recorrente_recebidas(cursor, usuario_id, renda_recorrente_id):
     garantir_estrutura_rendas_recorrentes(cursor)
     cursor.execute("""
@@ -577,6 +815,19 @@ def total_ocorrencias_renda_recorrente_recebidas(cursor, usuario_id, renda_recor
         WHERE O.UsuarioId = ? AND O.RendaRecorrenteId = ?
           AND ISNULL(R.ValorReal, 0) > 0
     """, (usuario_id, renda_recorrente_id))
+    return int(cursor.fetchone()[0] or 0)
+
+
+def total_ocorrencias_lancamento_recorrente_pagas(cursor, usuario_id, lancamento_recorrente_id):
+    garantir_estrutura_lancamentos_recorrentes(cursor)
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM FIN_LancamentoRecorrenteOcorrencias O
+        JOIN FIN_Lancamentos L
+            ON L.LancamentoId = O.LancamentoId AND L.UsuarioId = O.UsuarioId
+        WHERE O.UsuarioId = ? AND O.LancamentoRecorrenteId = ?
+          AND L.Pago = 1
+    """, (usuario_id, lancamento_recorrente_id))
     return int(cursor.fetchone()[0] or 0)
 
 
@@ -626,6 +877,104 @@ def ler_dados_renda_recorrente_form():
         'data_fim': data_fim,
         'ativa': 1 if request.form.get('ativa', 'on') == 'on' else 0,
     }, None
+
+
+def ler_dados_lancamento_recorrente_form():
+    descricao = (request.form.get('descricao') or '').strip()
+    if not descricao:
+        return None, 'Informe a descricao da despesa recorrente.'
+
+    valor_estimado = parse_money(request.form.get('valor_estimado'))
+    if valor_estimado < 0:
+        return None, 'Informe um valor estimado maior ou igual a zero.'
+
+    try:
+        data_inicio = normalizar_data(request.form.get('data_inicio'))
+    except (TypeError, ValueError):
+        return None, 'Informe uma data de inicio valida.'
+
+    if not data_inicio:
+        return None, 'Informe a data de inicio da recorrencia.'
+
+    try:
+        data_fim = normalizar_data(request.form.get('data_fim')) if request.form.get('data_fim') else None
+    except (TypeError, ValueError):
+        return None, 'Informe uma data final valida.'
+
+    if data_fim and data_fim < data_inicio:
+        return None, 'A data final precisa ser maior ou igual a data de inicio.'
+
+    periodicidade = periodicidade_renda_valida(request.form.get('periodicidade') or 'mensal')
+    intervalo_meses = intervalo_renda(periodicidade, request.form.get('intervalo_meses'))
+
+    try:
+        dia_vencimento = int(request.form.get('dia_vencimento') or data_inicio.day)
+    except (TypeError, ValueError):
+        dia_vencimento = data_inicio.day
+    dia_vencimento = min(max(dia_vencimento, 1), 31)
+
+    return {
+        'descricao': descricao[:140],
+        'categoria_id': request.form.get('categoria_id') or None,
+        'valor_estimado': valor_estimado,
+        'dia_vencimento': dia_vencimento,
+        'periodicidade': periodicidade,
+        'intervalo_meses': intervalo_meses,
+        'data_inicio': data_inicio,
+        'data_fim': data_fim,
+        'ativa': 1 if request.form.get('ativa', 'on') == 'on' else 0,
+    }, None
+
+
+def criar_regra_recorrente_a_partir_lancamento(cursor, usuario_id, lancamento_id, dados_lancamento):
+    garantir_estrutura_lancamentos_recorrentes(cursor)
+
+    cursor.execute("""
+        SELECT ISNULL(L.LancamentoRecorrenteId, O.LancamentoRecorrenteId) AS LancamentoRecorrenteId
+        FROM FIN_Lancamentos L
+        LEFT JOIN FIN_LancamentoRecorrenteOcorrencias O
+            ON O.LancamentoId = L.LancamentoId AND O.UsuarioId = L.UsuarioId
+        WHERE L.LancamentoId = ? AND L.UsuarioId = ?
+    """, (lancamento_id, usuario_id))
+    existente = cursor.fetchone()
+    if existente and existente.LancamentoRecorrenteId:
+        return existente.LancamentoRecorrenteId
+
+    data_inicio = dados_lancamento['data_vencimento']
+    cursor.execute("""
+        INSERT INTO FIN_LancamentosRecorrentes
+        (UsuarioId, CategoriaId, Descricao, ValorEstimado, DiaVencimento,
+         Periodicidade, IntervaloMeses, DataInicio, DataFim, Ativa)
+        VALUES (?, ?, ?, ?, ?, 'mensal', 1, ?, NULL, 1)
+    """, (
+        usuario_id,
+        dados_lancamento['categoria_id'],
+        dados_lancamento['descricao'],
+        dados_lancamento['valor_estimado'],
+        data_inicio.day,
+        data_inicio,
+    ))
+    cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
+    recorrente_id = int(cursor.fetchone()[0])
+
+    cursor.execute("""
+        UPDATE FIN_Lancamentos
+        SET LancamentoRecorrenteId = ?
+        WHERE LancamentoId = ? AND UsuarioId = ?
+    """, (recorrente_id, lancamento_id, usuario_id))
+
+    cursor.execute("""
+        INSERT INTO FIN_LancamentoRecorrenteOcorrencias
+        (UsuarioId, LancamentoRecorrenteId, LancamentoId, MesReferencia, AnoReferencia)
+        VALUES (?, ?, ?, ?, ?)
+    """, (
+        usuario_id,
+        recorrente_id,
+        lancamento_id,
+        data_inicio.month,
+        data_inicio.year,
+    ))
+    return recorrente_id
 
 
 def periodo_por_chave(chave):
@@ -1425,6 +1774,234 @@ def excluir_renda_recorrente(id):
     return redirect(url_for('financas.rendas_recorrentes'))
 
 
+@financas_bp.route('/lancamentos/recorrentes', methods=['GET', 'POST'])
+def lancamentos_recorrentes():
+    usuario_id = usuario_atual_id()
+    mes_atual, ano_atual = periodo_atual()
+
+    if request.method == 'POST':
+        dados, erro = ler_dados_lancamento_recorrente_form()
+        if erro:
+            flash(erro, 'danger')
+            return redirect(url_for('financas.lancamentos_recorrentes'))
+
+        with get_db_cursor() as cursor:
+            garantir_estrutura_lancamentos_recorrentes(cursor)
+
+            cursor.execute("""
+                SELECT CategoriaId
+                FROM FIN_Categorias
+                WHERE CategoriaId = ? AND UsuarioId = ?
+            """, (dados['categoria_id'], usuario_id))
+            if not cursor.fetchone():
+                flash('Selecione uma categoria valida.', 'danger')
+                return redirect(url_for('financas.lancamentos_recorrentes'))
+
+            cursor.execute("""
+                INSERT INTO FIN_LancamentosRecorrentes
+                (UsuarioId, CategoriaId, Descricao, ValorEstimado, DiaVencimento,
+                 Periodicidade, IntervaloMeses, DataInicio, DataFim, Ativa)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                usuario_id,
+                dados['categoria_id'],
+                dados['descricao'],
+                dados['valor_estimado'],
+                dados['dia_vencimento'],
+                dados['periodicidade'],
+                dados['intervalo_meses'],
+                dados['data_inicio'],
+                dados['data_fim'],
+                dados['ativa'],
+            ))
+            cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
+            lancamento_recorrente_id = int(cursor.fetchone()[0])
+
+            if dados['ativa']:
+                sincronizar_lancamento_recorrente_primeiro_periodo(cursor, usuario_id, lancamento_recorrente_id)
+                sincronizar_lancamentos_recorrentes_periodo(cursor, usuario_id, mes_atual, ano_atual, lancamento_recorrente_id)
+
+        flash('Despesa recorrente criada com sucesso.', 'success')
+        return redirect(url_for('financas.lancamentos_recorrentes'))
+
+    with get_db_cursor() as cursor:
+        garantir_estrutura_lancamentos_recorrentes(cursor)
+        sincronizar_lancamentos_recorrentes_periodo(cursor, usuario_id, mes_atual, ano_atual)
+
+        cursor.execute("""
+            SELECT
+                LR.LancamentoRecorrenteId, LR.CategoriaId,
+                LR.Descricao, LR.ValorEstimado, LR.DiaVencimento,
+                LR.Periodicidade, LR.IntervaloMeses, LR.DataInicio, LR.DataFim,
+                LR.Ativa, LR.DataAtualizacao,
+                C.Nome AS CategoriaNome, C.CorHex AS CategoriaCorHex,
+                ISNULL(O.TotalOcorrencias, 0) AS TotalOcorrencias,
+                ISNULL(O.Pagas, 0) AS Pagas
+            FROM FIN_LancamentosRecorrentes LR
+            LEFT JOIN FIN_Categorias C
+                ON C.CategoriaId = LR.CategoriaId
+                AND C.UsuarioId = LR.UsuarioId
+            OUTER APPLY (
+                SELECT
+                    COUNT(*) AS TotalOcorrencias,
+                    SUM(CASE WHEN L.Pago = 1 THEN 1 ELSE 0 END) AS Pagas
+                FROM FIN_LancamentoRecorrenteOcorrencias O
+                LEFT JOIN FIN_Lancamentos L
+                    ON L.LancamentoId = O.LancamentoId
+                    AND L.UsuarioId = O.UsuarioId
+                WHERE O.UsuarioId = LR.UsuarioId
+                  AND O.LancamentoRecorrenteId = LR.LancamentoRecorrenteId
+            ) O
+            WHERE LR.UsuarioId = ?
+            ORDER BY LR.Ativa DESC, LR.Descricao ASC
+        """, (usuario_id,))
+        recorrentes_rows = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT CategoriaId, Nome, CorHex
+            FROM FIN_Categorias
+            WHERE UsuarioId = ?
+            ORDER BY Nome
+        """, (usuario_id,))
+        categorias = cursor.fetchall()
+
+    chave_atual = chave_periodo(mes_atual, ano_atual)
+    recorrentes = []
+    for row in recorrentes_rows:
+        proxima_data = None
+        for offset in range(0, 37):
+            mes_ref, ano_ref = periodo_por_chave(chave_atual + offset)
+            candidata = data_vencimento_recorrente(row, mes_ref, ano_ref)
+            if candidata and candidata >= date.today():
+                proxima_data = candidata
+                break
+
+        recorrentes.append({
+            'LancamentoRecorrenteId': row.LancamentoRecorrenteId,
+            'CategoriaId': row.CategoriaId,
+            'Descricao': row.Descricao,
+            'ValorEstimado': float(row.ValorEstimado or 0),
+            'DiaVencimento': row.DiaVencimento,
+            'Periodicidade': row.Periodicidade,
+            'IntervaloMeses': int(row.IntervaloMeses or 1),
+            'PeriodicidadeLabel': rotulo_periodicidade_renda(row.Periodicidade, row.IntervaloMeses),
+            'DataInicio': normalizar_data(row.DataInicio),
+            'DataFim': normalizar_data(row.DataFim),
+            'Ativa': bool(row.Ativa),
+            'CategoriaNome': row.CategoriaNome,
+            'CategoriaCorHex': row.CategoriaCorHex,
+            'TotalOcorrencias': int(row.TotalOcorrencias or 0),
+            'Pagas': int(row.Pagas or 0),
+            'ProximaData': proxima_data,
+        })
+
+    return render_template(
+        'financas/lancamentos_recorrentes.html',
+        recorrentes=recorrentes,
+        categorias=categorias,
+        periodicidades=PERIODICIDADES_RENDA,
+        cor_padrao=COR_CATEGORIA_PADRAO,
+    )
+
+
+@financas_bp.route('/lancamentos/recorrentes/editar/<int:id>', methods=['POST'])
+def editar_lancamento_recorrente(id):
+    usuario_id = usuario_atual_id()
+    mes_atual, ano_atual = periodo_atual()
+    dados, erro = ler_dados_lancamento_recorrente_form()
+
+    if erro:
+        flash(erro, 'danger')
+        return redirect(url_for('financas.lancamentos_recorrentes'))
+
+    with get_db_cursor() as cursor:
+        garantir_estrutura_lancamentos_recorrentes(cursor)
+        cursor.execute("""
+            SELECT LancamentoRecorrenteId
+            FROM FIN_LancamentosRecorrentes
+            WHERE LancamentoRecorrenteId = ? AND UsuarioId = ?
+        """, (id, usuario_id))
+        if not cursor.fetchone():
+            flash('Despesa recorrente nao encontrada.', 'warning')
+            return redirect(url_for('financas.lancamentos_recorrentes'))
+
+        cursor.execute("""
+            SELECT CategoriaId
+            FROM FIN_Categorias
+            WHERE CategoriaId = ? AND UsuarioId = ?
+        """, (dados['categoria_id'], usuario_id))
+        if not cursor.fetchone():
+            flash('Selecione uma categoria valida.', 'danger')
+            return redirect(url_for('financas.lancamentos_recorrentes'))
+
+        remover_ocorrencias_lancamento_recorrente_pendentes(cursor, usuario_id, id)
+        cursor.execute("""
+            UPDATE FIN_LancamentosRecorrentes
+            SET CategoriaId = ?, Descricao = ?, ValorEstimado = ?,
+                DiaVencimento = ?, Periodicidade = ?, IntervaloMeses = ?,
+                DataInicio = ?, DataFim = ?, Ativa = ?, DataAtualizacao = SYSUTCDATETIME()
+            WHERE LancamentoRecorrenteId = ? AND UsuarioId = ?
+        """, (
+            dados['categoria_id'],
+            dados['descricao'],
+            dados['valor_estimado'],
+            dados['dia_vencimento'],
+            dados['periodicidade'],
+            dados['intervalo_meses'],
+            dados['data_inicio'],
+            dados['data_fim'],
+            dados['ativa'],
+            id,
+            usuario_id,
+        ))
+
+        if dados['ativa']:
+            sincronizar_lancamento_recorrente_primeiro_periodo(cursor, usuario_id, id)
+            sincronizar_lancamentos_recorrentes_periodo(cursor, usuario_id, mes_atual, ano_atual, id)
+
+    flash('Despesa recorrente atualizada.', 'success')
+    return redirect(url_for('financas.lancamentos_recorrentes'))
+
+
+@financas_bp.route('/lancamentos/recorrentes/excluir/<int:id>', methods=['POST'])
+def excluir_lancamento_recorrente(id):
+    usuario_id = usuario_atual_id()
+
+    with get_db_cursor() as cursor:
+        garantir_estrutura_lancamentos_recorrentes(cursor)
+        cursor.execute("""
+            SELECT LancamentoRecorrenteId
+            FROM FIN_LancamentosRecorrentes
+            WHERE LancamentoRecorrenteId = ? AND UsuarioId = ?
+        """, (id, usuario_id))
+        if not cursor.fetchone():
+            flash('Despesa recorrente nao encontrada.', 'warning')
+            return redirect(url_for('financas.lancamentos_recorrentes'))
+
+        pagas = total_ocorrencias_lancamento_recorrente_pagas(cursor, usuario_id, id)
+        remover_ocorrencias_lancamento_recorrente_pendentes(cursor, usuario_id, id)
+
+        if pagas:
+            cursor.execute("""
+                UPDATE FIN_LancamentosRecorrentes
+                SET Ativa = 0, DataAtualizacao = SYSUTCDATETIME()
+                WHERE LancamentoRecorrenteId = ? AND UsuarioId = ?
+            """, (id, usuario_id))
+            flash('Despesa recorrente desativada para preservar historico pago.', 'info')
+        else:
+            cursor.execute("""
+                DELETE FROM FIN_LancamentoRecorrenteOcorrencias
+                WHERE LancamentoRecorrenteId = ? AND UsuarioId = ?
+            """, (id, usuario_id))
+            cursor.execute("""
+                DELETE FROM FIN_LancamentosRecorrentes
+                WHERE LancamentoRecorrenteId = ? AND UsuarioId = ?
+            """, (id, usuario_id))
+            flash('Despesa recorrente excluida.', 'success')
+
+    return redirect(url_for('financas.lancamentos_recorrentes'))
+
+
 @financas_bp.route('/adicionar-gasto', methods=['GET', 'POST'])
 def adicionar_gasto():
     usuario_id = usuario_atual_id()
@@ -1496,6 +2073,7 @@ def dashboard():
     with get_db_cursor() as cursor:
         sincronizar_assinaturas_periodo(cursor, usuario_id, mes_sel, ano_sel)
         sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, mes_sel, ano_sel)
+        sincronizar_lancamentos_recorrentes_periodo(cursor, usuario_id, mes_sel, ano_sel)
         garantir_estrutura_carteiras(cursor)
 
         cursor.execute("""
@@ -1832,6 +2410,7 @@ def editar_gasto(id):
     categoria_id = dados.get('categoria_id')
     data_vencimento_bruta = dados.get('data_vencimento')
     pago = str(dados.get('pago', '')).lower() in {'1', 'true', 'on', 'sim', 'pago'}
+    recorrente = str(dados.get('recorrente', '')).lower() in {'1', 'true', 'on', 'sim'}
     carteira_id = dados.get('carteira_id') or None
 
     if not descricao:
@@ -1938,6 +2517,14 @@ def editar_gasto(id):
         if pago and valor_real_novo > 0:
             movimentar_carteira(cursor, usuario_id, carteira_nova, -valor_real_novo)
             ajustar_caixa(cursor, usuario_id, mes_referencia, ano_referencia, -valor_real_novo)
+
+        if recorrente:
+            criar_regra_recorrente_a_partir_lancamento(cursor, usuario_id, id, {
+                'categoria_id': categoria_id,
+                'descricao': descricao,
+                'valor_estimado': valor_estimado,
+                'data_vencimento': data_vencimento,
+            })
 
         ignorar_sincronizacao_assinatura_lancamento(cursor, usuario_id, id)
 
@@ -2250,6 +2837,7 @@ def deletar_gasto(id):
             ajustar_caixa(cursor, usuario_id, gasto.MesReferencia, gasto.AnoReferencia, valor_real)
 
         ignorar_sincronizacao_assinatura_lancamento(cursor, usuario_id, id)
+        ignorar_sincronizacao_lancamento_recorrente(cursor, usuario_id, id)
         cursor.execute("DELETE FROM FIN_Lancamentos WHERE LancamentoId = ? AND UsuarioId = ?", (id, usuario_id))
 
     flash('Lançamento excluído com sucesso!', 'success')
@@ -2387,39 +2975,52 @@ def clonar_mes_anterior():
     mes_origem, ano_origem = periodo_anterior(mes_destino, ano_destino)
 
     with get_db_cursor() as cursor:
-        cursor.execute("""
-            SELECT TOP 1 LancamentoId FROM FIN_Lancamentos 
-            WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
-        """, (usuario_id, mes_destino, ano_destino))
-        
-        ja_tem_dados = cursor.fetchone()
-
-        if ja_tem_dados:
-            flash(f'O mês {mes_destino}/{ano_destino} já possui lançamentos. Importação cancelada para evitar duplicidade.', 'danger')
-            return redirect(url_for('financas.dashboard', mes=mes_destino, ano=ano_destino))
+        garantir_estrutura_lancamentos_recorrentes(cursor)
+        sincronizar_lancamentos_recorrentes_periodo(cursor, usuario_id, mes_destino, ano_destino)
 
         cursor.execute("""
-            SELECT CategoriaId, Descricao, ValorEstimado, DataVencimento
-            FROM FIN_Lancamentos 
-            WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
-            ORDER BY DataVencimento, LancamentoId
+            SELECT L.CategoriaId, L.Descricao, L.ValorEstimado, L.DataVencimento
+            FROM FIN_Lancamentos L
+            LEFT JOIN FIN_LancamentoRecorrenteOcorrencias O
+                ON O.LancamentoId = L.LancamentoId AND O.UsuarioId = L.UsuarioId
+            WHERE L.UsuarioId = ? AND L.MesReferencia = ? AND L.AnoReferencia = ?
+              AND L.LancamentoRecorrenteId IS NULL
+              AND O.OcorrenciaId IS NULL
+            ORDER BY L.DataVencimento, L.LancamentoId
         """, (usuario_id, mes_origem, ano_origem))
         
         lancamentos_antigos = cursor.fetchall()
 
         if not lancamentos_antigos:
-            flash(f'Nenhum lançamento encontrado em {mes_origem}/{ano_origem} para copiar.', 'warning')
+            flash(f'Nenhum lancamento avulso encontrado em {mes_origem}/{ano_origem} para copiar.', 'warning')
             return redirect(url_for('financas.dashboard', mes=mes_destino, ano=ano_destino))
 
+        importados = 0
+        ignorados = 0
         for item in lancamentos_antigos:
             data_vencimento = data_vencimento_no_destino(item.DataVencimento, mes_destino, ano_destino)
+            cursor.execute("""
+                SELECT TOP 1 LancamentoId
+                FROM FIN_Lancamentos
+                WHERE UsuarioId = ? AND MesReferencia = ? AND AnoReferencia = ?
+                  AND CategoriaId = ? AND Descricao = ?
+            """, (usuario_id, mes_destino, ano_destino, item.CategoriaId, item.Descricao))
+            if cursor.fetchone():
+                ignorados += 1
+                continue
+
             cursor.execute("""
                 INSERT INTO FIN_Lancamentos 
                 (UsuarioId, CategoriaId, Descricao, ValorEstimado, ValorReal, DataVencimento, MesReferencia, AnoReferencia, Pago)
                 VALUES (?, ?, ?, ?, 0, ?, ?, ?, 0)
             """, (usuario_id, item.CategoriaId, item.Descricao, item.ValorEstimado, data_vencimento, mes_destino, ano_destino))
+            importados += 1
 
-    flash(f'Contas de {mes_origem}/{ano_origem} clonadas com sucesso!', 'success')
+    if importados:
+        complemento = f' ({ignorados} ja existiam e foram ignoradas)' if ignorados else ''
+        flash(f'{importados} conta(s) avulsa(s) de {mes_origem}/{ano_origem} importada(s) com sucesso.{complemento}', 'success')
+    else:
+        flash('Nada foi importado: os lancamentos avulsos do mes anterior ja existem no destino.', 'info')
     return redirect(url_for('financas.dashboard', mes=mes_destino, ano=ano_destino))
 
 @financas_bp.route('/importar-planilha', methods=['POST'])
