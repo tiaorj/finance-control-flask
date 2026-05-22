@@ -1,4 +1,5 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, render_template
 from flask_login import current_user, login_required
@@ -44,7 +45,7 @@ def _perfil_status(cursor, usuario_id):
 @login_required
 def index():
     usuario_id = int(current_user.get_id())
-    hoje = datetime.now()
+    hoje = datetime.now(ZoneInfo('America/Sao_Paulo'))
 
     with get_db_cursor() as cursor:
         sincronizar_assinaturas_periodo(cursor, usuario_id, hoje.month, hoje.year)

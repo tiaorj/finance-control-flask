@@ -1,6 +1,7 @@
 from calendar import monthrange
 from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user
@@ -83,14 +84,14 @@ def salvar_arquivo_nota(usuario_id):
     pasta_destino = Path(current_app.static_folder) / 'uploads' / 'garantias'
     pasta_destino.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime('%Y%m%d%H%M%S%f')
+    timestamp = datetime.now(ZoneInfo('America/Sao_Paulo')).strftime('%Y%m%d%H%M%S%f')
     nome_arquivo = f'nota_{usuario_id}_{timestamp}{extensao}'
     arquivo.save(pasta_destino / nome_arquivo)
     return f'uploads/garantias/{nome_arquivo}'
 
 
 def status_garantia(row, hoje=None):
-    hoje = hoje or date.today()
+    hoje = hoje or datetime.now(ZoneInfo('America/Sao_Paulo')).date()
     data_compra = normalizar_data(row.DataCompra)
     meses = int(row.MesesGarantia or 0)
     data_fim = somar_meses(data_compra, meses) if data_compra else None
@@ -133,7 +134,7 @@ def montar_bem(row, hoje=None):
 
 
 def montar_resumo_garantias(cursor, usuario_id, hoje=None):
-    hoje = hoje or date.today()
+    hoje = hoje or datetime.now(ZoneInfo('America/Sao_Paulo')).date()
 
     cursor.execute("""
         SELECT BemId, Nome, Categoria, Marca, Modelo, DataCompra, MesesGarantia,

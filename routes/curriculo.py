@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, current_app, render_template, make_response, request, redirect, url_for, flash
 from flask_login import current_user, login_required
@@ -59,7 +60,7 @@ def salvar_foto_perfil(usuario_id):
     pasta_destino = Path(current_app.static_folder) / 'uploads' / 'curriculos'
     pasta_destino.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime('%Y%m%d%H%M%S%f')
+    timestamp = datetime.now(ZoneInfo('America/Sao_Paulo')).strftime('%Y%m%d%H%M%S%f')
     nome_arquivo = f'perfil_{usuario_id}_{timestamp}{extensao}'
     foto.save(pasta_destino / nome_arquivo)
     return f'uploads/curriculos/{nome_arquivo}'

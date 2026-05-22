@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user
@@ -43,7 +44,7 @@ def montar_meta(row):
     valor_atual = float(row.ValorAtual or 0)
     progresso = min((valor_atual / valor_alvo * 100) if valor_alvo > 0 else 0, 100)
     data_alvo = normalizar_data(row.DataAlvo)
-    dias_restantes = (data_alvo - date.today()).days if data_alvo else None
+    dias_restantes = (data_alvo - datetime.now(ZoneInfo('America/Sao_Paulo')).date()).days if data_alvo else None
 
     return {
         'id': row.MetaId,

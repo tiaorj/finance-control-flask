@@ -3,6 +3,7 @@ from database import get_db_cursor
 from flask_login import UserMixin, current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -52,7 +53,7 @@ def login():
                 session['usuario_nome'] = usuario.Nome
 
                 cursor.execute("UPDATE Usuarios SET UltimoAcesso = ? WHERE UsuarioId = ?",
-                               (datetime.now(), usuario.UsuarioId))
+                               (datetime.now(ZoneInfo('America/Sao_Paulo')), usuario.UsuarioId))
 
                 flash(f'Bem-vindo, {usuario.Nome}!', 'success')
                 next_page = safe_next_url(request.args.get('next'))

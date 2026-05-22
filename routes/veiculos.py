@@ -1,5 +1,6 @@
 from calendar import monthrange
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user
@@ -68,7 +69,7 @@ def somar_meses(data_base, meses):
 
 
 def status_lembrete(row, hoje=None):
-    hoje = hoje or date.today()
+    hoje = hoje or datetime.now(ZoneInfo('America/Sao_Paulo')).date()
     data_vencimento = normalizar_data(row.DataVencimento)
     km_atual = row.QuilometragemAtual
     km_vencimento = row.KmVencimento
@@ -119,7 +120,7 @@ def montar_lembrete(row, hoje=None):
 
 
 def montar_resumo_veiculos(cursor, usuario_id, hoje=None):
-    hoje = hoje or date.today()
+    hoje = hoje or datetime.now(ZoneInfo('America/Sao_Paulo')).date()
 
     cursor.execute("""
         SELECT L.LembreteId, L.VeiculoId, V.Apelido, V.QuilometragemAtual,
@@ -411,7 +412,7 @@ def concluir_lembrete(id):
 
         if data_vencimento and recorrencia_meses:
             nova_data = somar_meses(data_vencimento, int(recorrencia_meses))
-            hoje = date.today()
+            hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
             while nova_data <= hoje:
                 nova_data = somar_meses(nova_data, int(recorrencia_meses))
             concluido = 0

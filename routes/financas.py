@@ -1,6 +1,7 @@
 ﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from database import get_db_cursor
 from datetime import datetime, date
+from zoneinfo import ZoneInfo
 import calendar
 from flask_login import current_user
 from routes.assinaturas import montar_resumo_assinaturas
@@ -118,7 +119,7 @@ PERIODICIDADES_RENDA = {
 
 
 def periodo_atual():
-    hoje = datetime.now()
+    hoje = datetime.now(ZoneInfo('America/Sao_Paulo'))
     return hoje.month, hoje.year
 
 
@@ -1404,7 +1405,7 @@ def rendas_recorrentes():
         for offset in range(0, 37):
             mes_ref, ano_ref = periodo_por_chave(chave_atual + offset)
             candidata = data_recebimento_recorrente(row, mes_ref, ano_ref)
-            if candidata and candidata >= date.today():
+            if candidata and candidata >= datetime.now(ZoneInfo('America/Sao_Paulo')).date():
                 proxima_data = candidata
                 break
 
@@ -1636,7 +1637,7 @@ def lancamentos_recorrentes():
         for offset in range(0, 37):
             mes_ref, ano_ref = periodo_por_chave(chave_atual + offset)
             candidata = data_vencimento_recorrente(row, mes_ref, ano_ref)
-            if candidata and candidata >= date.today():
+            if candidata and candidata >= datetime.now(ZoneInfo('America/Sao_Paulo')).date():
                 proxima_data = candidata
                 break
 
@@ -1980,7 +1981,7 @@ def dashboard():
     data_padrao_lancamento = date(
         ano_sel,
         mes_sel,
-        min(datetime.now().day, ultimo_dia_mes)
+        min(datetime.now(ZoneInfo('America/Sao_Paulo')).day, ultimo_dia_mes)
     ).strftime('%Y-%m-%d')
 
     return render_template('financas/dashboard.html',
@@ -2290,7 +2291,7 @@ def editar_gasto(id):
 @financas_bp.route('/rendas', methods=['GET', 'POST'])
 def gerenciar_rendas():
     usuario_id = usuario_atual_id()
-    hoje = datetime.now()
+    hoje = datetime.now(ZoneInfo('America/Sao_Paulo'))
 
     # Captura mês/ano da URL ou usa o atual como padrão
     mes = request.args.get('mes', hoje.month, type=int)
@@ -2595,7 +2596,7 @@ def atualizar_saldo():
     # Aceita valores no formato brasileiro antes de gravar no banco.
     novo_saldo = parse_money(request.form.get('saldo_conta', '0'))
 
-    hoje = datetime.now()
+    hoje = datetime.now(ZoneInfo('America/Sao_Paulo'))
 
     mes_sel = request.args.get('mes', hoje.month, type=int)
     ano_sel = request.args.get('ano', hoje.year, type=int)
@@ -2620,7 +2621,7 @@ def atualizar_saldo():
 @financas_bp.route('/receber-renda/<int:id>', methods=['POST'])
 def receber_renda(id):
     usuario_id = usuario_atual_id()
-    hoje = datetime.now()
+    hoje = datetime.now(ZoneInfo('America/Sao_Paulo'))
     mes_ref = hoje.month
     ano_ref = hoje.year
     carteira_id = request.form.get('carteira_id') or None
@@ -2673,7 +2674,7 @@ def receber_renda(id):
 @financas_bp.route('/reabrir-renda/<int:id>', methods=['POST'])
 def reabrir_renda(id):
     usuario_id = usuario_atual_id()
-    hoje = datetime.now()
+    hoje = datetime.now(ZoneInfo('America/Sao_Paulo'))
     mes_ref = hoje.month
     ano_ref = hoje.year
 

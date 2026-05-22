@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user
@@ -47,7 +48,7 @@ def valor_mensalizado(valor, ciclo):
 
 
 def montar_resumo_assinaturas(cursor, usuario_id, hoje=None):
-    hoje = hoje or date.today()
+    hoje = hoje or datetime.now(ZoneInfo('America/Sao_Paulo')).date()
 
     cursor.execute("""
         SELECT AssinaturaId, Nome, Categoria, Valor, Ciclo, DataRenovacao, Ativa
@@ -104,7 +105,7 @@ def lista():
         """, (usuario_id,))
         assinaturas_rows = cursor.fetchall()
 
-    hoje = date.today()
+    hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
     assinaturas = []
     for item in assinaturas_rows:
         data_renovacao = normalizar_data(item.DataRenovacao)

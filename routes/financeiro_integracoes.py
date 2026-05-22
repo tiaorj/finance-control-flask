@@ -1,9 +1,10 @@
 from calendar import monthrange
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 
 def periodo_atual():
-    hoje = datetime.now()
+    hoje = datetime.now(ZoneInfo('America/Sao_Paulo'))
     return hoje.month, hoje.year
 
 

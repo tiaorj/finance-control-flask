@@ -1,5 +1,6 @@
 from calendar import monthrange
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user
@@ -68,7 +69,7 @@ def rotulo_periodicidade(periodicidade, intervalo_meses):
 
 
 def montar_tarefa(row, hoje=None):
-    hoje = hoje or date.today()
+    hoje = hoje or datetime.now(ZoneInfo('America/Sao_Paulo')).date()
     proxima_data = normalizar_data(row.ProximaData)
     dias = (proxima_data - hoje).days if proxima_data else None
 
@@ -109,7 +110,7 @@ def montar_tarefa(row, hoje=None):
 
 
 def montar_resumo_tarefas(cursor, usuario_id, hoje=None):
-    hoje = hoje or date.today()
+    hoje = hoje or datetime.now(ZoneInfo('America/Sao_Paulo')).date()
     fim_mes = date(hoje.year, hoje.month, monthrange(hoje.year, hoje.month)[1])
 
     cursor.execute("""
@@ -258,10 +259,10 @@ def concluir(id):
             flash('Tarefa nao encontrada.', 'warning')
             return redirect(destino)
 
-        proxima_data = normalizar_data(tarefa.ProximaData) or date.today()
+        proxima_data = normalizar_data(tarefa.ProximaData) or datetime.now(ZoneInfo('America/Sao_Paulo')).date()
         intervalo_meses = int(tarefa.IntervaloMeses or 1)
         nova_data = somar_meses(proxima_data, intervalo_meses)
-        hoje = date.today()
+        hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
 
         while nova_data <= hoje:
             nova_data = somar_meses(nova_data, intervalo_meses)
@@ -298,10 +299,10 @@ def pular(id):
             flash('Tarefa nao encontrada.', 'warning')
             return redirect(url_for('tarefas.lista'))
 
-        proxima_data = normalizar_data(tarefa.ProximaData) or date.today()
+        proxima_data = normalizar_data(tarefa.ProximaData) or datetime.now(ZoneInfo('America/Sao_Paulo')).date()
         intervalo_meses = int(tarefa.IntervaloMeses or 1)
         nova_data = somar_meses(proxima_data, intervalo_meses)
-        hoje = date.today()
+        hoje = datetime.now(ZoneInfo('America/Sao_Paulo')).date()
 
         while nova_data <= hoje:
             nova_data = somar_meses(nova_data, intervalo_meses)
