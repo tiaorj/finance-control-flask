@@ -276,9 +276,10 @@
 </head>
 <body>
     {% set endpoint = request.endpoint or '' %}
+    {% set usa_curriculo = session.get('usa_curriculo', True) %}
     {% set financeiro_config_ativo = endpoint in ['financas.adicionar_gasto', 'financas.categorias', 'financas.categorias_rendas'] %}
-    {% set curriculo_admin_ativo = endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.') %}
-    {% set admin_menu_ativo = endpoint.startswith('dashboard.') or endpoint.startswith('financas.') or endpoint.startswith('assinaturas.') or endpoint.startswith('metas.') or endpoint.startswith('tarefas.') or endpoint.startswith('veiculos.') or endpoint.startswith('garantias.') or endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.') or endpoint.startswith('curriculo.') %}
+    {% set curriculo_admin_ativo = usa_curriculo and (endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.')) %}
+    {% set admin_menu_ativo = endpoint.startswith('dashboard.') or endpoint.startswith('financas.') or endpoint.startswith('assinaturas.') or endpoint.startswith('metas.') or endpoint.startswith('tarefas.') or endpoint.startswith('veiculos.') or endpoint.startswith('garantias.') or (usa_curriculo and (endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.') or endpoint.startswith('curriculo.'))) %}
     {% set app_shell_ativo = current_user.is_authenticated and admin_menu_ativo %}
 
     {% if app_shell_ativo %}
@@ -412,53 +413,57 @@
                     </div>
                 </div>
 
-                <div class="app-nav-section">
-                    <span class="app-nav-title">Perfil profissional</span>
-                    <div class="app-nav-list">
-                        <a class="app-nav-link {{ 'active' if endpoint == 'curriculo.especialista' else '' }}" href="{{ url_for('curriculo.especialista') }}">
-                            <i class="bi bi-person-vcard"></i>
-                            <span class="app-nav-copy">
-                                <strong>Perfil p&uacute;blico</strong>
-                                <small>Visualiza&ccedil;&atilde;o do curr&iacute;culo</small>
-                            </span>
-                        </a>
-                        <a class="app-nav-link {{ 'active' if endpoint == 'curriculo.editar_perfil' else '' }}" href="{{ url_for('curriculo.editar_perfil') }}">
-                            <i class="bi bi-pencil-square"></i>
-                            <span class="app-nav-copy">
-                                <strong>Dados principais</strong>
-                                <small>Nome, foto e resumo</small>
-                            </span>
-                        </a>
+                {% if usa_curriculo %}
+                    <div class="app-nav-section">
+                        <span class="app-nav-title">Perfil profissional</span>
+                        <div class="app-nav-list">
+                            <a class="app-nav-link {{ 'active' if endpoint == 'curriculo.especialista' else '' }}" href="{{ url_for('curriculo.especialista') }}">
+                                <i class="bi bi-person-vcard"></i>
+                                <span class="app-nav-copy">
+                                    <strong>Perfil p&uacute;blico</strong>
+                                    <small>Visualiza&ccedil;&atilde;o do curr&iacute;culo</small>
+                                </span>
+                            </a>
+                            <a class="app-nav-link {{ 'active' if endpoint == 'curriculo.editar_perfil' else '' }}" href="{{ url_for('curriculo.editar_perfil') }}">
+                                <i class="bi bi-pencil-square"></i>
+                                <span class="app-nav-copy">
+                                    <strong>Dados principais</strong>
+                                    <small>Nome, foto e resumo</small>
+                                </span>
+                            </a>
 
-                        <div class="app-nav-sublist">
-                            <span class="app-nav-subtitle">Se&ccedil;&otilde;es do curr&iacute;culo</span>
-                            <a class="app-nav-sublink {{ 'active' if (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' else '' }}" href="{{ url_for('experiencias_admin.lista') }}">
-                                <i class="bi bi-briefcase"></i>Experi&ecirc;ncias
-                            </a>
-                            <a class="app-nav-sublink {{ 'active' if endpoint.startswith('formacao_admin.') else '' }}" href="{{ url_for('formacao_admin.lista') }}">
-                                <i class="bi bi-mortarboard"></i>Forma&ccedil;&atilde;o
-                            </a>
-                            <a class="app-nav-sublink {{ 'active' if endpoint.startswith('projetos_admin.') else '' }}" href="{{ url_for('projetos_admin.lista') }}">
-                                <i class="bi bi-kanban"></i>Projetos
-                            </a>
-                            <a class="app-nav-sublink {{ 'active' if endpoint.startswith('habilidades_admin.') else '' }}" href="{{ url_for('habilidades_admin.lista') }}">
-                                <i class="bi bi-stars"></i>Habilidades
-                            </a>
-                            <a class="app-nav-sublink {{ 'active' if endpoint.startswith('certificacoes_admin.') else '' }}" href="{{ url_for('certificacoes_admin.lista') }}">
-                                <i class="bi bi-patch-check"></i>Certifica&ccedil;&otilde;es
-                            </a>
+                            <div class="app-nav-sublist">
+                                <span class="app-nav-subtitle">Se&ccedil;&otilde;es do curr&iacute;culo</span>
+                                <a class="app-nav-sublink {{ 'active' if (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' else '' }}" href="{{ url_for('experiencias_admin.lista') }}">
+                                    <i class="bi bi-briefcase"></i>Experi&ecirc;ncias
+                                </a>
+                                <a class="app-nav-sublink {{ 'active' if endpoint.startswith('formacao_admin.') else '' }}" href="{{ url_for('formacao_admin.lista') }}">
+                                    <i class="bi bi-mortarboard"></i>Forma&ccedil;&atilde;o
+                                </a>
+                                <a class="app-nav-sublink {{ 'active' if endpoint.startswith('projetos_admin.') else '' }}" href="{{ url_for('projetos_admin.lista') }}">
+                                    <i class="bi bi-kanban"></i>Projetos
+                                </a>
+                                <a class="app-nav-sublink {{ 'active' if endpoint.startswith('habilidades_admin.') else '' }}" href="{{ url_for('habilidades_admin.lista') }}">
+                                    <i class="bi bi-stars"></i>Habilidades
+                                </a>
+                                <a class="app-nav-sublink {{ 'active' if endpoint.startswith('certificacoes_admin.') else '' }}" href="{{ url_for('certificacoes_admin.lista') }}">
+                                    <i class="bi bi-patch-check"></i>Certifica&ccedil;&otilde;es
+                                </a>
+                            </div>
                         </div>
                     </div>
-                </div>
+                {% endif %}
             </nav>
 
             <div class="app-sidebar-footer">
                 <a class="app-nav-link" href="{{ url_for('main.index') }}">
                     <i class="bi bi-globe2"></i>Site p&uacute;blico
                 </a>
-                <a class="app-nav-link" href="{{ url_for('curriculo.gerar_pdf') }}" target="_blank" rel="noopener">
-                    <i class="bi bi-file-pdf"></i>Baixar PDF
-                </a>
+                {% if usa_curriculo %}
+                    <a class="app-nav-link" href="{{ url_for('curriculo.gerar_pdf') }}" target="_blank" rel="noopener">
+                        <i class="bi bi-file-pdf"></i>Baixar PDF
+                    </a>
+                {% endif %}
                 <a class="app-nav-link" href="{{ url_for('admin.logout') }}">
                     <i class="bi bi-box-arrow-right"></i>Sair
                 </a>

@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% macro dinheiro(valor) -%}{{ (valor or 0) | formato_real }}{%- endmacro %}
+{% set usa_curriculo = session.get('usa_curriculo', True) %}
 
 {% block content %}
 <main class="client-portal">
@@ -8,7 +9,7 @@
             <div>
                 <span class="admin-kicker">Portal do Cliente</span>
                 <h1>Bem-vindo, {{ session.usuario_nome }}</h1>
-                <p>Seu ponto de entrada para acompanhar finan&ccedil;as, evoluir perfil profissional e solicitar servi&ccedil;os digitais.</p>
+                <p>Seu ponto de entrada para acompanhar finan&ccedil;as{% if usa_curriculo %}, evoluir perfil profissional{% endif %} e solicitar servi&ccedil;os digitais.</p>
             </div>
             <div class="client-portal-actions">
                 <a href="{{ url_for('financas.dashboard') }}" class="btn btn-warning fw-bold">
@@ -20,7 +21,7 @@
             </div>
         </section>
 
-        <section class="client-widget-grid">
+        <section class="client-widget-grid" {% if not usa_curriculo %}style="grid-template-columns: minmax(0, 1fr);"{% endif %}>
             <article class="client-widget client-widget-finance">
                 <div class="client-widget-header">
                     <div>
@@ -53,32 +54,34 @@
                 <a href="{{ url_for('financas.dashboard') }}" class="client-widget-link">Ver dashboard financeiro <i class="bi bi-arrow-right"></i></a>
             </article>
 
-            <article class="client-widget">
-                <div class="client-widget-header">
-                    <div>
-                        <span class="admin-kicker">Curr&iacute;culo</span>
-                        <h2>Status do perfil</h2>
+            {% if usa_curriculo %}
+                <article class="client-widget">
+                    <div class="client-widget-header">
+                        <div>
+                            <span class="admin-kicker">Curr&iacute;culo</span>
+                            <h2>Status do perfil</h2>
+                        </div>
+                        <i class="bi bi-person-vcard"></i>
                     </div>
-                    <i class="bi bi-person-vcard"></i>
-                </div>
 
-                <div class="client-profile-progress">
-                    <strong>{{ perfil_percentual }}%</strong>
-                    <div class="progress">
-                        <div class="progress-bar" role="progressbar" style="width: {{ perfil_percentual }}%;" aria-valuenow="{{ perfil_percentual }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    <div class="client-profile-progress">
+                        <strong>{{ perfil_percentual }}%</strong>
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar" style="width: {{ perfil_percentual }}%;" aria-valuenow="{{ perfil_percentual }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
                     </div>
-                </div>
 
-                <div class="client-checklist">
-                    {% for item in perfil_itens %}
-                        <span class="{{ 'done' if item.ativo else '' }}">
-                            <i class="bi {{ 'bi-check-circle-fill' if item.ativo else 'bi-circle' }}"></i>{{ item.label|safe }}
-                        </span>
-                    {% endfor %}
-                </div>
+                    <div class="client-checklist">
+                        {% for item in perfil_itens %}
+                            <span class="{{ 'done' if item.ativo else '' }}">
+                                <i class="bi {{ 'bi-check-circle-fill' if item.ativo else 'bi-circle' }}"></i>{{ item.label|safe }}
+                            </span>
+                        {% endfor %}
+                    </div>
 
-                <a href="{{ url_for('curriculo.especialista') }}" class="client-widget-link">Ver perfil profissional <i class="bi bi-arrow-right"></i></a>
-            </article>
+                    <a href="{{ url_for('curriculo.especialista') }}" class="client-widget-link">Ver perfil profissional <i class="bi bi-arrow-right"></i></a>
+                </article>
+            {% endif %}
         </section>
 
         <section class="client-portal-layout">
@@ -90,12 +93,14 @@
 
                 <div class="client-service-grid">
                     {% for servico in servicos %}
-                        <article class="client-service-card">
-                            <i class="bi {{ servico.icone }}"></i>
-                            <h3>{{ servico.titulo|safe }}</h3>
-                            <p>{{ servico.texto|safe }}</p>
-                            <a href="{{ url_for(servico.url) }}{{ servico.anchor }}">Acessar <i class="bi bi-arrow-right"></i></a>
-                        </article>
+                        {% if usa_curriculo or servico.anchor != '?servico=curriculo' %}
+                            <article class="client-service-card">
+                                <i class="bi {{ servico.icone }}"></i>
+                                <h3>{{ servico.titulo|safe }}</h3>
+                                <p>{{ servico.texto|safe }}</p>
+                                <a href="{{ url_for(servico.url) }}{{ servico.anchor }}">Acessar <i class="bi bi-arrow-right"></i></a>
+                            </article>
+                        {% endif %}
                     {% endfor %}
                 </div>
 
@@ -106,11 +111,13 @@
 
                 <div class="client-article-list">
                     {% for artigo in artigos %}
-                        <article>
-                            <span>{{ artigo.categoria }}</span>
-                            <h3>{{ artigo.titulo|safe }}</h3>
-                            <small>{{ artigo.tempo }} de leitura</small>
-                        </article>
+                        {% if usa_curriculo or artigo.categoria != 'Carreira' %}
+                            <article>
+                                <span>{{ artigo.categoria }}</span>
+                                <h3>{{ artigo.titulo|safe }}</h3>
+                                <small>{{ artigo.tempo }} de leitura</small>
+                            </article>
+                        {% endif %}
                     {% endfor %}
                 </div>
             </div>
