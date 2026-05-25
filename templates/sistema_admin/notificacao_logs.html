@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <span class="text-muted fw-bold text-uppercase small">Administração</span>
+            <h1 class="h3 mb-0">Logs de Notificações</h1>
+            <p class="text-muted mb-0">
+                Acompanhe os e-mails enviados automaticamente pelo sistema.
+            </p>
+        </div>
+
+        <a href="{{ url_for('sistema_admin.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Usuário</label>
+                    <select name="usuario_id" class="form-select">
+                        <option value="">Todos</option>
+                        {% for usuario in usuarios %}
+                            <option value="{{ usuario.UsuarioId }}"
+                                {% if filtro_usuario_id == usuario.UsuarioId %}selected{% endif %}>
+                                {{ usuario.Nome }} - {{ usuario.Username }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="">Todos</option>
+                        {% for item in status_lista %}
+                            <option value="{{ item.Status }}"
+                                {% if filtro_status == item.Status %}selected{% endif %}>
+                                {{ item.Status }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search"></i> Filtrar
+                    </button>
+
+                    <a href="{{ url_for('sistema_admin.notificacao_logs') }}" class="btn btn-outline-secondary">
+                        Limpar
+                    </a>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <strong>Últimos registros</strong>
+            <span class="badge bg-secondary">{{ logs|length }} registro(s)</span>
+        </div>
+
+        <div class="card-body p-0">
+            {% if logs %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Data</th>
+                                <th>Usuário</th>
+                                <th>E-mail</th>
+                                <th>Tipo</th>
+                                <th>Assunto</th>
+                                <th>Status</th>
+                                <th>Erro</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in logs %}
+                                <tr>
+                                    <td style="white-space: nowrap;">
+                                        {% if log.DataEnvio %}
+                                            {{ log.DataEnvio.strftime('%d/%m/%Y %H:%M') }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        <strong>{{ log.UsuarioNome or 'Usuário não encontrado' }}</strong><br>
+                                        <small class="text-muted">ID: {{ log.UsuarioId }}</small>
+                                    </td>
+
+                                    <td>
+                                        {{ log.EmailDestino or log.Username or '-' }}
+                                    </td>
+
+                                    <td>
+                                        <span class="badge bg-light text-dark border">
+                                            {{ log.Tipo }}
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        {{ log.Assunto }}
+                                    </td>
+
+                                    <td>
+                                        {% if log.Status == 'enviado' %}
+                                            <span class="badge bg-success">Enviado</span>
+                                        {% elif log.Status == 'erro' %}
+                                            <span class="badge bg-danger">Erro</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ log.Status }}</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        {% if log.MensagemErro %}
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                    type="button"
+                                                    data-bs-toggle="collapse"
+                                                    data-bs-target="#erro{{ log.NotificacaoLogId }}">
+                                                Ver erro
+                                            </button>
+
+                                            <div class="collapse mt-2" id="erro{{ log.NotificacaoLogId }}">
+                                                <pre class="bg-light border rounded p-2 small mb-0"
+                                                     style="white-space: pre-wrap;">{{ log.MensagemErro }}</pre>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+                    Nenhum log encontrado.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

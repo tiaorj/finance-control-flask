@@ -44,7 +44,7 @@ def index():
             'titulo': 'Logs de notifica&ccedil;&otilde;es',
             'descricao': 'Consulte hist&oacute;rico de envios e falhas de notifica&ccedil;&atilde;o.',
             'icone': 'bi-bell',
-            'url': None,
+            'url': url_for('sistema_admin.notificacao_logs'),
         },
     ]
     return render_template('sistema_admin/index.html', cards=cards)
@@ -557,4 +557,72 @@ def workspace_membros(workspace_id):
         usuarios=usuarios_lista,
         membros=membros,
         niveis=NIVEIS_ACESSO_WORKSPACE,
+    )
+
+@sistema_admin_bp.route('/notificacoes')
+@admin_required
+def notificacao_logs():
+    status = (request.args.get('status') or '').strip()
+    usuario_id = request.args.get('usuario_id', type=int)
+
+    filtros = []
+    params = []
+
+    if status:
+        filtros.append("L.Status = ?")
+        params.append(status)
+
+    if usuario_id:
+        filtros.append("L.UsuarioId = ?")
+        params.append(usuario_id)
+
+    where_sql = ""
+    if filtros:
+        where_sql = "WHERE " + " AND ".join(filtros)
+
+    with get_db_cursor() as cursor:
+        cursor.execute("""
+            SELECT UsuarioId, Nome, Username
+            FROM Usuarios
+            ORDER BY Nome
+        """)
+        usuarios = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT DISTINCT Status
+            FROM APP_NotificacaoLogs
+            WHERE Status IS NOT NULL
+            ORDER BY Status
+        """)
+        status_lista = cursor.fetchall()
+
+        query = f"""
+            SELECT TOP 200
+                L.NotificacaoLogId,
+                L.UsuarioId,
+                U.Nome AS UsuarioNome,
+                U.Username,
+                L.Tipo,
+                L.EmailDestino,
+                L.Assunto,
+                L.Status,
+                L.MensagemErro,
+                L.DataEnvio
+            FROM APP_NotificacaoLogs L
+            LEFT JOIN Usuarios U
+                ON U.UsuarioId = L.UsuarioId
+            {where_sql}
+            ORDER BY L.DataEnvio DESC
+        """
+
+        cursor.execute(query, tuple(params))
+        logs = cursor.fetchall()
+
+    return render_template(
+        'sistema_admin/notificacao_logs.html',
+        logs=logs,
+        usuarios=usuarios,
+        status_lista=status_lista,
+        filtro_status=status,
+        filtro_usuario_id=usuario_id
     )
