@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<main class="client-portal">
+    <div class="container py-5">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+            <div>
+                <span class="admin-kicker">Administra&ccedil;&atilde;o</span>
+                <h1 class="fw-bold text-dark mb-1">Administradores</h1>
+                <p class="text-muted mb-0">Defina quais usu&aacute;rios podem acessar a administra&ccedil;&atilde;o do sistema.</p>
+            </div>
+            <a href="{{ url_for('sistema_admin.index') }}" class="btn btn-outline-secondary fw-bold">
+                <i class="bi bi-arrow-left me-2"></i>Voltar
+            </a>
+        </div>
+
+        <div class="alert alert-warning small">
+            <i class="bi bi-shield-lock me-1"></i>
+            Apenas administradores master podem alterar esta tela. Seu pr&oacute;prio acesso master n&atilde;o pode ser removido aqui.
+        </div>
+
+        <form method="POST" class="bg-white border rounded shadow-sm overflow-hidden">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="is_admin" value="{{ usuario_atual_id }}">
+            <input type="hidden" name="admin_tipo_{{ usuario_atual_id }}" value="master">
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Usu&aacute;rio</th>
+                            <th>Administrador</th>
+                            <th>Tipo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for usuario in usuarios %}
+                            {% set eh_usuario_atual = usuario.UsuarioId == usuario_atual_id %}
+                            <tr>
+                                <td class="ps-3">
+                                    <div class="fw-bold">{{ usuario.Nome }}</div>
+                                    <div class="small text-muted">{{ usuario.Username }}</div>
+                                </td>
+                                <td>
+                                    <div class="form-check">
+                                        <input class="form-check-input"
+                                               type="checkbox"
+                                               name="is_admin"
+                                               id="is_admin_{{ usuario.UsuarioId }}"
+                                               value="{{ usuario.UsuarioId }}"
+                                               {% if usuario.IsAdmin or eh_usuario_atual %}checked{% endif %}
+                                               {% if eh_usuario_atual %}disabled{% endif %}>
+                                        <label class="form-check-label" for="is_admin_{{ usuario.UsuarioId }}">
+                                            {% if eh_usuario_atual %}Seu acesso master{% else %}Pode administrar{% endif %}
+                                        </label>
+                                    </div>
+                                </td>
+                                <td style="min-width: 180px;">
+                                    {% set tipo_atual = 'master' if eh_usuario_atual else (usuario.AdminTipo or 'suporte') %}
+                                    <select name="admin_tipo_{{ usuario.UsuarioId }}"
+                                            class="form-select form-select-sm"
+                                            {% if eh_usuario_atual %}disabled{% endif %}>
+                                        {% for tipo in admin_tipos %}
+                                            <option value="{{ tipo }}" {% if tipo_atual == tipo %}selected{% endif %}>
+                                                {{ tipo }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-5">Nenhum usu&aacute;rio encontrado.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-end gap-2 p-3 border-top">
+                <a href="{{ url_for('sistema_admin.index') }}" class="btn btn-outline-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-primary fw-bold">
+                    <i class="bi bi-check-lg me-1"></i>Salvar administradores
+                </button>
+            </div>
+        </form>
+    </div>
+</main>
+{% endblock %}

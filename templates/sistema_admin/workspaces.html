@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<main class="client-portal">
+    <div class="container py-5">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+            <div>
+                <span class="admin-kicker">Administra&ccedil;&atilde;o</span>
+                <h1 class="fw-bold text-dark mb-1">Fam&iacute;lias/Workspaces</h1>
+                <p class="text-muted mb-0">Crie grupos e defina quais usu&aacute;rios pertencem a cada workspace.</p>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ url_for('sistema_admin.index') }}" class="btn btn-outline-secondary fw-bold">
+                    <i class="bi bi-arrow-left me-2"></i>Voltar
+                </a>
+                <a href="{{ url_for('sistema_admin.workspace_novo') }}" class="btn btn-primary fw-bold">
+                    <i class="bi bi-plus-circle me-2"></i>Novo workspace
+                </a>
+            </div>
+        </div>
+
+        <div class="bg-white border rounded shadow-sm overflow-hidden">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Nome</th>
+                            <th>Tipo</th>
+                            <th>Dono</th>
+                            <th>Membros</th>
+                            <th>Status</th>
+                            <th class="text-end pe-3">A&ccedil;&otilde;es</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for workspace in workspaces %}
+                            <tr>
+                                <td class="ps-3 fw-bold">{{ workspace.Nome }}</td>
+                                <td><span class="badge text-bg-light border">{{ workspace.Tipo }}</span></td>
+                                <td>
+                                    <div class="fw-bold">{{ workspace.DonoNome }}</div>
+                                    <div class="small text-muted">{{ workspace.DonoUsername }}</div>
+                                </td>
+                                <td>{{ workspace.TotalMembros or 0 }}</td>
+                                <td>
+                                    {% if workspace.Ativo %}
+                                        <span class="badge text-bg-success">Ativo</span>
+                                    {% else %}
+                                        <span class="badge text-bg-secondary">Inativo</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end pe-3">
+                                    <div class="d-flex flex-wrap justify-content-end gap-2">
+                                        <a href="{{ url_for('sistema_admin.workspace_membros', workspace_id=workspace.WorkspaceId) }}"
+                                           class="btn btn-sm btn-outline-primary fw-bold">
+                                            <i class="bi bi-people me-1"></i>Membros
+                                        </a>
+                                        <a href="{{ url_for('sistema_admin.workspace_editar', workspace_id=workspace.WorkspaceId) }}"
+                                           class="btn btn-sm btn-outline-secondary fw-bold">
+                                            <i class="bi bi-pencil-square me-1"></i>Editar
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-5">Nenhum workspace encontrado.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock %}

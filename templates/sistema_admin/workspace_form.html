@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<main class="client-portal">
+    <div class="container py-5">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+            <div>
+                <span class="admin-kicker">Administra&ccedil;&atilde;o</span>
+                <h1 class="fw-bold text-dark mb-1">
+                    {% if workspace %}Editar workspace{% else %}Novo workspace{% endif %}
+                </h1>
+                <p class="text-muted mb-0">Configure o nome, tipo, dono principal e status do workspace.</p>
+            </div>
+            <a href="{{ url_for('sistema_admin.workspaces') }}" class="btn btn-outline-secondary fw-bold">
+                <i class="bi bi-arrow-left me-2"></i>Voltar
+            </a>
+        </div>
+
+        <form method="POST" class="bg-white border rounded shadow-sm p-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="nome" class="form-label fw-bold">Nome</label>
+                    <input type="text" id="nome" name="nome" class="form-control" maxlength="100"
+                           value="{{ form.nome }}" required>
+                </div>
+
+                <div class="col-md-3">
+                    <label for="tipo" class="form-label fw-bold">Tipo</label>
+                    <select id="tipo" name="tipo" class="form-select" required>
+                        {% for tipo in tipos %}
+                            <option value="{{ tipo }}" {% if form.tipo == tipo %}selected{% endif %}>{{ tipo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Status</label>
+                    <div class="form-check border rounded px-3 py-2">
+                        <input class="form-check-input ms-0 me-2" type="checkbox" id="ativo" name="ativo" value="1"
+                               {% if form.ativo %}checked{% endif %}>
+                        <label class="form-check-label fw-bold" for="ativo">Ativo</label>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <label for="dono_usuario_id" class="form-label fw-bold">Dono principal</label>
+                    <select id="dono_usuario_id" name="dono_usuario_id" class="form-select" required>
+                        <option value="">Selecione...</option>
+                        {% for usuario in usuarios %}
+                            <option value="{{ usuario.UsuarioId }}" {% if form.dono_usuario_id == usuario.UsuarioId %}selected{% endif %}>
+                                {{ usuario.Nome }} - {{ usuario.Username }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Para remover o dono atual dos membros, primeiro escolha outro dono aqui.</div>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
+                <a href="{{ url_for('sistema_admin.workspaces') }}" class="btn btn-outline-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-primary fw-bold">
+                    <i class="bi bi-check-lg me-1"></i>Salvar workspace
+                </button>
+            </div>
+        </form>
+    </div>
+</main>
+{% endblock %}

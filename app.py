@@ -22,7 +22,9 @@ from routes.tarefas import tarefas_bp
 from routes.veiculos import veiculos_bp
 from routes.garantias import garantias_bp
 from routes.agenda import agenda_bp
+from routes.sistema_admin import sistema_admin_bp
 from commands.notificacoes import registrar_comandos
+from helpers.admin_auth import usuario_eh_admin
 from helpers.modulos import usuario_tem_modulo
 from scheduler import configurar_scheduler
 
@@ -69,6 +71,7 @@ app.register_blueprint(tarefas_bp)
 app.register_blueprint(veiculos_bp)
 app.register_blueprint(garantias_bp)
 app.register_blueprint(agenda_bp)
+app.register_blueprint(sistema_admin_bp)
 app.register_blueprint(main_bp)
 
 mail = Mail(app)
@@ -92,7 +95,11 @@ INFO_BASE = {
 
 @app.context_processor
 def inject_info():
-    return dict(INFO_BASE=INFO_BASE, usuario_tem_modulo=usuario_tem_modulo)
+    return dict(
+        INFO_BASE=INFO_BASE,
+        usuario_tem_modulo=usuario_tem_modulo,
+        usuario_eh_admin=usuario_eh_admin,
+    )
 
 app.register_blueprint(empresa_bp)
 app.register_blueprint(curriculo_bp)

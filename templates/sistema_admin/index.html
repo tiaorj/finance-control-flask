@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<main class="client-portal">
+    <div class="container py-5">
+        <section class="client-portal-hero">
+            <div>
+                <span class="admin-kicker">Administra&ccedil;&atilde;o</span>
+                <h1>Administra&ccedil;&atilde;o do sistema</h1>
+                <p>&Aacute;rea restrita para acompanhamento e configura&ccedil;&atilde;o operacional da plataforma.</p>
+            </div>
+            <div class="client-portal-actions">
+                <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-light fw-bold">
+                    <i class="bi bi-arrow-left me-2"></i>Voltar ao painel
+                </a>
+            </div>
+        </section>
+
+        <section class="client-service-grid mt-4">
+            {% for card in cards %}
+                <article class="client-service-card">
+                    <i class="bi {{ card.icone }}"></i>
+                    <h3>{{ card.titulo|safe }}</h3>
+                    <p>{{ card.descricao|safe }}</p>
+                    {% if card.url %}
+                        <a href="{{ card.url }}">Acessar <i class="bi bi-arrow-right"></i></a>
+                    {% endif %}
+                </article>
+            {% endfor %}
+        </section>
+    </div>
+</main>
+{% endblock %}

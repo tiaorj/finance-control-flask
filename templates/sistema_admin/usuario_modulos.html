@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<main class="client-portal">
+    <div class="container py-5">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+            <div>
+                <span class="admin-kicker">Administra&ccedil;&atilde;o</span>
+                <h1 class="fw-bold text-dark mb-1">M&oacute;dulos do usu&aacute;rio</h1>
+                <p class="text-muted mb-0">{{ usuario.Nome }} &bull; {{ usuario.Username }}</p>
+            </div>
+            <a href="{{ url_for('sistema_admin.usuarios') }}" class="btn btn-outline-secondary fw-bold">
+                <i class="bi bi-arrow-left me-2"></i>Voltar
+            </a>
+        </div>
+
+        {% if editando_proprio_usuario %}
+            <div class="alert alert-warning small">
+                <i class="bi bi-shield-lock me-1"></i>
+                Voc&ecirc; est&aacute; editando seu pr&oacute;prio usu&aacute;rio. O acesso administrativo n&atilde;o pode ser removido por esta tela.
+            </div>
+        {% endif %}
+
+        <form method="POST" class="bg-white border rounded shadow-sm p-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="row g-3">
+                {% for modulo in modulos %}
+                    {% set codigo = (modulo.Codigo or '')|lower %}
+                    {% set modulo_admin_proprio = editando_proprio_usuario and codigo in codigos_modulos_admin %}
+                    <div class="col-md-6 col-xl-4">
+                        <label class="border rounded p-3 h-100 d-block bg-light">
+                            <div class="form-check">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       name="modulos"
+                                       value="{{ modulo.ModuloId }}"
+                                       {% if modulos_usuario.get(modulo.ModuloId) or modulo_admin_proprio %}checked{% endif %}
+                                       {% if modulo_admin_proprio %}disabled{% endif %}>
+                                <span class="form-check-label fw-bold">{{ modulo.Nome }}</span>
+                            </div>
+                            <div class="small text-muted mt-2">{{ modulo.Descricao or 'Sem descri&ccedil;&atilde;o.' }}</div>
+                            <div class="d-flex flex-wrap gap-1 mt-3">
+                                <span class="badge text-bg-light border">{{ modulo.Codigo }}</span>
+                                {% if not modulo.Ativo %}
+                                    <span class="badge text-bg-secondary">Inativo globalmente</span>
+                                {% endif %}
+                                {% if modulo_admin_proprio %}
+                                    <span class="badge text-bg-warning">Protegido</span>
+                                {% endif %}
+                            </div>
+                        </label>
+                    </div>
+                {% else %}
+                    <div class="col-12">
+                        <div class="text-center text-muted py-5">Nenhum m&oacute;dulo cadastrado.</div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
+                <a href="{{ url_for('sistema_admin.usuarios') }}" class="btn btn-outline-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-primary fw-bold" {% if not modulos %}disabled{% endif %}>
+                    <i class="bi bi-check-lg me-1"></i>Salvar m&oacute;dulos
+                </button>
+            </div>
+        </form>
+    </div>
+</main>
+{% endblock %}

@@ -279,7 +279,7 @@
     {% set usa_curriculo = session.get('usa_curriculo', True) %}
     {% set financeiro_config_ativo = endpoint in ['financas.adicionar_gasto', 'financas.categorias', 'financas.categorias_rendas'] %}
     {% set curriculo_admin_ativo = usa_curriculo and (endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.')) %}
-    {% set admin_menu_ativo = endpoint.startswith('dashboard.') or endpoint.startswith('financas.') or endpoint.startswith('assinaturas.') or endpoint.startswith('metas.') or endpoint.startswith('agenda.') or endpoint.startswith('tarefas.') or endpoint.startswith('veiculos.') or endpoint.startswith('garantias.') or (usa_curriculo and (endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.') or endpoint.startswith('curriculo.'))) %}
+    {% set admin_menu_ativo = endpoint.startswith('dashboard.') or endpoint.startswith('sistema_admin.') or endpoint.startswith('financas.') or endpoint.startswith('assinaturas.') or endpoint.startswith('metas.') or endpoint.startswith('agenda.') or endpoint.startswith('tarefas.') or endpoint.startswith('veiculos.') or endpoint.startswith('garantias.') or (usa_curriculo and (endpoint.startswith('projetos_admin.') or (endpoint.startswith('experiencias_admin.') and endpoint != 'experiencias_admin.trajetoria_publica') or endpoint == 'admin.editar_experiencia' or endpoint.startswith('formacao_admin.') or endpoint.startswith('habilidades_admin.') or endpoint.startswith('certificacoes_admin.') or endpoint.startswith('curriculo.'))) %}
     {% set app_shell_ativo = current_user.is_authenticated and admin_menu_ativo %}
 
     {% if app_shell_ativo %}
@@ -461,6 +461,21 @@
                                     <i class="bi bi-patch-check"></i>Certifica&ccedil;&otilde;es
                                 </a>
                             </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if usuario_eh_admin() %}
+                    <div class="app-nav-section">
+                        <span class="app-nav-title">Administra&ccedil;&atilde;o</span>
+                        <div class="app-nav-list">
+                            <a class="app-nav-link {{ 'active' if endpoint.startswith('sistema_admin.') else '' }}" href="{{ url_for('sistema_admin.index') }}">
+                                <i class="bi bi-shield-lock"></i>
+                                <span class="app-nav-copy">
+                                    <strong>Sistema</strong>
+                                    <small>Usu&aacute;rios, m&oacute;dulos e logs</small>
+                                </span>
+                            </a>
                         </div>
                     </div>
                 {% endif %}
