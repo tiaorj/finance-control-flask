@@ -765,21 +765,33 @@ def periodo_por_chave(chave):
     return mes, ano
 
 
-def saldo_transportado_periodo(cursor, usuario_id, mes, ano, profundidade=12, usuarios_ids=None):
+def saldo_transportado_periodo(
+    cursor,
+    usuario_id,
+    mes,
+    ano,
+    profundidade=12,
+    usuarios_ids=None,
+    usuarios_caixa_ids=None,
+):
     if profundidade <= 0:
         return 0.0
 
     usuarios_ids = usuarios_ids or [usuario_id]
+    usuarios_caixa_ids = usuarios_caixa_ids or [usuario_id]
     usuarios_placeholders = placeholders_sql(usuarios_ids)
+    usuarios_caixa_placeholders = placeholders_sql(usuarios_caixa_ids)
     chave_atual = chave_periodo(mes, ano)
     chave_inicio = chave_atual - profundidade
     chave_fim = chave_atual - 1
     mes_inicio, ano_inicio = periodo_por_chave(chave_inicio)
     mes_fim, ano_fim = periodo_por_chave(chave_fim)
-    params_periodo = tuple(usuarios_ids) + (
+    params_periodo = (
         ano_inicio, ano_inicio, mes_inicio,
         ano_fim, ano_fim, mes_fim,
     )
+    params_caixa = tuple(usuarios_caixa_ids) + params_periodo
+    params_financeiro = tuple(usuarios_ids) + params_periodo
     resumos = {}
 
     for chave in range(chave_inicio, chave_fim + 1):
@@ -807,7 +819,7 @@ def saldo_transportado_periodo(cursor, usuario_id, mes, ano, profundidade=12, us
                 0 AS RendasAReceber,
                 0 AS ContasPendentes
             FROM FIN_Caixa
-            WHERE UsuarioId IN ({usuarios_placeholders})
+            WHERE UsuarioId IN ({usuarios_caixa_placeholders})
             AND (AnoReferencia > ? OR (AnoReferencia = ? AND MesReferencia >= ?))
             AND (AnoReferencia < ? OR (AnoReferencia = ? AND MesReferencia <= ?))
             GROUP BY MesReferencia, AnoReferencia
@@ -846,7 +858,7 @@ def saldo_transportado_periodo(cursor, usuario_id, mes, ano, profundidade=12, us
             GROUP BY MesReferencia, AnoReferencia
         ) resumo
         GROUP BY MesReferencia, AnoReferencia
-    """, params_periodo * 3)
+    """, params_caixa + params_financeiro + params_financeiro)
     for item in cursor.fetchall():
         chave = chave_periodo(item.MesReferencia, item.AnoReferencia)
         if chave in resumos:
@@ -1837,13 +1849,21 @@ def dashboard():
     mes_anterior, ano_anterior = periodo_anterior(mes_sel, ano_sel)
     mes_proximo, ano_proximo = periodo_proximo(mes_sel, ano_sel)
     anos_lista = sorted({ano_atual - 1, ano_atual, ano_sel - 1, ano_sel, ano_sel + 1})
+    visao_financeira = 'familia' if request.args.get('visao') == 'familia' else 'individual'
+    modo_familia = visao_financeira == 'familia'
+    usuarios_caixa = [usuario_id]
 
     with get_db_cursor() as cursor:
         sincronizar_assinaturas_periodo(cursor, usuario_id, mes_sel, ano_sel)
         sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, mes_sel, ano_sel)
         sincronizar_lancamentos_recorrentes_periodo(cursor, usuario_id, mes_sel, ano_sel)
-        usuarios_financeiro = usuarios_visiveis_financeiro(cursor, usuario_id) or [usuario_id]
+        usuarios_financeiro = (
+            usuarios_visiveis_financeiro(cursor, usuario_id)
+            if modo_familia
+            else [usuario_id]
+        ) or [usuario_id]
         usuarios_placeholders = placeholders_sql(usuarios_financeiro)
+        usuarios_caixa_placeholders = placeholders_sql(usuarios_caixa)
 
         resumo_params = []
         resumo_params.extend(usuarios_financeiro)
@@ -1856,7 +1876,7 @@ def dashboard():
         resumo_params.extend([mes_sel, ano_sel])
         resumo_params.extend(usuarios_financeiro)
         resumo_params.extend([ano_sel, ano_sel, mes_sel])
-        resumo_params.extend(usuarios_financeiro)
+        resumo_params.extend(usuarios_caixa)
         resumo_params.extend([mes_sel, ano_sel])
 
         cursor.execute(f"""
@@ -1894,7 +1914,7 @@ def dashboard():
                 ISNULL((
                     SELECT SUM(ISNULL(SaldoAtual, 0))
                     FROM FIN_Caixa
-                    WHERE UsuarioId IN ({usuarios_placeholders}) AND MesReferencia = ? AND AnoReferencia = ?
+                    WHERE UsuarioId IN ({usuarios_caixa_placeholders}) AND MesReferencia = ? AND AnoReferencia = ?
                 ), 0) AS SaldoBancario
         """, tuple(resumo_params))
         resumo_mes = cursor.fetchone()
@@ -1908,7 +1928,7 @@ def dashboard():
         carteiras = listar_carteiras_ativas(cursor, usuario_id)
         resumo_carteiras = obter_resumo_carteiras(cursor, usuario_id)
 
-        if len(usuarios_financeiro) == 1 and resumo_carteiras['ativas'] > 0 and mes_sel == mes_atual and ano_sel == ano_atual:
+        if resumo_carteiras['ativas'] > 0 and mes_sel == mes_atual and ano_sel == ano_atual:
             saldo_bancario = resumo_carteiras['saldo_total']
             sincronizar_caixa_com_carteiras(cursor, usuario_id, mes_sel, ano_sel)
 
@@ -1931,6 +1951,7 @@ def dashboard():
             mes_sel,
             ano_sel,
             usuarios_ids=usuarios_financeiro,
+            usuarios_caixa_ids=usuarios_caixa,
         )
         fluxo_caixa = montar_fluxo_caixa_diario(
             cursor,
@@ -2023,6 +2044,8 @@ def dashboard():
                            ano_anterior=ano_anterior,
                            mes_proximo=mes_proximo,
                            ano_proximo=ano_proximo,
+                           visao_financeira=visao_financeira,
+                           modo_familia=modo_familia,
                            renda=rendas_recebidas,
                            rendas_previstas=rendas_previstas,
                            rendas_a_receber=rendas_a_receber,

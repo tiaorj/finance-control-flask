@@ -12,7 +12,17 @@
             </div>
             <div class="client-portal-actions">
                 {% if modulo_financeiro %}
-                    <a href="{{ url_for('financas.dashboard') }}" class="btn btn-warning fw-bold">
+                    <div class="btn-group" role="group" aria-label="Vis&atilde;o financeira">
+                        <a href="{{ url_for('dashboard.index', visao='individual') }}"
+                           class="btn {% if visao_financeira == 'individual' %}btn-light text-dark{% else %}btn-outline-light{% endif %} fw-bold">
+                            <i class="bi bi-person me-1"></i>Individual
+                        </a>
+                        <a href="{{ url_for('dashboard.index', visao='familia') }}"
+                           class="btn {% if modo_familia %}btn-light text-dark{% else %}btn-outline-light{% endif %} fw-bold">
+                            <i class="bi bi-people me-1"></i>Fam&iacute;lia
+                        </a>
+                    </div>
+                    <a href="{{ url_for('financas.dashboard', visao=visao_financeira) }}" class="btn btn-warning fw-bold">
                         <i class="bi bi-wallet2 me-2"></i>Abrir financeiro
                     </a>
                 {% endif %}
@@ -21,6 +31,14 @@
                 </a>
             </div>
         </section>
+
+        {% if modulo_financeiro and modo_familia %}
+            <div class="alert alert-info py-2 px-3 mt-3 mb-4 small">
+                <i class="bi bi-info-circle me-1"></i>
+                A vis&atilde;o fam&iacute;lia consolida lan&ccedil;amentos compartilhados.
+                O saldo de carteiras permanece individual.
+            </div>
+        {% endif %}
 
         {% if modulo_financeiro or modulo_carreiras %}
             <section class="client-widget-grid" {% if not (modulo_financeiro and modulo_carreiras) %}style="grid-template-columns: minmax(0, 1fr);"{% endif %}>
@@ -54,7 +72,7 @@
                             </div>
                         </div>
 
-                        <a href="{{ url_for('financas.dashboard') }}" class="client-widget-link">Ver dashboard financeiro <i class="bi bi-arrow-right"></i></a>
+                        <a href="{{ url_for('financas.dashboard', visao=visao_financeira) }}" class="client-widget-link">Ver dashboard financeiro <i class="bi bi-arrow-right"></i></a>
                     </article>
                 {% endif %}
 

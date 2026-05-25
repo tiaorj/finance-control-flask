@@ -1,7 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request
 from flask_login import current_user, login_required
 
 from database import get_db_cursor
@@ -52,6 +52,8 @@ def index():
     modulo_financeiro = usuario_tem_modulo('finance')
     modulo_life = usuario_tem_modulo('life')
     modulo_carreiras = usuario_tem_modulo('careers')
+    visao_financeira = 'familia' if request.args.get('visao') == 'familia' else 'individual'
+    modo_familia = visao_financeira == 'familia'
 
     saldo_atual = 0.0
     saldo_previsto = 0.0
@@ -72,8 +74,14 @@ def index():
             if modulo_financeiro:
                 sincronizar_assinaturas_periodo(cursor, usuario_id, hoje.month, hoje.year)
                 sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, hoje.month, hoje.year)
-                usuarios_financeiro = usuarios_visiveis_financeiro(cursor, usuario_id) or [usuario_id]
+                usuarios_financeiro = (
+                    usuarios_visiveis_financeiro(cursor, usuario_id)
+                    if modo_familia
+                    else [usuario_id]
+                ) or [usuario_id]
+                usuarios_caixa = [usuario_id]
                 usuarios_placeholders = placeholders_sql(usuarios_financeiro)
+                usuarios_caixa_placeholders = placeholders_sql(usuarios_caixa)
 
                 financeiro_params = []
                 financeiro_params.extend(usuarios_financeiro)
@@ -82,7 +90,7 @@ def index():
                 financeiro_params.extend([hoje.month, hoje.year])
                 financeiro_params.extend(usuarios_financeiro)
                 financeiro_params.extend([hoje.month, hoje.year])
-                financeiro_params.extend(usuarios_financeiro)
+                financeiro_params.extend(usuarios_caixa)
                 financeiro_params.extend([hoje.month, hoje.year])
 
                 cursor.execute(f"""
@@ -114,7 +122,7 @@ def index():
                         ISNULL((
                             SELECT SUM(ISNULL(SaldoAtual, 0))
                             FROM FIN_Caixa
-                            WHERE UsuarioId IN ({usuarios_placeholders})
+                            WHERE UsuarioId IN ({usuarios_caixa_placeholders})
                             AND MesReferencia = ?
                             AND AnoReferencia = ?
                         ), 0) AS SaldoAtual
@@ -123,7 +131,7 @@ def index():
                 carteiras = listar_carteiras_ativas(cursor, usuario_id)
                 resumo_carteiras = obter_resumo_carteiras(cursor, usuario_id)
 
-                if len(usuarios_financeiro) == 1 and resumo_carteiras['ativas'] > 0:
+                if resumo_carteiras['ativas'] > 0:
                     sincronizar_caixa_com_carteiras(cursor, usuario_id, hoje.month, hoje.year)
 
                 cursor.execute(f"""
@@ -138,7 +146,7 @@ def index():
 
                 saldo_atual = (
                     resumo_carteiras['saldo_total']
-                    if len(usuarios_financeiro) == 1 and resumo_carteiras['ativas'] > 0
+                    if resumo_carteiras['ativas'] > 0
                     else float(financeiro.SaldoAtual or 0)
                 )
                 rendas_recebidas = float(financeiro.RendasRecebidas or 0)
@@ -222,6 +230,8 @@ def index():
         modulo_financeiro=modulo_financeiro,
         modulo_life=modulo_life,
         modulo_carreiras=modulo_carreiras,
+        visao_financeira=visao_financeira,
+        modo_familia=modo_familia,
         mes_atual=hoje.strftime('%m/%Y'),
         saldo_atual=saldo_atual,
         saldo_previsto=saldo_previsto,
