@@ -11,6 +11,8 @@ BEGIN
         IntervaloMeses INT NOT NULL DEFAULT 1,
         DataInicio DATE NOT NULL,
         DataFim DATE NULL,
+        ParcelaInicial INT NULL,
+        ParcelaTotal INT NULL,
         Ativa BIT NOT NULL DEFAULT 1,
         DataCriacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
         DataAtualizacao DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -64,4 +66,24 @@ END;
 IF COL_LENGTH('dbo.FIN_Lancamentos', 'LancamentoRecorrenteId') IS NULL
 BEGIN
     ALTER TABLE dbo.FIN_Lancamentos ADD LancamentoRecorrenteId INT NULL;
+END;
+
+IF COL_LENGTH('dbo.FIN_Lancamentos', 'ParcelaNumero') IS NULL
+BEGIN
+    ALTER TABLE dbo.FIN_Lancamentos ADD ParcelaNumero INT NULL;
+END;
+
+IF COL_LENGTH('dbo.FIN_Lancamentos', 'ParcelaTotal') IS NULL
+BEGIN
+    ALTER TABLE dbo.FIN_Lancamentos ADD ParcelaTotal INT NULL;
+END;
+
+IF COL_LENGTH('dbo.FIN_LancamentosRecorrentes', 'ParcelaInicial') IS NULL
+BEGIN
+    ALTER TABLE dbo.FIN_LancamentosRecorrentes ADD ParcelaInicial INT NULL;
+END;
+
+IF COL_LENGTH('dbo.FIN_LancamentosRecorrentes', 'ParcelaTotal') IS NULL
+BEGIN
+    ALTER TABLE dbo.FIN_LancamentosRecorrentes ADD ParcelaTotal INT NULL;
 END;

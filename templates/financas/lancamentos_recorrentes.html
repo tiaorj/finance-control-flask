@@ -15,7 +15,7 @@
     }
 
     .table-finance {
-        min-width: 1040px;
+        min-width: 1180px;
     }
 
     .table-finance th {
@@ -99,6 +99,16 @@
                     <input type="date" name="data_fim" class="form-control">
                 </div>
 
+                <div class="col-md-2 col-xl-1">
+                    <label class="form-label small fw-bold text-muted mb-1">Parcela</label>
+                    <input type="number" name="parcela_inicial" class="form-control" min="1" placeholder="1">
+                </div>
+
+                <div class="col-md-2 col-xl-1">
+                    <label class="form-label small fw-bold text-muted mb-1">Total</label>
+                    <input type="number" name="parcela_total" class="form-control" min="1" placeholder="9">
+                </div>
+
                 <div class="col-md-3 col-xl-1 d-grid">
                     <button type="submit" class="btn btn-success fw-bold" title="Adicionar">
                         <i class="bi bi-plus-circle"></i>
@@ -122,6 +132,7 @@
                             <th class="text-end">Valor</th>
                             <th>Ciclo</th>
                             <th>Periodo</th>
+                            <th>Parcelas</th>
                             <th>Status</th>
                             <th class="text-end pe-3">Acoes</th>
                         </tr>
@@ -170,6 +181,12 @@
                                         {% endif %}
                                     </div>
                                 </td>
+                                <td style="min-width: 150px;">
+                                    <div class="d-flex gap-2">
+                                        <input type="number" name="parcela_inicial" form="form-lancamento-recorrente-{{ item.LancamentoRecorrenteId }}" class="form-control form-control-sm" min="1" value="{{ item.ParcelaInicial or '' }}" placeholder="Atual">
+                                        <input type="number" name="parcela_total" form="form-lancamento-recorrente-{{ item.LancamentoRecorrenteId }}" class="form-control form-control-sm" min="1" value="{{ item.ParcelaTotal or '' }}" placeholder="Total">
+                                    </div>
+                                </td>
                                 <td style="min-width: 120px;">
                                     <select name="ativa" form="form-lancamento-recorrente-{{ item.LancamentoRecorrenteId }}" class="form-select form-select-sm">
                                         <option value="on" {% if item.Ativa %}selected{% endif %}>Ativa</option>
@@ -191,7 +208,7 @@
                             </tr>
                         {% else %}
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-5">
+                                <td colspan="8" class="text-center text-muted py-5">
                                     Nenhuma despesa recorrente cadastrada.
                                 </td>
                             </tr>

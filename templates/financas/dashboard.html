@@ -13,7 +13,10 @@
         data-valor-real="{{ (l.ValorReal or 0) | formato_real }}"
         data-pago="{{ 1 if l.Pago else 0 }}"
         data-carteira-id="{{ l.CarteiraId or '' }}"
-        data-recorrente-id="{{ l.LancamentoRecorrenteId or '' }}">
+        data-recorrente-id="{{ l.LancamentoRecorrenteId or '' }}"
+        data-recorrencia-data-fim="{{ l.RecorrenciaDataFim.strftime('%Y-%m-%d') if l.RecorrenciaDataFim else '' }}"
+        data-parcela-numero="{{ l.ParcelaNumero or '' }}"
+        data-parcela-total="{{ l.ParcelaTotal or l.RecorrenciaParcelaTotal or '' }}">
     <i class="bi bi-pencil-square{% if label %} me-1{% endif %}"></i>{% if label %}{{ label }}{% endif %}
 </button>
 {%- endmacro %}
@@ -439,9 +442,6 @@
                     <div class="metric-value mt-2 text-success">{{ dinheiro(saldo_em_caixa) }}</div>
                     <div class="small text-muted mt-2">
                         Banco: {{ dinheiro(saldo_bancario) }}
-                        {% if saldo_transportado > 0 %}
-                            + anterior: {{ dinheiro(saldo_transportado) }}
-                        {% endif %}
                         + a receber
                     </div>
                 </div>
@@ -636,6 +636,11 @@
                                 </td>
                                 <td class="fw-bold lancamento-descricao">
                                     {{ l.Descricao }}
+                                    {% if l.ParcelaTotal %}
+                                        <span class="badge rounded-pill text-bg-warning ms-1" title="Parcela {{ l.ParcelaNumero or 1 }} de {{ l.ParcelaTotal }}">
+                                            {{ l.ParcelaNumero or 1 }}/{{ l.ParcelaTotal }}
+                                        </span>
+                                    {% endif %}
                                     {% if l.LancamentoRecorrenteId %}
                                         <span class="badge rounded-pill text-bg-light ms-1" title="Despesa recorrente">
                                             <i class="bi bi-arrow-repeat"></i>
@@ -741,6 +746,11 @@
                             <div class="d-flex align-items-start justify-content-between gap-2">
                                 <div class="lancamento-card-title">
                                     {{ l.Descricao }}
+                                    {% if l.ParcelaTotal %}
+                                        <span class="badge rounded-pill text-bg-warning ms-1" title="Parcela {{ l.ParcelaNumero or 1 }} de {{ l.ParcelaTotal }}">
+                                            {{ l.ParcelaNumero or 1 }}/{{ l.ParcelaTotal }}
+                                        </span>
+                                    {% endif %}
                                     {% if l.LancamentoRecorrenteId %}
                                         <span class="badge rounded-pill text-bg-light ms-1" title="Despesa recorrente">
                                             <i class="bi bi-arrow-repeat"></i>
@@ -1072,6 +1082,20 @@
                                 <div class="small text-muted" id="editarRecorrenteAjuda">
                                     Cria uma despesa fixa com os dados atuais deste lancamento.
                                 </div>
+                                <div class="row g-2 mt-2" id="editarRecorrenciaOpcoes">
+                                    <div class="col-md-4">
+                                        <label for="editarRecorrenciaDataFim" class="form-label small fw-bold text-muted mb-1">Repetir ate</label>
+                                        <input type="date" id="editarRecorrenciaDataFim" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="editarParcelaNumero" class="form-label small fw-bold text-muted mb-1">Parcela atual</label>
+                                        <input type="number" id="editarParcelaNumero" class="form-control form-control-sm" min="1" placeholder="1">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="editarParcelaTotal" class="form-label small fw-bold text-muted mb-1">Total de parcelas</label>
+                                        <input type="number" id="editarParcelaTotal" class="form-control form-control-sm" min="1" placeholder="9">
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1196,6 +1220,25 @@ function atualizarCamposEdicaoStatus() {
     }
 }
 
+function atualizarCamposRecorrenciaEdicao() {
+    const recorrente = document.getElementById('editarRecorrente');
+    const opcoes = document.getElementById('editarRecorrenciaOpcoes');
+    const campos = [
+        document.getElementById('editarRecorrenciaDataFim'),
+        document.getElementById('editarParcelaNumero'),
+        document.getElementById('editarParcelaTotal')
+    ];
+    const ativo = Boolean(recorrente?.checked);
+
+    if (opcoes) {
+        opcoes.classList.toggle('d-none', !ativo);
+    }
+
+    campos.forEach(campo => {
+        if (campo) campo.disabled = !ativo;
+    });
+}
+
 function abrirModalEdicaoLancamento(botao) {
     const modalEl = document.getElementById('modalEditarLancamento');
     if (!modalEl || typeof bootstrap === 'undefined') return;
@@ -1209,6 +1252,9 @@ function abrirModalEdicaoLancamento(botao) {
     document.getElementById('editarPago').value = botao.dataset.pago === '1' ? '1' : '0';
     document.getElementById('editarCarteiraId').value = botao.dataset.carteiraId || '';
     document.getElementById('editarLancamentoResumo').textContent = botao.dataset.descricao || '-';
+    document.getElementById('editarRecorrenciaDataFim').value = botao.dataset.recorrenciaDataFim || '';
+    document.getElementById('editarParcelaNumero').value = botao.dataset.parcelaNumero || '';
+    document.getElementById('editarParcelaTotal').value = botao.dataset.parcelaTotal || '';
 
     const recorrenteCheckbox = document.getElementById('editarRecorrente');
     const recorrenteAjuda = document.getElementById('editarRecorrenteAjuda');
@@ -1220,6 +1266,7 @@ function abrirModalEdicaoLancamento(botao) {
         : 'Cria uma despesa fixa mensal com os dados atuais deste lancamento.';
 
     atualizarCamposEdicaoStatus();
+    atualizarCamposRecorrenciaEdicao();
     bootstrap.Modal.getOrCreateInstance(modalEl).show();
 }
 
@@ -1229,6 +1276,11 @@ function salvarEdicaoLancamento() {
     const pago = document.getElementById('editarPago')?.value === '1';
     const carteiraSelect = document.getElementById('editarCarteiraId');
     const valorRealInput = document.getElementById('editarValorReal');
+    const recorrente = document.getElementById('editarRecorrente')?.checked;
+    const parcelaNumeroInput = document.getElementById('editarParcelaNumero');
+    const parcelaTotalInput = document.getElementById('editarParcelaTotal');
+    const parcelaNumero = parcelaNumeroInput?.value ? parseInt(parcelaNumeroInput.value, 10) : null;
+    const parcelaTotal = parcelaTotalInput?.value ? parseInt(parcelaTotalInput.value, 10) : null;
 
     if (!id) {
         alert("Lancamento nao identificado.");
@@ -1244,6 +1296,18 @@ function salvarEdicaoLancamento() {
     if (pago && (!Number.isFinite(parseMoneyBR(valorRealInput.value)) || parseMoneyBR(valorRealInput.value) <= 0)) {
         alert("Informe um valor real maior que zero para marcar como pago.");
         valorRealInput.focus();
+        return;
+    }
+
+    if (recorrente && ((parcelaNumero && !parcelaTotal) || (!parcelaNumero && parcelaTotal))) {
+        alert("Informe a parcela atual e o total de parcelas.");
+        (parcelaNumero ? parcelaTotalInput : parcelaNumeroInput)?.focus();
+        return;
+    }
+
+    if (recorrente && parcelaNumero && parcelaTotal && parcelaNumero > parcelaTotal) {
+        alert("A parcela atual nao pode ser maior que o total de parcelas.");
+        parcelaNumeroInput.focus();
         return;
     }
 
@@ -1264,7 +1328,10 @@ function salvarEdicaoLancamento() {
             valor_real: valorRealInput.value,
             pago: pago ? 1 : 0,
             carteira_id: carteiraSelect?.value || null,
-            recorrente: document.getElementById('editarRecorrente')?.checked ? 1 : 0
+            recorrente: recorrente ? 1 : 0,
+            recorrencia_data_fim: document.getElementById('editarRecorrenciaDataFim')?.value || null,
+            parcela_numero: recorrente ? (parcelaNumero || null) : null,
+            parcela_total: recorrente ? (parcelaTotal || null) : null
         })
     })
     .then(async response => {
@@ -1291,6 +1358,8 @@ function salvarEdicaoLancamento() {
         botaoSalvar.innerHTML = '<i class="bi bi-check-lg me-1"></i>Salvar altera&ccedil;&otilde;es';
     });
 }
+
+document.getElementById('editarRecorrente')?.addEventListener('change', atualizarCamposRecorrenciaEdicao);
 
 function deletarGasto(id) {
     if (!confirm("Excluir este lancamento permanentemente?")) return;

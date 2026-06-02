@@ -12,6 +12,7 @@ from routes.metas import montar_resumo_metas
 
 financas_bp = Blueprint('financas', __name__, url_prefix='/app/financeiro')
 financas_legacy_bp = Blueprint('financas_legacy', __name__, url_prefix='/financas')
+_SCHEMA_PARCELAS_VERIFICADO = False
 
 
 def usuario_atual_id():
@@ -87,6 +88,12 @@ def parse_money_strict(valor):
     if ',' in valor_limpo:
         valor_limpo = valor_limpo.replace('.', '').replace(',', '.')
     return float(valor_limpo)
+
+
+def parse_int_opcional(valor):
+    if valor is None or str(valor).strip() == '':
+        return None
+    return int(valor)
 
 
 MESES_LISTA = [
@@ -204,6 +211,95 @@ def data_vencimento_no_destino(data_origem, mes_destino, ano_destino):
     return date(ano_destino, mes_destino, dia)
 
 
+def somar_meses(data_base, meses):
+    total_meses = data_base.month - 1 + int(meses or 0)
+    ano = data_base.year + total_meses // 12
+    mes = total_meses % 12 + 1
+    dia = min(data_base.day, calendar.monthrange(ano, mes)[1])
+    return date(ano, mes, dia)
+
+
+def data_fim_por_parcelas(data_inicio, parcela_inicial, parcela_total, intervalo_meses=1):
+    if not data_inicio or not parcela_inicial or not parcela_total:
+        return None
+    meses_ate_ultima = (int(parcela_total) - int(parcela_inicial)) * max(int(intervalo_meses or 1), 1)
+    return somar_meses(data_inicio, meses_ate_ultima)
+
+
+def numero_parcela_recorrente(lancamento_recorrente, mes, ano):
+    parcela_total = getattr(lancamento_recorrente, 'ParcelaTotal', None)
+    if not parcela_total:
+        return None
+
+    data_inicio = normalizar_data(lancamento_recorrente.DataInicio)
+    if not data_inicio:
+        return None
+
+    periodo_inicio = chave_periodo(data_inicio.month, data_inicio.year)
+    periodo_destino = chave_periodo(mes, ano)
+    delta_periodos = periodo_destino - periodo_inicio
+    intervalo = max(int(lancamento_recorrente.IntervaloMeses or 1), 1)
+    if delta_periodos < 0 or delta_periodos % intervalo != 0:
+        return None
+
+    parcela_inicial = int(getattr(lancamento_recorrente, 'ParcelaInicial', None) or 1)
+    parcela_numero = parcela_inicial + (delta_periodos // intervalo)
+    if parcela_numero > int(parcela_total):
+        return None
+    return parcela_numero
+
+
+def validar_parcelas(parcela_numero, parcela_total, data_inicio=None, data_fim=None, intervalo_meses=1):
+    if parcela_numero is None and parcela_total is None:
+        return None
+
+    if parcela_numero is None or parcela_total is None:
+        return 'Informe a parcela atual e o total de parcelas.'
+
+    if parcela_numero < 1 or parcela_total < 1:
+        return 'As parcelas precisam ser maiores que zero.'
+
+    if parcela_numero > parcela_total:
+        return 'A parcela atual nao pode ser maior que o total de parcelas.'
+
+    if data_inicio and data_fim:
+        data_ultima_parcela = data_fim_por_parcelas(data_inicio, parcela_numero, parcela_total, intervalo_meses)
+        if data_ultima_parcela and data_fim < data_ultima_parcela:
+            return 'A data final precisa cobrir ate a ultima parcela.'
+
+    return None
+
+
+def garantir_schema_parcelas_lancamentos(cursor):
+    global _SCHEMA_PARCELAS_VERIFICADO
+    if _SCHEMA_PARCELAS_VERIFICADO:
+        return
+
+    comandos = [
+        """
+        IF COL_LENGTH('dbo.FIN_Lancamentos', 'ParcelaNumero') IS NULL
+            ALTER TABLE dbo.FIN_Lancamentos ADD ParcelaNumero INT NULL
+        """,
+        """
+        IF COL_LENGTH('dbo.FIN_Lancamentos', 'ParcelaTotal') IS NULL
+            ALTER TABLE dbo.FIN_Lancamentos ADD ParcelaTotal INT NULL
+        """,
+        """
+        IF COL_LENGTH('dbo.FIN_LancamentosRecorrentes', 'ParcelaInicial') IS NULL
+            ALTER TABLE dbo.FIN_LancamentosRecorrentes ADD ParcelaInicial INT NULL
+        """,
+        """
+        IF COL_LENGTH('dbo.FIN_LancamentosRecorrentes', 'ParcelaTotal') IS NULL
+            ALTER TABLE dbo.FIN_LancamentosRecorrentes ADD ParcelaTotal INT NULL
+        """,
+    ]
+
+    for comando in comandos:
+        cursor.execute(comando)
+
+    _SCHEMA_PARCELAS_VERIFICADO = True
+
+
 def data_recebimento_recorrente(renda_recorrente, mes, ano):
     data_inicio = normalizar_data(renda_recorrente.DataInicio)
     if not data_inicio:
@@ -245,6 +341,9 @@ def data_vencimento_recorrente(lancamento_recorrente, mes, ano):
     data_ocorrencia = date(ano, mes, dia)
     data_fim = normalizar_data(lancamento_recorrente.DataFim)
     if data_fim and data_ocorrencia > data_fim:
+        return None
+
+    if getattr(lancamento_recorrente, 'ParcelaTotal', None) and numero_parcela_recorrente(lancamento_recorrente, mes, ano) is None:
         return None
 
     return data_ocorrencia
@@ -434,11 +533,14 @@ def sincronizar_rendas_recorrentes_periodo(cursor, usuario_id, mes, ano, renda_r
 
 
 def criar_ocorrencia_lancamento_recorrente(cursor, usuario_id, lancamento_recorrente, data_vencimento, mes, ano):
+    parcela_numero = numero_parcela_recorrente(lancamento_recorrente, mes, ano)
+    parcela_total = getattr(lancamento_recorrente, 'ParcelaTotal', None)
+
     cursor.execute("""
         INSERT INTO FIN_Lancamentos
         (UsuarioId, CategoriaId, LancamentoRecorrenteId, Descricao, ValorEstimado, ValorReal,
-         DataVencimento, MesReferencia, AnoReferencia, Pago)
-        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 0)
+         DataVencimento, MesReferencia, AnoReferencia, Pago, ParcelaNumero, ParcelaTotal)
+        VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 0, ?, ?)
     """, (
         usuario_id,
         lancamento_recorrente.CategoriaId,
@@ -448,12 +550,16 @@ def criar_ocorrencia_lancamento_recorrente(cursor, usuario_id, lancamento_recorr
         data_vencimento,
         mes,
         ano,
+        parcela_numero,
+        parcela_total,
     ))
     cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
     return int(cursor.fetchone()[0])
 
 
 def sincronizar_lancamentos_recorrentes_periodo(cursor, usuario_id, mes, ano, lancamento_recorrente_id=None):
+    garantir_schema_parcelas_lancamentos(cursor)
+
     params = [usuario_id]
     filtro = ''
     if lancamento_recorrente_id:
@@ -463,7 +569,7 @@ def sincronizar_lancamentos_recorrentes_periodo(cursor, usuario_id, mes, ano, la
     cursor.execute(f"""
         SELECT LancamentoRecorrenteId, UsuarioId, CategoriaId, Descricao,
                ValorEstimado, DiaVencimento, Periodicidade, IntervaloMeses,
-               DataInicio, DataFim, Ativa
+               DataInicio, DataFim, Ativa, ParcelaInicial, ParcelaTotal
         FROM FIN_LancamentosRecorrentes
         WHERE UsuarioId = ? AND Ativa = 1{filtro}
         ORDER BY Descricao ASC
@@ -692,6 +798,25 @@ def ler_dados_lancamento_recorrente_form():
     intervalo_meses = intervalo_renda(periodicidade, request.form.get('intervalo_meses'))
 
     try:
+        parcela_inicial = parse_int_opcional(request.form.get('parcela_inicial'))
+        parcela_total = parse_int_opcional(request.form.get('parcela_total'))
+    except (TypeError, ValueError):
+        return None, 'Informe parcelas validas.'
+
+    erro_parcelas = validar_parcelas(
+        parcela_inicial,
+        parcela_total,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        intervalo_meses=intervalo_meses,
+    )
+    if erro_parcelas:
+        return None, erro_parcelas
+
+    if parcela_total and not data_fim:
+        data_fim = data_fim_por_parcelas(data_inicio, parcela_inicial, parcela_total, intervalo_meses)
+
+    try:
         dia_vencimento = int(request.form.get('dia_vencimento') or data_inicio.day)
     except (TypeError, ValueError):
         dia_vencimento = data_inicio.day
@@ -706,11 +831,15 @@ def ler_dados_lancamento_recorrente_form():
         'intervalo_meses': intervalo_meses,
         'data_inicio': data_inicio,
         'data_fim': data_fim,
+        'parcela_inicial': parcela_inicial,
+        'parcela_total': parcela_total,
         'ativa': 1 if request.form.get('ativa', 'on') == 'on' else 0,
     }, None
 
 
 def criar_regra_recorrente_a_partir_lancamento(cursor, usuario_id, lancamento_id, dados_lancamento):
+    garantir_schema_parcelas_lancamentos(cursor)
+
     cursor.execute("""
         SELECT ISNULL(L.LancamentoRecorrenteId, O.LancamentoRecorrenteId) AS LancamentoRecorrenteId
         FROM FIN_Lancamentos L
@@ -723,11 +852,17 @@ def criar_regra_recorrente_a_partir_lancamento(cursor, usuario_id, lancamento_id
         return existente.LancamentoRecorrenteId
 
     data_inicio = dados_lancamento['data_vencimento']
+    parcela_numero = dados_lancamento.get('parcela_numero')
+    parcela_total = dados_lancamento.get('parcela_total')
+    data_fim = dados_lancamento.get('recorrencia_data_fim')
+    if parcela_total and not data_fim:
+        data_fim = data_fim_por_parcelas(data_inicio, parcela_numero, parcela_total)
+
     cursor.execute("""
         INSERT INTO FIN_LancamentosRecorrentes
         (UsuarioId, CategoriaId, Descricao, ValorEstimado, DiaVencimento,
-         Periodicidade, IntervaloMeses, DataInicio, DataFim, Ativa)
-        VALUES (?, ?, ?, ?, ?, 'mensal', 1, ?, NULL, 1)
+         Periodicidade, IntervaloMeses, DataInicio, DataFim, Ativa, ParcelaInicial, ParcelaTotal)
+        VALUES (?, ?, ?, ?, ?, 'mensal', 1, ?, ?, 1, ?, ?)
     """, (
         usuario_id,
         dados_lancamento['categoria_id'],
@@ -735,6 +870,9 @@ def criar_regra_recorrente_a_partir_lancamento(cursor, usuario_id, lancamento_id
         dados_lancamento['valor_estimado'],
         data_inicio.day,
         data_inicio,
+        data_fim,
+        parcela_numero,
+        parcela_total,
     ))
     cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
     recorrente_id = int(cursor.fetchone()[0])
@@ -1571,6 +1709,8 @@ def lancamentos_recorrentes():
             return redirect(url_for('financas.lancamentos_recorrentes'))
 
         with get_db_cursor() as cursor:
+            garantir_schema_parcelas_lancamentos(cursor)
+
             cursor.execute("""
                 SELECT CategoriaId
                 FROM FIN_Categorias
@@ -1583,8 +1723,8 @@ def lancamentos_recorrentes():
             cursor.execute("""
                 INSERT INTO FIN_LancamentosRecorrentes
                 (UsuarioId, CategoriaId, Descricao, ValorEstimado, DiaVencimento,
-                 Periodicidade, IntervaloMeses, DataInicio, DataFim, Ativa)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 Periodicidade, IntervaloMeses, DataInicio, DataFim, Ativa, ParcelaInicial, ParcelaTotal)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 usuario_id,
                 dados['categoria_id'],
@@ -1596,6 +1736,8 @@ def lancamentos_recorrentes():
                 dados['data_inicio'],
                 dados['data_fim'],
                 dados['ativa'],
+                dados['parcela_inicial'],
+                dados['parcela_total'],
             ))
             cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
             lancamento_recorrente_id = int(cursor.fetchone()[0])
@@ -1608,6 +1750,7 @@ def lancamentos_recorrentes():
         return redirect(url_for('financas.lancamentos_recorrentes'))
 
     with get_db_cursor() as cursor:
+        garantir_schema_parcelas_lancamentos(cursor)
         sincronizar_lancamentos_recorrentes_periodo(cursor, usuario_id, mes_atual, ano_atual)
 
         cursor.execute("""
@@ -1615,7 +1758,7 @@ def lancamentos_recorrentes():
                 LR.LancamentoRecorrenteId, LR.CategoriaId,
                 LR.Descricao, LR.ValorEstimado, LR.DiaVencimento,
                 LR.Periodicidade, LR.IntervaloMeses, LR.DataInicio, LR.DataFim,
-                LR.Ativa, LR.DataAtualizacao,
+                LR.Ativa, LR.DataAtualizacao, LR.ParcelaInicial, LR.ParcelaTotal,
                 C.Nome AS CategoriaNome, C.CorHex AS CategoriaCorHex,
                 ISNULL(O.TotalOcorrencias, 0) AS TotalOcorrencias,
                 ISNULL(O.Pagas, 0) AS Pagas
@@ -1669,6 +1812,8 @@ def lancamentos_recorrentes():
             'PeriodicidadeLabel': rotulo_periodicidade_renda(row.Periodicidade, row.IntervaloMeses),
             'DataInicio': normalizar_data(row.DataInicio),
             'DataFim': normalizar_data(row.DataFim),
+            'ParcelaInicial': row.ParcelaInicial,
+            'ParcelaTotal': row.ParcelaTotal,
             'Ativa': bool(row.Ativa),
             'CategoriaNome': row.CategoriaNome,
             'CategoriaCorHex': row.CategoriaCorHex,
@@ -1697,6 +1842,8 @@ def editar_lancamento_recorrente(id):
         return redirect(url_for('financas.lancamentos_recorrentes'))
 
     with get_db_cursor() as cursor:
+        garantir_schema_parcelas_lancamentos(cursor)
+
         cursor.execute("""
             SELECT LancamentoRecorrenteId
             FROM FIN_LancamentosRecorrentes
@@ -1720,7 +1867,8 @@ def editar_lancamento_recorrente(id):
             UPDATE FIN_LancamentosRecorrentes
             SET CategoriaId = ?, Descricao = ?, ValorEstimado = ?,
                 DiaVencimento = ?, Periodicidade = ?, IntervaloMeses = ?,
-                DataInicio = ?, DataFim = ?, Ativa = ?, DataAtualizacao = SYSUTCDATETIME()
+                DataInicio = ?, DataFim = ?, ParcelaInicial = ?, ParcelaTotal = ?,
+                Ativa = ?, DataAtualizacao = SYSUTCDATETIME()
             WHERE LancamentoRecorrenteId = ? AND UsuarioId = ?
         """, (
             dados['categoria_id'],
@@ -1731,6 +1879,8 @@ def editar_lancamento_recorrente(id):
             dados['intervalo_meses'],
             dados['data_inicio'],
             dados['data_fim'],
+            dados['parcela_inicial'],
+            dados['parcela_total'],
             dados['ativa'],
             id,
             usuario_id,
@@ -1934,31 +2084,29 @@ def dashboard():
 
         cursor.execute(f"""
             SELECT L.*, C.Nome as CategoriaNome, C.CorHex,
-                   W.Nome AS CarteiraNome, W.CorHex AS CarteiraCorHex
+                   W.Nome AS CarteiraNome, W.CorHex AS CarteiraCorHex,
+                   LR.DataFim AS RecorrenciaDataFim,
+                   LR.ParcelaInicial AS RecorrenciaParcelaInicial,
+                   LR.ParcelaTotal AS RecorrenciaParcelaTotal
             FROM FIN_Lancamentos L
             JOIN FIN_Categorias C ON L.CategoriaId = C.CategoriaId
             LEFT JOIN FIN_Carteiras W
                 ON W.CarteiraId = L.CarteiraId
                 AND W.UsuarioId = L.UsuarioId
+            LEFT JOIN FIN_LancamentosRecorrentes LR
+                ON LR.LancamentoRecorrenteId = L.LancamentoRecorrenteId
+                AND LR.UsuarioId = L.UsuarioId
             WHERE L.UsuarioId IN ({usuarios_placeholders}) AND L.MesReferencia = ? AND L.AnoReferencia = ?
             ORDER BY L.DataVencimento ASC
         """, tuple(usuarios_financeiro) + (mes_sel, ano_sel))
         lancamentos = cursor.fetchall()
 
-        saldo_transportado = saldo_transportado_periodo(
-            cursor,
-            usuario_id,
-            mes_sel,
-            ano_sel,
-            usuarios_ids=usuarios_financeiro,
-            usuarios_caixa_ids=usuarios_caixa,
-        )
         fluxo_caixa = montar_fluxo_caixa_diario(
             cursor,
             usuario_id,
             mes_sel,
             ano_sel,
-            saldo_bancario + saldo_transportado,
+            saldo_bancario,
             usuarios_ids=usuarios_financeiro,
         )
 
@@ -2020,7 +2168,7 @@ def dashboard():
         for item in ranking_categorias
     ]
 
-    caixa_disponivel = saldo_bancario + saldo_transportado
+    caixa_disponivel = saldo_bancario
     saldo_em_caixa_real = caixa_disponivel + rendas_a_receber
     sobra_prevista = saldo_em_caixa_real - contas_pendentes_mes
 
@@ -2058,7 +2206,6 @@ def dashboard():
                            valores_grafico=valores_grafico,
                            cores_grafico=cores_grafico,
                            saldo_bancario=saldo_bancario,
-                           saldo_transportado=saldo_transportado,
                            saldo_em_caixa=saldo_em_caixa_real,
                            fluxo_caixa=fluxo_caixa,
                            resumo_assinaturas=resumo_assinaturas,
@@ -2224,6 +2371,7 @@ def editar_gasto(id):
     pago = str(dados.get('pago', '')).lower() in {'1', 'true', 'on', 'sim', 'pago'}
     recorrente = str(dados.get('recorrente', '')).lower() in {'1', 'true', 'on', 'sim'}
     carteira_id = dados.get('carteira_id') or None
+    recorrencia_data_fim_bruta = dados.get('recorrencia_data_fim')
 
     if not descricao:
         return {"success": False, "message": "Informe a descricao do lancamento."}, 400
@@ -2237,6 +2385,18 @@ def editar_gasto(id):
         data_vencimento = datetime.strptime(data_vencimento_bruta, '%Y-%m-%d').date()
     except (TypeError, ValueError):
         return {"success": False, "message": "Informe uma data de vencimento valida."}, 400
+
+    try:
+        recorrencia_data_fim = (
+            datetime.strptime(recorrencia_data_fim_bruta, '%Y-%m-%d').date()
+            if recorrencia_data_fim_bruta
+            else None
+        )
+    except (TypeError, ValueError):
+        return {"success": False, "message": "Informe uma data final da recorrencia valida."}, 400
+
+    if recorrencia_data_fim and recorrencia_data_fim < data_vencimento:
+        return {"success": False, "message": "A recorrencia precisa terminar depois do vencimento atual."}, 400
 
     try:
         valor_estimado = parse_money_strict(dados.get('valor_estimado'))
@@ -2253,6 +2413,24 @@ def editar_gasto(id):
     if valor_real < 0:
         return {"success": False, "message": "O valor real nao pode ser negativo."}, 400
 
+    try:
+        parcela_numero = parse_int_opcional(dados.get('parcela_numero'))
+        parcela_total = parse_int_opcional(dados.get('parcela_total'))
+    except (TypeError, ValueError):
+        return {"success": False, "message": "Informe parcelas validas."}, 400
+
+    erro_parcelas = validar_parcelas(
+        parcela_numero,
+        parcela_total,
+        data_inicio=data_vencimento,
+        data_fim=recorrencia_data_fim,
+    )
+    if erro_parcelas:
+        return {"success": False, "message": erro_parcelas}, 400
+
+    if recorrente and parcela_total and not recorrencia_data_fim:
+        recorrencia_data_fim = data_fim_por_parcelas(data_vencimento, parcela_numero, parcela_total)
+
     if carteira_id:
         try:
             carteira_id = int(carteira_id)
@@ -2260,6 +2438,8 @@ def editar_gasto(id):
             return {"success": False, "message": "Carteira invalida."}, 400
 
     with get_db_cursor() as cursor:
+        garantir_schema_parcelas_lancamentos(cursor)
+
         cursor.execute("""
             SELECT ISNULL(ValorReal, 0) AS ValorReal, Pago, CarteiraId, MesReferencia, AnoReferencia
             FROM FIN_Lancamentos
@@ -2303,7 +2483,9 @@ def editar_gasto(id):
                 MesReferencia = ?,
                 AnoReferencia = ?,
                 Pago = ?,
-                CarteiraId = ?
+                CarteiraId = ?,
+                ParcelaNumero = ?,
+                ParcelaTotal = ?
             WHERE LancamentoId = ? AND UsuarioId = ?
         """, (
             categoria_id,
@@ -2315,6 +2497,8 @@ def editar_gasto(id):
             ano_referencia,
             1 if pago else 0,
             carteira_nova,
+            parcela_numero,
+            parcela_total,
             id,
             usuario_id,
         ))
@@ -2333,6 +2517,9 @@ def editar_gasto(id):
                 'descricao': descricao,
                 'valor_estimado': valor_estimado,
                 'data_vencimento': data_vencimento,
+                'recorrencia_data_fim': recorrencia_data_fim,
+                'parcela_numero': parcela_numero,
+                'parcela_total': parcela_total,
             })
 
         ignorar_sincronizacao_assinatura_lancamento(cursor, usuario_id, id)
