@@ -459,58 +459,6 @@
             </div>
         </div>
 
-        <div class="finance-card bg-white p-3 mb-4">
-            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-                <div>
-                    <h6 class="fw-bold mb-1"><i class="bi bi-activity me-2"></i>Fluxo de Caixa Projetado</h6>
-                    <div class="text-muted small">Linha diaria cruzando saldo, rendas previstas e contas do periodo.</div>
-                </div>
-                {% if fluxo_caixa.risco_descoberto %}
-                    <div class="alert alert-danger py-2 px-3 mb-0 small fw-bold">
-                        <i class="bi bi-exclamation-triangle me-1"></i>
-                        Risco de descoberto em {{ "%02d"|format(fluxo_caixa.primeiro_dia_negativo) }}/{{ "%02d"|format(mes_sel) }}
-                    </div>
-                {% else %}
-                    <div class="alert alert-success py-2 px-3 mb-0 small fw-bold">
-                        <i class="bi bi-check-circle me-1"></i>Sem saldo negativo projetado
-                    </div>
-                {% endif %}
-            </div>
-
-            <div class="row g-3 align-items-stretch">
-                <div class="col-lg-9">
-                    <div class="chart-box">
-                        <canvas id="graficoFluxoCaixa"></canvas>
-                    </div>
-                </div>
-                <div class="col-lg-3">
-                    <div class="h-100 d-flex flex-column gap-2">
-                        <div class="border rounded p-2">
-                            <div class="small text-muted fw-bold text-uppercase">Saldo inicial estimado</div>
-                            <div class="fw-bold">{{ dinheiro(fluxo_caixa.saldo_inicial) }}</div>
-                        </div>
-                        <div class="border rounded p-2">
-                            <div class="small text-muted fw-bold text-uppercase">Entradas no periodo</div>
-                            <div class="fw-bold text-success">{{ dinheiro(fluxo_caixa.total_entradas) }}</div>
-                        </div>
-                        <div class="border rounded p-2">
-                            <div class="small text-muted fw-bold text-uppercase">Saidas no periodo</div>
-                            <div class="fw-bold text-danger">{{ dinheiro(fluxo_caixa.total_saidas) }}</div>
-                        </div>
-                        <div class="border rounded p-2">
-                            <div class="small text-muted fw-bold text-uppercase">Menor saldo</div>
-                            <div class="fw-bold {% if fluxo_caixa.saldo_minimo < 0 %}text-danger{% else %}text-primary{% endif %}">
-                                {{ dinheiro(fluxo_caixa.saldo_minimo) }}
-                            </div>
-                            {% if fluxo_caixa.dia_saldo_minimo %}
-                                <div class="small text-muted">Dia {{ "%02d"|format(fluxo_caixa.dia_saldo_minimo) }}/{{ "%02d"|format(mes_sel) }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         {% if resumo_carteiras.ativas %}
         <div class="finance-card bg-white p-3 mb-4">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
@@ -899,6 +847,58 @@
             {% endif %}
         </div>
 
+        <div class="finance-card bg-white p-3 mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <h6 class="fw-bold mb-1"><i class="bi bi-activity me-2"></i>Fluxo de Caixa Projetado</h6>
+                    <div class="text-muted small">Linha diaria cruzando saldo, rendas previstas e contas do periodo.</div>
+                </div>
+                {% if fluxo_caixa.risco_descoberto %}
+                    <div class="alert alert-danger py-2 px-3 mb-0 small fw-bold">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Risco de descoberto em {{ "%02d"|format(fluxo_caixa.primeiro_dia_negativo) }}/{{ "%02d"|format(mes_sel) }}
+                    </div>
+                {% else %}
+                    <div class="alert alert-success py-2 px-3 mb-0 small fw-bold">
+                        <i class="bi bi-check-circle me-1"></i>Sem saldo negativo projetado
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="row g-3 align-items-stretch">
+                <div class="col-lg-9">
+                    <div class="chart-box">
+                        <canvas id="graficoFluxoCaixa"></canvas>
+                    </div>
+                </div>
+                <div class="col-lg-3">
+                    <div class="h-100 d-flex flex-column gap-2">
+                        <div class="border rounded p-2">
+                            <div class="small text-muted fw-bold text-uppercase">Saldo inicial estimado</div>
+                            <div class="fw-bold">{{ dinheiro(fluxo_caixa.saldo_inicial) }}</div>
+                        </div>
+                        <div class="border rounded p-2">
+                            <div class="small text-muted fw-bold text-uppercase">Entradas no periodo</div>
+                            <div class="fw-bold text-success">{{ dinheiro(fluxo_caixa.total_entradas) }}</div>
+                        </div>
+                        <div class="border rounded p-2">
+                            <div class="small text-muted fw-bold text-uppercase">Saidas no periodo</div>
+                            <div class="fw-bold text-danger">{{ dinheiro(fluxo_caixa.total_saidas) }}</div>
+                        </div>
+                        <div class="border rounded p-2">
+                            <div class="small text-muted fw-bold text-uppercase">Menor saldo</div>
+                            <div class="fw-bold {% if fluxo_caixa.saldo_minimo < 0 %}text-danger{% else %}text-primary{% endif %}">
+                                {{ dinheiro(fluxo_caixa.saldo_minimo) }}
+                            </div>
+                            {% if fluxo_caixa.dia_saldo_minimo %}
+                                <div class="small text-muted">Dia {{ "%02d"|format(fluxo_caixa.dia_saldo_minimo) }}/{{ "%02d"|format(mes_sel) }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+                
         <div class="finance-card bg-white p-3 mb-4">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
                 <div>
