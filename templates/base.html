@@ -507,35 +507,35 @@
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav ms-auto align-items-lg-center">
                     <li class="nav-item">
-                        <a class="nav-link px-lg-3 {{ 'active' if endpoint == 'main.index' else '' }}" href="{{ url_for('main.index') }}#servicos" {% if endpoint == 'main.index' %}aria-current="page"{% endif %}>
-                            Solu&ccedil;&otilde;es
+                        <a class="nav-link px-lg-3 {{ 'active' if endpoint == 'main.index' else '' }}"
+                        href="{{ url_for('main.index') }}#produtos"
+                        {% if endpoint == 'main.index' %}aria-current="page"{% endif %}>
+                            Produtos
                         </a>
                     </li>
+
                     <li class="nav-item">
-                        <a class="nav-link px-lg-3" href="{{ url_for('main.index') }}#planos">Planos</a>
+                        <a class="nav-link px-lg-3" href="{{ url_for('main.index') }}#directos">
+                            DirectOS
+                        </a>
                     </li>
+
                     <li class="nav-item">
-                        <a class="nav-link px-lg-3 {{ 'active' if endpoint == 'empresa.projetos' else '' }}" href="{{ url_for('empresa.projetos') }}" {% if endpoint == 'empresa.projetos' %}aria-current="page"{% endif %}>Cases</a>
+                        <a class="nav-link px-lg-3" href="{{ url_for('main.index') }}#portfolio">
+                            Portf&oacute;lio
+                        </a>
                     </li>
+
                     <li class="nav-item">
-                        <a class="nav-link px-lg-3 {{ 'active' if endpoint == 'empresa.contato' else '' }}" href="{{ url_for('empresa.contato') }}" {% if endpoint == 'empresa.contato' %}aria-current="page"{% endif %}>Contato</a>
+                        <a class="nav-link px-lg-3" href="{{ url_for('main.index') }}#contato">
+                            Contato
+                        </a>
                     </li>
 
                     {% if current_user.is_authenticated %}
                     <li class="nav-item ms-lg-3">
                         <a class="nav-platform-login" href="{{ url_for('dashboard.index') }}">
-                            App
-                        </a>
-                    </li>
-                    <li class="nav-item ms-lg-2">
-                        <a class="nav-link px-lg-3" href="{{ url_for('admin.logout') }}">
-                            Sair
-                        </a>
-                    </li>
-                    {% else %}
-                    <li class="nav-item ms-lg-3">
-                        <a class="nav-platform-login" href="{{ url_for('admin.login') }}">
-                            Entrar
+                            Acessar painel
                         </a>
                     </li>
                     {% endif %}
