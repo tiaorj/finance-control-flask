@@ -18,11 +18,11 @@
 
                 <div class="platform-hero-actions">
                     <a href="https://directos-saas.onrender.com" target="_blank" rel="noopener" class="btn btn-warning fw-bold">
-                        Conhecer o DirectOS
+                        Solicitar implantação assistida
                     </a>
 
                     <a href="#produtos" class="btn btn-outline-light fw-bold">
-                        Ver soluções
+                        Ver demonstração do DirectOS
                     </a>
                 </div>
             </div>
@@ -64,6 +64,7 @@
                     <p>
                         Sistema SaaS para gestão de ordens de serviço, clientes, serviços, atendimentos,
                         recebimentos, recibos, relatórios e comunicação assistida por WhatsApp.
+                        Nesta fase inicial, a contratação é feita com implantação assistida.
                     </p>
 
                     <ul class="mt-3 mb-4">
@@ -72,10 +73,11 @@
                         <li>Financeiro e recibos</li>
                         <li>Assistente IA para textos e checklists</li>
                         <li>Relatórios operacionais e financeiros</li>
+                        <li>Implantação inicial acompanhada</li>
                     </ul>
 
-                    <a href="https://directos-saas.onrender.com" target="_blank" rel="noopener">
-                        Acessar demonstração <i class="bi bi-arrow-right"></i>
+                    <a href="#contato">
+                        Solicitar acesso assistido <i class="bi bi-arrow-right"></i>
                     </a>
                 </article>
 
@@ -86,11 +88,11 @@
 
                     <span class="platform-kicker">Produto em evolução</span>
 
-                    <h3>Financeiro</h3>
+                    <h3>Financeiro Pessoal</h3>
 
                     <p>
-                        Plataforma para controle financeiro pessoal e de pequenos negócios, com organização
-                        de entradas, despesas, carteiras, categorias, status de pagamento e acompanhamento mensal.
+                        Sistema para controle financeiro pessoal, com organização de entradas, despesas,
+                        carteiras, categorias, status de pagamento, assinaturas, metas e acompanhamento mensal.
                     </p>
 
                     <ul class="mt-3 mb-4">
@@ -101,7 +103,7 @@
                         <li>Dashboard de acompanhamento</li>
                     </ul>
 
-                    <a href="{{ url_for('admin.cadastro') }}">
+                    <a href="{{ url_for('admin.login', next=url_for('financas.dashboard')) }}">
                         Acessar sistema financeiro <i class="bi bi-arrow-right"></i>
                     </a>
                 </article>
@@ -149,10 +151,11 @@
         <div class="container">
             <div class="platform-section-heading">
                 <span class="platform-kicker">Destaque</span>
-                <h2>DirectOS: o produto mais pronto para demonstração</h2>
+                <h2>DirectOS: implantação assistida para os primeiros clientes</h2>
                 <p>
-                    O DirectOS foi criado para pequenos prestadores de serviço que precisam controlar atendimento,
-                    cliente, status, valores e comunicação sem depender de planilhas ou mensagens soltas.
+                    O DirectOS está em fase inicial de lançamento. Nesta etapa, o acesso é liberado com
+                    implantação acompanhada, configuração inicial e orientação direta para pequenos prestadores
+                    de serviço que desejam organizar atendimentos, clientes, valores e comunicação.
                 </p>
             </div>
 
@@ -166,7 +169,7 @@
                     </p>
                     <strong>OS centralizada</strong>
                     <a href="https://directos-saas.onrender.com" target="_blank" rel="noopener" class="btn btn-outline-primary fw-bold">
-                        Ver DirectOS
+                        Ver demonstração
                     </a>
                 </article>
 
@@ -177,8 +180,8 @@
                         recibo geral da OS e recibo individual por pagamento.
                     </p>
                     <strong>Controle profissional</strong>
-                    <a href="https://directos-saas.onrender.com" target="_blank" rel="noopener" class="btn btn-primary fw-bold">
-                        Testar demonstração
+                    <a href="#contato" class="btn btn-primary fw-bold">
+                        Solicitar implantação
                     </a>
                 </article>
 
@@ -189,8 +192,8 @@
                         para envio manual pelo WhatsApp.
                     </p>
                     <strong>Atendimento assistido</strong>
-                    <a href="https://directos-saas.onrender.com" target="_blank" rel="noopener" class="btn btn-outline-primary fw-bold">
-                        Conhecer recursos
+                    <a href="#contato" class="btn btn-outline-primary fw-bold">
+                        Falar sobre acesso
                     </a>
                 </article>
 
@@ -349,13 +352,13 @@
 
                 <article>
                     <span>Produto</span>
-                    <h3>Quero conhecer o DirectOS</h3>
+                    <h3>Quero implantar o DirectOS</h3>
                     <p>
-                        Acesse a demonstração do sistema de ordens de serviço e veja como ele pode ajudar
-                        pequenos prestadores de serviço.
+                        Solicite uma implantação assistida para configurar o DirectOS conforme sua operação
+                        e iniciar o uso com acompanhamento direto.
                     </p>
-                    <a href="https://directos-saas.onrender.com" target="_blank" rel="noopener">
-                        Abrir DirectOS <i class="bi bi-arrow-right"></i>
+                    <a href="{{ url_for('empresa.contato') }}">
+                        Solicitar implantação assistida <i class="bi bi-arrow-right"></i>
                     </a>
                 </article>
 
@@ -397,8 +400,8 @@
             </p>
 
             <div>
-                <a href="https://directos-saas.onrender.com" target="_blank" rel="noopener" class="btn btn-warning fw-bold">
-                    Conhecer o DirectOS
+                <a href="{{ url_for('empresa.contato') }}" class="btn btn-warning fw-bold">
+                    Solicitar implantação assistida
                 </a>
 
                 <a href="{{ url_for('curriculo.especialista') }}" class="btn btn-outline-light fw-bold">
