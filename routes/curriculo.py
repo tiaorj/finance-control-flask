@@ -203,9 +203,44 @@ def editar_perfil():
 
 
 @curriculo_bp.route('/especialista')
-@login_required
 def especialista():
-    dados = get_dados_completos_curriculo(int(current_user.get_id()))
+    """
+    Página pública do perfil profissional exibida no portal DirectTI.
+
+    A rota não exige login porque é usada como portfólio público.
+    Para visitantes, carrega o currículo do usuário principal configurado abaixo.
+    Para usuário logado, continua exibindo o currículo do usuário autenticado.
+    """
+
+    if current_user.is_authenticated:
+        usuario_id = int(current_user.get_id())
+    else:
+        usuario_id = None
+
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                SELECT TOP 1 UsuarioId
+                FROM Usuarios
+                WHERE Username IN (?, ?, ?)
+                ORDER BY UsuarioId
+            """, (
+                'tiaorj@gmail.com',
+                'direct.ti.tec@gmail.com',
+                'admin'
+            ))
+
+            usuario_publico = cursor.fetchone()
+
+            if usuario_publico:
+                usuario_id = int(usuario_publico.UsuarioId)
+
+    if not usuario_id:
+        return render_template(
+            'errors/404.html',
+            mensagem='Perfil profissional ainda não configurado.'
+        ), 404
+
+    dados = get_dados_completos_curriculo(usuario_id)
     return render_template('especialista.html', **dados)
 
 @curriculo_bp.route('/gerar-pdf')
