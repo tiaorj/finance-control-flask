@@ -2,19 +2,27 @@
 
 {% block content %}
 <main class="platform-landing">
-    <section class="platform-hero" style="background-image: linear-gradient(90deg, rgba(0, 20, 45, 0.92), rgba(0, 33, 71, 0.72), rgba(0, 33, 71, 0.18)), url('{{ url_for('static', filename='img/platform-hero.png') }}');">
+
+    <section class="platform-hero" style="background-image: linear-gradient(90deg, rgba(0, 20, 45, 0.94), rgba(0, 33, 71, 0.78), rgba(0, 33, 71, 0.28)), url('{{ url_for('static', filename='img/platform-hero.png') }}');">
         <div class="container">
             <div class="platform-hero-content">
-                <span class="platform-kicker">Direct TI Plataforma</span>
-                <h1>Gest&atilde;o Financeira e Solu&ccedil;&otilde;es Digitais em um s&oacute; lugar.</h1>
-                <p>Organize finan&ccedil;as, fortale&ccedil;a perfis profissionais e contrate portais sob medida com uma plataforma criada para transformar opera&ccedil;&atilde;o em resultado.</p>
+                <span class="platform-kicker">DirectTI Portal</span>
+
+                <h1>Soluções digitais, automação e sistemas inteligentes para pequenos negócios.</h1>
+
+                <p>
+                    A DirectTI reúne produtos próprios, projetos em evolução e desenvolvimento sob medida
+                    para ajudar empresas e profissionais a organizar processos, ganhar produtividade e transformar
+                    tecnologia em resultado.
+                </p>
 
                 <div class="platform-hero-actions">
-                    <a href="{{ url_for('admin.cadastro') }}" class="btn btn-warning fw-bold">
-                        Comece agora gratuitamente
+                    <a href="https://directos-saas.onrender.com" target="_blank" rel="noopener" class="btn btn-warning fw-bold">
+                        Conhecer o DirectOS
                     </a>
-                    <a href="#servicos" class="btn btn-outline-light fw-bold">
-                        Conhe&ccedil;a as solu&ccedil;&otilde;es
+
+                    <a href="#produtos" class="btn btn-outline-light fw-bold">
+                        Ver soluções
                     </a>
                 </div>
             </div>
@@ -23,74 +31,253 @@
 
     <section class="platform-trust-strip">
         <div class="container">
-            <span>Controle financeiro</span>
-            <span>Perfil profissional</span>
-            <span>Portais empresariais</span>
-            <span>Consultoria t&eacute;cnica</span>
+            <span>Ordens de Serviço</span>
+            <span>Gestão Financeira</span>
+            <span>Portfólio Técnico</span>
+            <span>IA aplicada</span>
         </div>
     </section>
 
-    <section id="servicos" class="platform-section">
+    <section id="produtos" class="platform-section">
         <div class="container">
             <div class="platform-section-heading">
-                <span class="platform-kicker">Servi&ccedil;os</span>
-                <h2>O que a plataforma resolve</h2>
-                <p>Tr&ecirc;s frentes para empresas, profissionais e opera&ccedil;&otilde;es que precisam de organiza&ccedil;&atilde;o, presen&ccedil;a digital e software feito para a realidade do neg&oacute;cio.</p>
+                <span class="platform-kicker">Produtos</span>
+                <h2>Um portal para acessar as soluções da DirectTI</h2>
+                <p>
+                    O objetivo da DirectTI é construir uma linha de sistemas simples, úteis e acessíveis para
+                    prestadores de serviço, pequenos negócios e profissionais que precisam sair da planilha
+                    e organizar melhor sua operação.
+                </p>
             </div>
 
             <div class="platform-services-grid">
+
                 <article class="platform-service-card">
-                    <div class="platform-service-icon"><i class="bi bi-wallet2"></i></div>
-                    <h3>Gest&atilde;o Financeira</h3>
-                    <p>Cadastre receitas, despesas, saldos e acompanhe a sa&uacute;de financeira por per&iacute;odo, categoria e status de pagamento.</p>
-                    <a href="{{ url_for('admin.cadastro') }}">Come&ccedil;ar controle <i class="bi bi-arrow-right"></i></a>
+                    <div class="platform-service-icon">
+                        <i class="bi bi-clipboard-check"></i>
+                    </div>
+
+                    <span class="platform-kicker">Produto principal</span>
+
+                    <h3>DirectOS</h3>
+
+                    <p>
+                        Sistema SaaS para gestão de ordens de serviço, clientes, serviços, atendimentos,
+                        recebimentos, recibos, relatórios e comunicação assistida por WhatsApp.
+                    </p>
+
+                    <ul class="mt-3 mb-4">
+                        <li>Controle completo de OS</li>
+                        <li>Área do cliente por link</li>
+                        <li>Financeiro e recibos</li>
+                        <li>Assistente IA para textos e checklists</li>
+                        <li>Relatórios operacionais e financeiros</li>
+                    </ul>
+
+                    <a href="https://directos-saas.onrender.com" target="_blank" rel="noopener">
+                        Acessar demonstração <i class="bi bi-arrow-right"></i>
+                    </a>
                 </article>
 
                 <article class="platform-service-card">
-                    <div class="platform-service-icon"><i class="bi bi-person-vcard"></i></div>
-                    <h3>Consultoria de Curr&iacute;culos</h3>
-                    <p>Organize experi&ecirc;ncias, forma&ccedil;&otilde;es, habilidades e conquistas para transformar trajet&oacute;ria em um perfil claro e competitivo.</p>
-                    <a href="{{ url_for('curriculo.especialista') }}">Ver modelo profissional <i class="bi bi-arrow-right"></i></a>
+                    <div class="platform-service-icon">
+                        <i class="bi bi-wallet2"></i>
+                    </div>
+
+                    <span class="platform-kicker">Produto em evolução</span>
+
+                    <h3>Financeiro</h3>
+
+                    <p>
+                        Plataforma para controle financeiro pessoal e de pequenos negócios, com organização
+                        de entradas, despesas, carteiras, categorias, status de pagamento e acompanhamento mensal.
+                    </p>
+
+                    <ul class="mt-3 mb-4">
+                        <li>Receitas e despesas</li>
+                        <li>Carteiras e contas</li>
+                        <li>Assinaturas e recorrências</li>
+                        <li>Metas financeiras</li>
+                        <li>Dashboard de acompanhamento</li>
+                    </ul>
+
+                    <a href="{{ url_for('admin.cadastro') }}">
+                        Começar pelo financeiro <i class="bi bi-arrow-right"></i>
+                    </a>
                 </article>
 
                 <article class="platform-service-card">
-                    <div class="platform-service-icon"><i class="bi bi-window-stack"></i></div>
-                    <h3>Desenvolvimento sob Medida</h3>
-                    <p>Cria&ccedil;&atilde;o de portais, dashboards e sistemas internos para empresas que precisam sair da planilha e ganhar escala.</p>
-                    <a href="{{ url_for('empresa.contato') }}">Solicitar proposta <i class="bi bi-arrow-right"></i></a>
+                    <div class="platform-service-icon">
+                        <i class="bi bi-trophy"></i>
+                    </div>
+
+                    <span class="platform-kicker">Projeto em evolução</span>
+
+                    <h3>FutPlay / Meu Pitaco FC</h3>
+
+                    <p>
+                        Plataforma em desenvolvimento para futebol, palpites, bolões, campeonatos, rankings
+                        e participação de usuários em ligas públicas ou privadas.
+                    </p>
+
+                    <ul class="mt-3 mb-4">
+                        <li>Palpites de jogos</li>
+                        <li>Ligas públicas e privadas</li>
+                        <li>Ranking de participantes</li>
+                        <li>Convites por link ou código</li>
+                        <li>Portal esportivo em evolução</li>
+                    </ul>
+
+                    <a href="#contato">
+                        Acompanhar evolução <i class="bi bi-arrow-right"></i>
+                    </a>
                 </article>
+
             </div>
         </div>
     </section>
 
-    <section id="planos" class="platform-section platform-plans">
+    <section id="directos" class="platform-section platform-plans">
         <div class="container">
             <div class="platform-section-heading">
-                <span class="platform-kicker">Planos</span>
-                <h2>Comece simples, evolua conforme a necessidade</h2>
+                <span class="platform-kicker">Destaque</span>
+                <h2>DirectOS: o produto mais pronto para demonstração</h2>
+                <p>
+                    O DirectOS foi criado para pequenos prestadores de serviço que precisam controlar atendimento,
+                    cliente, status, valores e comunicação sem depender de planilhas ou mensagens soltas.
+                </p>
             </div>
 
             <div class="platform-plan-grid">
+
                 <article>
-                    <h3>Gratuito</h3>
-                    <p>Controle financeiro inicial para organizar entradas, despesas e saldos mensais.</p>
-                    <strong>R$ 0</strong>
-                    <a href="{{ url_for('admin.cadastro') }}" class="btn btn-outline-primary fw-bold">Criar conta</a>
+                    <h3>Organização da operação</h3>
+                    <p>
+                        Cadastre clientes, serviços e ordens de serviço com status, prioridade, datas,
+                        responsável, descrição do problema, solução aplicada e histórico.
+                    </p>
+                    <strong>OS centralizada</strong>
+                    <a href="https://directos-saas.onrender.com" target="_blank" rel="noopener" class="btn btn-outline-primary fw-bold">
+                        Ver DirectOS
+                    </a>
                 </article>
 
                 <article>
-                    <h3>Consultoria</h3>
-                    <p>Acompanhamento para estruturar perfil profissional, curr&iacute;culo, portf&oacute;lio e posicionamento.</p>
-                    <strong>Sob consulta</strong>
-                    <a href="{{ url_for('empresa.contato') }}" class="btn btn-primary fw-bold">Falar com especialista</a>
+                    <h3>Financeiro e recibos</h3>
+                    <p>
+                        Controle valores previstos, valores finais, recebimentos parciais, saldo restante,
+                        recibo geral da OS e recibo individual por pagamento.
+                    </p>
+                    <strong>Controle profissional</strong>
+                    <a href="https://directos-saas.onrender.com" target="_blank" rel="noopener" class="btn btn-primary fw-bold">
+                        Testar demonstração
+                    </a>
                 </article>
 
                 <article>
-                    <h3>Projeto sob Medida</h3>
-                    <p>Desenvolvimento de portais e automa&ccedil;&otilde;es para opera&ccedil;&otilde;es que precisam de software pr&oacute;prio.</p>
-                    <strong>Projeto fechado</strong>
-                    <a href="{{ url_for('empresa.contato') }}" class="btn btn-outline-primary fw-bold">Pedir diagn&oacute;stico</a>
+                    <h3>IA e WhatsApp</h3>
+                    <p>
+                        Use IA para melhorar descrições, gerar checklists técnicos e criar mensagens prontas
+                        para envio manual pelo WhatsApp.
+                    </p>
+                    <strong>Atendimento assistido</strong>
+                    <a href="https://directos-saas.onrender.com" target="_blank" rel="noopener" class="btn btn-outline-primary fw-bold">
+                        Conhecer recursos
+                    </a>
                 </article>
+
+            </div>
+        </div>
+    </section>
+
+    <section id="portfolio" class="platform-section">
+        <div class="container">
+            <div class="platform-section-heading">
+                <span class="platform-kicker">Portfólio técnico</span>
+                <h2>Experiência aplicada em produtos reais</h2>
+                <p>
+                    A DirectTI também funciona como vitrine técnica dos projetos, tecnologias e experiências
+                    utilizadas no desenvolvimento das soluções.
+                </p>
+            </div>
+
+            <div class="platform-services-grid">
+
+                <article class="platform-service-card">
+                    <div class="platform-service-icon">
+                        <i class="bi bi-code-slash"></i>
+                    </div>
+
+                    <h3>Desenvolvimento de sistemas</h3>
+
+                    <p>
+                        Experiência em desenvolvimento backend, manutenção de sistemas legados, modernização,
+                        integrações, APIs e criação de aplicações web para uso real.
+                    </p>
+
+                    <ul class="mt-3 mb-4">
+                        <li>ASP Classic</li>
+                        <li>C# .NET</li>
+                        <li>PHP</li>
+                        <li>Python Flask</li>
+                        <li>APIs REST e integrações</li>
+                    </ul>
+
+                    <a href="{{ url_for('curriculo.especialista') }}">
+                        Ver perfil profissional <i class="bi bi-arrow-right"></i>
+                    </a>
+                </article>
+
+                <article class="platform-service-card">
+                    <div class="platform-service-icon">
+                        <i class="bi bi-database-check"></i>
+                    </div>
+
+                    <h3>Dados, SQL e BI</h3>
+
+                    <p>
+                        Forte atuação com bancos de dados, modelagem, consultas, relatórios, dashboards
+                        e transformação de dados em indicadores úteis para tomada de decisão.
+                    </p>
+
+                    <ul class="mt-3 mb-4">
+                        <li>SQL Server</li>
+                        <li>Oracle</li>
+                        <li>Power BI</li>
+                        <li>Modelagem de dados</li>
+                        <li>Relatórios gerenciais</li>
+                    </ul>
+
+                    <a href="{{ url_for('curriculo.especialista') }}">
+                        Conhecer trajetória <i class="bi bi-arrow-right"></i>
+                    </a>
+                </article>
+
+                <article class="platform-service-card">
+                    <div class="platform-service-icon">
+                        <i class="bi bi-cpu"></i>
+                    </div>
+
+                    <h3>IA aplicada ao desenvolvimento</h3>
+
+                    <p>
+                        Uso de IA para acelerar desenvolvimento, melhorar textos, criar assistentes,
+                        apoiar análise de código, modernização de telas e automação de processos.
+                    </p>
+
+                    <ul class="mt-3 mb-4">
+                        <li>Assistentes de texto</li>
+                        <li>Geração de checklists</li>
+                        <li>Melhoria de mensagens</li>
+                        <li>Produtividade com Codex</li>
+                        <li>Automação de fluxos</li>
+                    </ul>
+
+                    <a href="#contato">
+                        Conversar sobre IA <i class="bi bi-arrow-right"></i>
+                    </a>
+                </article>
+
             </div>
         </div>
     </section>
@@ -98,68 +285,120 @@
     <section class="platform-section platform-testimonials">
         <div class="container">
             <div class="platform-section-heading">
-                <span class="platform-kicker">Depoimentos</span>
-                <h2>Confian&ccedil;a para quem precisa sair do improviso</h2>
-                <p>Casos de uso que mostram como organiza&ccedil;&atilde;o financeira, posicionamento profissional e portais internos podem reduzir ru&iacute;do na opera&ccedil;&atilde;o.</p>
+                <span class="platform-kicker">Posicionamento</span>
+                <h2>Soluções simples, práticas e criadas a partir de problemas reais</h2>
+                <p>
+                    A proposta da DirectTI é construir sistemas com foco em uso prático, clareza visual,
+                    organização de processos e evolução contínua.
+                </p>
             </div>
 
             <div class="platform-testimonial-grid">
+
                 <article>
-                    <p>&ldquo;O controle financeiro deixou claro o que estava vencendo, o que j&aacute; tinha sido pago e quanto sobraria no m&ecirc;s.&rdquo;</p>
-                    <strong>Cliente financeiro</strong>
-                    <span>Gest&atilde;o mensal</span>
+                    <p>
+                        “O DirectOS nasceu para resolver uma dor comum de prestadores de serviço:
+                        organizar clientes, OS, pagamentos e comunicação em um único lugar.”
+                    </p>
+                    <strong>DirectOS</strong>
+                    <span>Produto principal</span>
                 </article>
+
                 <article>
-                    <p>&ldquo;A organiza&ccedil;&atilde;o do perfil profissional ajudou a transformar experi&ecirc;ncia t&eacute;cnica em uma narrativa objetiva.&rdquo;</p>
-                    <strong>Profissional de tecnologia</strong>
-                    <span>Consultoria de curr&iacute;culo</span>
+                    <p>
+                        “O sistema financeiro começou como uso pessoal, mas possui base para evoluir
+                        para controle financeiro simples para pequenos negócios.”
+                    </p>
+                    <strong>Financeiro</strong>
+                    <span>Produto em evolução</span>
                 </article>
+
                 <article>
-                    <p>&ldquo;O portal interno substituiu controles espalhados e trouxe uma rotina mais previs&iacute;vel para a equipe.&rdquo;</p>
-                    <strong>Opera&ccedil;&atilde;o empresarial</strong>
-                    <span>Desenvolvimento sob medida</span>
+                    <p>
+                        “O FutPlay explora uma frente diferente: comunidade, futebol, palpites,
+                        rankings e participação em campeonatos.”
+                    </p>
+                    <strong>FutPlay</strong>
+                    <span>Projeto em validação</span>
                 </article>
+
             </div>
         </div>
     </section>
 
-    <section class="platform-section platform-articles">
+    <section id="contato" class="platform-section platform-articles">
         <div class="container">
             <div class="platform-section-heading">
-                <span class="platform-kicker">Blog</span>
-                <h2>Artigos para finan&ccedil;as, carreira e tecnologia</h2>
-                <p>Conte&uacute;do educativo para atrair clientes, responder d&uacute;vidas frequentes e fortalecer autoridade da plataforma.</p>
+                <span class="platform-kicker">Contato</span>
+                <h2>Vamos conversar sobre sistemas, automação ou produtos digitais?</h2>
+                <p>
+                    Entre em contato para conhecer o DirectOS, falar sobre desenvolvimento sob medida
+                    ou acompanhar a evolução dos produtos da DirectTI.
+                </p>
             </div>
 
             <div class="platform-article-grid">
+
                 <article>
-                    <span>Finan&ccedil;as</span>
-                    <h3>Como organizar contas do m&ecirc;s sem depender de planilhas quebradas</h3>
-                    <p>Um guia simples para separar entradas, despesas, saldos e previs&otilde;es.</p>
+                    <span>Produto</span>
+                    <h3>Quero conhecer o DirectOS</h3>
+                    <p>
+                        Acesse a demonstração do sistema de ordens de serviço e veja como ele pode ajudar
+                        pequenos prestadores de serviço.
+                    </p>
+                    <a href="https://directos-saas.onrender.com" target="_blank" rel="noopener">
+                        Abrir DirectOS <i class="bi bi-arrow-right"></i>
+                    </a>
                 </article>
+
                 <article>
-                    <span>Carreira</span>
-                    <h3>O que um curr&iacute;culo precisa mostrar para gerar confian&ccedil;a</h3>
-                    <p>Como estruturar conquistas, tecnologias e resultados de forma comercial.</p>
+                    <span>Portfólio</span>
+                    <h3>Ver perfil profissional</h3>
+                    <p>
+                        Conheça a experiência técnica, projetos, tecnologias e trajetória profissional
+                        por trás da DirectTI.
+                    </p>
+                    <a href="{{ url_for('curriculo.especialista') }}">
+                        Ver currículo <i class="bi bi-arrow-right"></i>
+                    </a>
                 </article>
+
                 <article>
-                    <span>Tecnologia</span>
-                    <h3>Quando vale criar um portal sob medida para sua empresa</h3>
-                    <p>Sinais de que processos manuais est&atilde;o limitando crescimento.</p>
+                    <span>Projeto</span>
+                    <h3>Solicitar desenvolvimento</h3>
+                    <p>
+                        Precisa de um portal, sistema interno, dashboard ou automação? Podemos avaliar
+                        o melhor caminho para sua operação.
+                    </p>
+                    <a href="{{ url_for('empresa.contato') }}">
+                        Falar sobre projeto <i class="bi bi-arrow-right"></i>
+                    </a>
                 </article>
+
             </div>
         </div>
     </section>
 
     <section class="platform-final-cta">
         <div class="container">
-            <h2>Pronto para transformar organiza&ccedil;&atilde;o em crescimento?</h2>
-            <p>Entre pela gest&atilde;o financeira gratuita ou fale sobre uma solu&ccedil;&atilde;o digital sob medida.</p>
+            <h2>DirectTI: tecnologia prática para transformar ideias em sistemas reais.</h2>
+
+            <p>
+                Comece conhecendo o DirectOS ou navegue pelo portfólio técnico para ver como as soluções
+                estão sendo construídas.
+            </p>
+
             <div>
-                <a href="{{ url_for('admin.cadastro') }}" class="btn btn-warning fw-bold">Come&ccedil;ar agora</a>
-                <a href="{{ url_for('empresa.contato') }}" class="btn btn-outline-light fw-bold">Conversar sobre projeto</a>
+                <a href="https://directos-saas.onrender.com" target="_blank" rel="noopener" class="btn btn-warning fw-bold">
+                    Conhecer o DirectOS
+                </a>
+
+                <a href="{{ url_for('curriculo.especialista') }}" class="btn btn-outline-light fw-bold">
+                    Ver portfólio técnico
+                </a>
             </div>
         </div>
     </section>
+
 </main>
 {% endblock %}
