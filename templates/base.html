@@ -508,21 +508,9 @@
                 <ul class="navbar-nav ms-auto align-items-lg-center">
                     <li class="nav-item">
                         <a class="nav-link px-lg-3 {{ 'active' if endpoint == 'main.index' else '' }}"
-                        href="{{ url_for('main.index') }}#produtos"
+                        href="{{ url_for('main.index') }}#directos"
                         {% if endpoint == 'main.index' %}aria-current="page"{% endif %}>
-                            Produtos
-                        </a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link px-lg-3" href="{{ url_for('main.index') }}#directos">
                             DirectOS
-                        </a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link px-lg-3" href="{{ url_for('main.index') }}#portfolio">
-                            Portf&oacute;lio
                         </a>
                     </li>
 

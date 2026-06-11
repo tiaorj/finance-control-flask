@@ -672,9 +672,13 @@ body {
     display: inline-flex;
     font-weight: 800;
     gap: 0.45rem;
-    margin-top: auto;
+    margin-top: 0.6rem;
     text-decoration: none;
     text-transform: uppercase;
+}
+
+.platform-service-card a:first-of-type {
+    margin-top: auto;
 }
 
 .platform-plans {
