@@ -495,6 +495,7 @@
         <main class="app-main">
     {% else %}
     <nav class="navbar navbar-expand-lg navbar-dark sticky-top shadow site-navbar">
+        {% set public_anchor_prefix = '' if endpoint == 'main.index' else url_for('main.index') %}
         <div class="container">
             <a class="navbar-brand fw-bold fs-3" href="{{ url_for('main.index') }}" aria-label="Direct TI - In&iacute;cio">
                 DIRECT<span class="brand-accent"> TI</span>
@@ -507,15 +508,21 @@
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav ms-auto align-items-lg-center">
                     <li class="nav-item">
+                        <a class="nav-link px-lg-3" href="{{ public_anchor_prefix }}#produtos">
+                            Produtos
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
                         <a class="nav-link px-lg-3 {{ 'active' if endpoint == 'main.index' else '' }}"
-                        href="{{ url_for('main.index') }}#directos"
+                        href="{{ public_anchor_prefix }}#directos"
                         {% if endpoint == 'main.index' %}aria-current="page"{% endif %}>
                             DirectOS
                         </a>
                     </li>
 
                     <li class="nav-item">
-                        <a class="nav-link px-lg-3" href="{{ url_for('main.index') }}#contato">
+                        <a class="nav-link px-lg-3" href="{{ public_anchor_prefix }}#contato">
                             Contato
                         </a>
                     </li>

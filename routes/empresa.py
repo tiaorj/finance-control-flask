@@ -5,6 +5,25 @@ from flask_mail import Message
 
 empresa_bp = Blueprint('empresa', __name__)
 
+MENSAGEM_SUCESSO_IMPLANTACAO_DIRECTOS = (
+    "Solicita\u00e7\u00e3o enviada com sucesso. Em breve entraremos em contato "
+    "para entender sua opera\u00e7\u00e3o e orientar a implanta\u00e7\u00e3o."
+)
+
+
+def _campo_formulario(nome):
+    return (request.form.get(nome) or '').strip()
+
+
+def _campo_opcional_formulario(nome):
+    valor = _campo_formulario(nome)
+    return valor or None
+
+
+def _campo_utm(nome):
+    valor = (request.form.get(nome) or request.args.get(nome) or '').strip()
+    return valor or None
+
 @empresa_bp.route('/empresa')
 def home():
     return render_template('landing.html')
@@ -31,6 +50,78 @@ def projetos():
             })
 
     return render_template('projetos.html', projetos=projetos, info={})
+
+
+@empresa_bp.route('/solicitar-implantacao-directos', methods=['GET', 'POST'])
+def solicitar_implantacao_directos():
+    utm = {
+        'utm_source': _campo_utm('utm_source'),
+        'utm_medium': _campo_utm('utm_medium'),
+        'utm_campaign': _campo_utm('utm_campaign'),
+    }
+
+    if request.method == 'POST':
+        form_data = {
+            'nome': _campo_formulario('nome'),
+            'empresa': _campo_opcional_formulario('empresa'),
+            'email': _campo_opcional_formulario('email'),
+            'whatsapp': _campo_opcional_formulario('whatsapp'),
+            'tipo_negocio': _campo_opcional_formulario('tipo_negocio'),
+            'volume_os_mes': _campo_opcional_formulario('volume_os_mes'),
+            'mensagem': _campo_opcional_formulario('mensagem'),
+        }
+
+        if not form_data['nome']:
+            flash('Informe seu nome para solicitar a implantacao assistida.', 'danger')
+            return render_template(
+                'solicitar_implantacao_directos.html',
+                form_data=form_data,
+                utm=utm,
+            ), 400
+
+        try:
+            with get_db_cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO APP_LeadsDirectOS
+                        (Nome, Empresa, Email, Whatsapp, TipoNegocio, VolumeOSMes,
+                         Mensagem, Origem, UtmSource, UtmMedium, UtmCampaign)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        form_data['nome'],
+                        form_data['empresa'],
+                        form_data['email'],
+                        form_data['whatsapp'],
+                        form_data['tipo_negocio'],
+                        form_data['volume_os_mes'],
+                        form_data['mensagem'],
+                        'Portal DirectTI - DirectOS',
+                        utm['utm_source'],
+                        utm['utm_medium'],
+                        utm['utm_campaign'],
+                    ),
+                )
+
+            flash(MENSAGEM_SUCESSO_IMPLANTACAO_DIRECTOS, 'success')
+            return redirect(url_for('empresa.solicitar_implantacao_directos'))
+        except Exception:
+            current_app.logger.exception('Erro ao salvar lead do DirectOS')
+            flash(
+                'Nao foi possivel enviar a solicitacao agora. Tente novamente em instantes.',
+                'danger',
+            )
+            return render_template(
+                'solicitar_implantacao_directos.html',
+                form_data=form_data,
+                utm=utm,
+            ), 500
+
+    return render_template(
+        'solicitar_implantacao_directos.html',
+        form_data={},
+        utm=utm,
+    )
     
 @empresa_bp.route('/contato', methods=['GET', 'POST'])
 def contato():

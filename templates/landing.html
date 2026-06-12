@@ -1,9 +1,10 @@
 {% extends 'base.html' %}
 
 {% block content %}
+{% set directos_implantacao_url = url_for('empresa.solicitar_implantacao_directos') %}
 <main class="platform-landing">
 
-    <section class="platform-hero" style="background-image: linear-gradient(90deg, rgba(0, 20, 45, 0.94), rgba(0, 33, 71, 0.78), rgba(0, 33, 71, 0.28)), url('{{ url_for('static', filename='img/platform-hero.png') }}');">
+    <section class="platform-hero">
         <div class="container">
             <div class="platform-hero-content">
                 <span class="platform-kicker">DirectTI Portal</span>
@@ -17,7 +18,7 @@
                 </p>
 
                 <div class="platform-hero-actions">
-                    <a href="#contato" class="btn btn-warning fw-bold">
+                    <a href="{{ directos_implantacao_url }}" class="btn btn-warning fw-bold">
                         Solicitar implantação assistida
                     </a>
 
@@ -76,7 +77,7 @@
                         <li>Implantação inicial acompanhada</li>
                     </ul>
 
-                    <a href="#contato">
+                    <a href="{{ directos_implantacao_url }}">
                         Solicitar implantação assistida <i class="bi bi-arrow-right"></i>
                     </a>
 
@@ -177,7 +178,7 @@
                         recibo geral da OS e recibo individual por pagamento.
                     </p>
                     <strong>Controle profissional</strong>
-                    <a href="#contato" class="btn btn-primary fw-bold">
+                    <a href="{{ directos_implantacao_url }}" class="btn btn-primary fw-bold">
                         Solicitar implantação assistida
                     </a>
                 </article>
@@ -189,7 +190,7 @@
                         para envio manual pelo WhatsApp.
                     </p>
                     <strong>Atendimento assistido</strong>
-                    <a href="#contato" class="btn btn-outline-primary fw-bold">
+                    <a href="{{ directos_implantacao_url }}" class="btn btn-outline-primary fw-bold">
                         Falar sobre implantação
                     </a>
                 </article>
@@ -354,7 +355,7 @@
                         Solicite uma implantação assistida para configurar o DirectOS conforme sua operação
                         e iniciar o uso com acompanhamento direto.
                     </p>
-                    <a href="{{ url_for('empresa.contato') }}">
+                    <a href="{{ directos_implantacao_url }}">
                         Solicitar implantação assistida <i class="bi bi-arrow-right"></i>
                     </a>
                 </article>
@@ -397,7 +398,7 @@
             </p>
 
             <div>
-                <a href="#contato" class="btn btn-warning fw-bold">
+                <a href="{{ directos_implantacao_url }}" class="btn btn-warning fw-bold">
                     Solicitar implantação assistida
                 </a>
 

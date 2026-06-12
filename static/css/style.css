@@ -506,16 +506,45 @@ body {
 
 .platform-hero {
     align-items: center;
-    background-position: center;
-    background-size: cover;
+    background:
+        linear-gradient(115deg, rgba(0, 20, 45, 0.98) 0%, rgba(0, 33, 71, 0.94) 48%, rgba(8, 75, 121, 0.86) 100%),
+        linear-gradient(135deg, transparent 0 62%, rgba(255, 140, 0, 0.16) 62% 64%, transparent 64%),
+        linear-gradient(24deg, transparent 0 70%, rgba(255, 255, 255, 0.1) 70% 71%, transparent 71%);
     color: #fff;
     display: flex;
     min-height: min(760px, calc(100vh - 28px));
+    overflow: hidden;
     padding: 7rem 0 6rem;
+    position: relative;
+}
+
+.platform-hero::before {
+    background-image:
+        linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: 48px 48px;
+    content: "";
+    inset: 0;
+    opacity: 0.38;
+    pointer-events: none;
+    position: absolute;
+}
+
+.platform-hero::after {
+    background:
+        linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent),
+        repeating-linear-gradient(135deg, transparent 0 18px, rgba(255,255,255,0.045) 18px 19px, transparent 19px 42px);
+    content: "";
+    inset: 0;
+    opacity: 0.5;
+    pointer-events: none;
+    position: absolute;
 }
 
 .platform-hero-content {
     max-width: 760px;
+    position: relative;
+    z-index: 1;
 }
 
 .platform-kicker {
@@ -793,6 +822,157 @@ body {
     flex-wrap: wrap;
     gap: 0.8rem;
     justify-content: center;
+}
+
+.directos-request-page {
+    background: #f6f8fb;
+    margin-top: -20px;
+    min-height: calc(100vh - 140px);
+    padding: 3rem 0 4rem;
+}
+
+.directos-request-hero {
+    align-items: flex-end;
+    background:
+        linear-gradient(90deg, rgba(0, 20, 45, 0.95), rgba(0, 33, 71, 0.76)),
+        url("../img/platform-hero.png");
+    background-position: center;
+    background-size: cover;
+    border-radius: 8px;
+    color: #fff;
+    display: flex;
+    gap: 1.5rem;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    min-height: 310px;
+    padding: clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.directos-request-hero h1 {
+    font-size: clamp(2.35rem, 5vw, 4rem);
+    letter-spacing: 0;
+    line-height: 0.96;
+    margin: 0;
+    max-width: 760px;
+    text-transform: uppercase;
+}
+
+.directos-request-hero p {
+    color: rgba(255,255,255,0.84);
+    line-height: 1.7;
+    margin: 1rem 0 0;
+    max-width: 720px;
+}
+
+.directos-request-hero .btn,
+.directos-request-form .btn {
+    border-radius: 6px;
+    min-height: 46px;
+    text-transform: uppercase;
+}
+
+.directos-request-layout {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1fr);
+}
+
+.directos-request-summary,
+.directos-request-form {
+    background: #fff;
+    border: 1px solid #e7edf5;
+    border-radius: 8px;
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
+    padding: clamp(1.25rem, 3vw, 1.75rem);
+}
+
+.directos-request-summary h2 {
+    color: #182230;
+    font-size: clamp(1.9rem, 4vw, 2.65rem);
+    letter-spacing: 0;
+    line-height: 1;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+.directos-request-summary p {
+    color: #667085;
+    line-height: 1.7;
+    margin: 1rem 0 1.25rem;
+}
+
+.directos-request-points {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.directos-request-points div {
+    align-items: flex-start;
+    background: #f8fafc;
+    border: 1px solid #edf2f7;
+    border-radius: 8px;
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.85rem;
+}
+
+.directos-request-points i {
+    align-items: center;
+    background: #eef5ff;
+    border-radius: 8px;
+    color: #0056b3;
+    display: inline-flex;
+    flex: 0 0 38px;
+    height: 38px;
+    justify-content: center;
+    width: 38px;
+}
+
+.directos-request-points span {
+    color: #344054;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.directos-request-form .form-label {
+    color: #344054;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.directos-request-form .form-control {
+    background: #f8fafc;
+    border-color: #dfe7f0;
+    border-radius: 6px;
+    min-height: 46px;
+}
+
+.directos-request-form textarea.form-control {
+    min-height: 132px;
+}
+
+@media (max-width: 991.98px) {
+    .directos-request-hero,
+    .directos-request-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .directos-request-hero {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .directos-request-page {
+        padding: 2rem 0 3rem;
+    }
+
+    .directos-request-hero .btn {
+        width: 100%;
+    }
 }
 
 .auth-page {
