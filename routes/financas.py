@@ -2078,9 +2078,11 @@ def dashboard():
         carteiras = listar_carteiras_ativas(cursor, usuario_id)
         resumo_carteiras = obter_resumo_carteiras(cursor, usuario_id)
 
-        if resumo_carteiras['ativas'] > 0 and mes_sel == mes_atual and ano_sel == ano_atual:
+        if resumo_carteiras['ativas'] > 0:
             saldo_bancario = resumo_carteiras['saldo_total']
-            sincronizar_caixa_com_carteiras(cursor, usuario_id, mes_sel, ano_sel)
+
+            if mes_sel == mes_atual and ano_sel == ano_atual:
+                sincronizar_caixa_com_carteiras(cursor, usuario_id, mes_sel, ano_sel)
 
         cursor.execute(f"""
             SELECT L.*, C.Nome as CategoriaNome, C.CorHex,
