@@ -1,4 +1,5 @@
-from flask import Flask
+from flask import Flask, jsonify
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_login import LoginManager
 from flask_mail import Mail
 from flask_wtf import CSRFProtect
@@ -31,6 +32,7 @@ from scheduler import configurar_scheduler
 load_dotenv()
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 @app.template_filter('split_techs')
 def split_techs(value):
@@ -103,6 +105,10 @@ def inject_info():
 
 app.register_blueprint(empresa_bp)
 app.register_blueprint(curriculo_bp)
+
+@app.get('/health')
+def health_check():
+    return jsonify(status='ok'), 200
 
 @app.errorhandler(404)
 def page_not_found(e):

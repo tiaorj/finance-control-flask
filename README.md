@@ -1,22 +1,43 @@
-Sistema de Controle Financeiro Pessoal com Python e Flask
+# Controle Financeiro
 
-Projeto pessoal desenvolvido com Python, Flask e SQL Server, com o objetivo de criar uma plataforma web para controle financeiro, organização de informações pessoais e automação de processos.
+Aplicação web em Python, Flask e SQL Server para organização de receitas, despesas, categorias, carteiras, metas e períodos financeiros. A área restrita utiliza autenticação de usuários e mantém o banco SQL Server existente.
 
-O sistema possui área restrita com login, permitindo que apenas usuários autenticados acessem os dados financeiros. A aplicação foi pensada inicialmente para uso pessoal, mas com estrutura preparada para evoluir futuramente para uma solução pública ou SaaS.
+## Publicação independente
 
-Entre as principais funcionalidades estão o cadastro e gerenciamento de lançamentos financeiros, controle por mês e ano de referência, categorias, carteiras, valores estimados e realizados, status de pagamento, datas de vencimento e observações.
+Domínio de produção: `https://financeiro.directti.dev.br`
 
-Além da parte financeira, o projeto também serve como ambiente de aprendizado e evolução técnica, reunindo práticas de desenvolvimento web, organização de código, integração com banco de dados, autenticação de usuários e uso de boas práticas com Flask.
+A aplicação não depende do site institucional para autenticação, rotas ou execução. O entrypoint WSGI é `app:app` e os arquivos públicos ficam em `static/`.
 
-Tecnologias utilizadas
-Python
-Flask
-SQL Server
-HTML
-CSS
-Bootstrap
-JavaScript
-Git/GitHub
-Objetivo do projeto
+## Variáveis obrigatórias
 
-O principal objetivo deste projeto é aprimorar conhecimentos em desenvolvimento web com Python e Flask, criar uma aplicação útil para controle financeiro pessoal e preparar uma base sólida para futuras melhorias, como dashboards, relatórios, automações, API REST e publicação em ambiente de produção.
+Configure os valores reais somente no ambiente da plataforma, sem versionar segredos:
+
+- `APP_URL`
+- `FLASK_SECRET_KEY`
+- `FLASK_ENV=production`
+- `FLASK_DEBUG=false`
+- `DB_SERVER`
+- `DB_DATABASE`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `DB_BACKEND` (`pyodbc` quando o driver ODBC estiver disponível)
+- `DB_DRIVER`
+- `DB_ENCRYPT`
+- `DB_TRUST_SERVER_CERTIFICATE`
+
+As variáveis de e-mail são necessárias apenas para os recursos que enviam mensagens. Consulte `.env.example` para placeholders sem segredos.
+
+## Instalação e inicialização
+
+```bash
+python -m pip install -r requirements.txt
+gunicorn --bind 0.0.0.0:${PORT:-8000} app:app
+```
+
+O `Dockerfile` existente usa Gunicorn e aceita a porta fornecida pela plataforma.
+
+## Domínio e proxy HTTPS
+
+Aponte o DNS de `financeiro.directti.dev.br` para a plataforma de hospedagem, habilite TLS e encaminhe `X-Forwarded-For`, `X-Forwarded-Proto` e `X-Forwarded-Host` a partir de um proxy confiável. A aplicação usa `ProxyFix` para reconhecer esses cabeçalhos.
+
+O endpoint `GET /health` retorna `{"status":"ok"}` sem acessar o banco e pode ser usado como health check.

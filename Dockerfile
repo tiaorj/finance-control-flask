@@ -1,37 +1,37 @@
-# Usa uma imagem oficial do Python
+# Use uma imagem oficial do Python para execucao em producao
 FROM python:3.11-slim
 
-# Evita interrupções por prompts de configuração
+# Evita interrupcoes por prompts de configuracao
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 2. Instala apenas o necessário para baixar a chave e o driver
+# Instala ferramentas necessarias para o driver SQL Server
 RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
     ca-certificates \
     && apt-get clean
 
-# 3. Baixa a chave da Microsoft e converte para o formato de keyring (substitui o apt-key)
+# Baixa a chave da Microsoft e converte para o formato de keyring
 RUN curl -sSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
 
-# 4. Adiciona o repositório usando a chave específica criada acima
+# Adiciona o repositorio usando a chave especifica criada acima
 RUN echo "deb [arch=amd64,arm64,armhf signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/11/prod bullseye main" > /etc/apt/sources.list.d/mssql-release.list
 
-# 5. Instala o Driver ODBC 17 e dependências do pyodbc
+# Instala o Driver ODBC 17 e dependencias do pyodbc
 RUN apt-get update && ACCEPT_EULA=Y apt-get install -y \
     msodbcsql17 \
     unixodbc-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# 6. Configuração do ambiente de trabalho
+# Configura o diretorio de trabalho
 WORKDIR /app
 
-# 7. Instalação das dependências Python
+# Instala as dependencias Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 8. Copia o código fonte[cite: 1]
+# Copia o codigo-fonte
 COPY . .
 
-# 9. Inicialização com Gunicorn para o Render
-CMD ["gunicorn", "--bind", "0.0.0.0:10000", "app:app"]
+# Inicia o servidor WSGI para producao usando a porta da plataforma
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT:-8080} app:app"]
